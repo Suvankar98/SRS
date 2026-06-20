@@ -1,0 +1,67 @@
+﻿@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f4f9ff;
+  --foreground: #003d73;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #e2e8f0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Georgia, sans-serif;
+  --font-mono: Consolas, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Georgia, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(0, 91, 170, 0.28);
+  color: #003d73;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark ::selection {
+  background: rgba(56, 189, 248, 0.3);
+  color: #e2e8f0;
+}
+
+.dark .danger-btn {
+  border-color: #ef4444;
+  background: #dc2626;
+}
+
+.dark .danger-btn:hover {
+  border-color: #f87171;
+  background: #b91c1c;
+}
+
+.danger-btn {
+  border: 1px solid #fca5a5;
+  background: #ef4444;
+  color: #ffffff;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.danger-btn:hover {
+  background: #dc2626;
+  border-color: #f87171;
+}
+

@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+model User {
+  id              Int              @id @default(autoincrement())
+  name            String
+  username        String           @unique
+  password        String
+  whatsappNumber  String?
+  role            UserRole
+  assignedCalls   ServiceRequest[]
+  createdAt       DateTime         @default(now())
+}
+
+model Product {
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  createdAt       DateTime         @default(now())
+}
+
+model CallType {
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  createdAt       DateTime         @default(now())
+}
+
+model ServiceRequest {
+  id            Int       @id @default(autoincrement())
+  docketNumber  String    @unique
+  name          String
+  company       String
+  phoneNumber1  String
+  phoneNumber2  String?
+  fullAddress   String
+  area          String
+  product       String
+  callType      String
+  assignedToId  Int?
+  assignedTo    User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+}
