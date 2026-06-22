@@ -115,23 +115,27 @@ export default async function AdminPage() {
               Add member
             </button>
           </form>
-          <div className="mt-4 space-y-2 text-sm">
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            Team members: {staffMembers.length}
+          </div>
+          <div className="mt-3 max-h-[26rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {staffMembers.map((member) => (
               <form
                 key={member.id}
                 action={deleteStaff}
-                className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-blue-200 bg-white px-3 py-3 text-blue-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <input type="hidden" name="id" value={member.id} />
-                <p className="min-w-0 flex-1 truncate">
-                  {member.name} ({member.username})
-                </p>
-                <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-blue-600 dark:bg-slate-700 dark:text-slate-200">
-                  {member.whatsappNumber ? member.whatsappNumber : "No WA"}
-                </span>
-                <span className="rounded-full bg-blue-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:bg-slate-600 dark:text-slate-100">
-                  {member.role.toLowerCase()}
-                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-blue-900 dark:text-slate-100">{member.name}</p>
+                  <p className="text-xs text-blue-600 dark:text-slate-300">@{member.username}</p>
+                  <p className="mt-1 text-xs text-blue-700 dark:text-slate-200">
+                    WhatsApp: {member.whatsappNumber ? member.whatsappNumber : "Not provided"}
+                  </p>
+                  <span className="mt-2 inline-flex rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:bg-slate-600 dark:text-slate-100">
+                    {member.role.toLowerCase()}
+                  </span>
+                </div>
                 <button
                   type="submit"
                   aria-label={`Delete ${member.name}`}

@@ -114,6 +114,41 @@ export async function createServiceRequest(formData: FormData) {
   redirect(`/dashboard?created=${request.docketNumber}`);
 }
 
+export async function updateServiceRequestDetails(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+
+  const requestId = Number(getRequiredField(formData, "requestId"));
+  const name = getRequiredField(formData, "name");
+  const company = getRequiredField(formData, "company");
+  const phoneNumber1 = getRequiredField(formData, "phoneNumber1");
+  const fullAddress = getRequiredField(formData, "fullAddress");
+  const area = getRequiredField(formData, "area");
+  const product = getRequiredField(formData, "product");
+  const callType = getRequiredField(formData, "callType");
+  const phoneNumber2Raw = formData.get("phoneNumber2");
+  const phoneNumber2 =
+    typeof phoneNumber2Raw === "string" && phoneNumber2Raw.trim() !== ""
+      ? phoneNumber2Raw.trim()
+      : null;
+
+  await prisma.serviceRequest.update({
+    where: { id: requestId },
+    data: {
+      name,
+      company,
+      phoneNumber1,
+      phoneNumber2,
+      fullAddress,
+      area,
+      product,
+      callType,
+    },
+  });
+
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+
 export async function addStaff(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
@@ -307,6 +342,47 @@ export async function assignServiceCall(formData: FormData) {
       }
     }
   }
+
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+
+export async function updateServiceCallStatus(formData: FormData) {
+  const session = await requireSession();
+
+  // Only employees can update status
+  if (session.role !== APP_ROLES.EMPLOYEE) {
+    redirect("/dashboard");
+  }
+
+  const requestId = Number(getRequiredField(formData, "requestId"));
+  const status = getRequiredField(formData, "status");
+  const statusReason = formData.get("statusReason");
+  const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
+
+  // Validate status values
+  const validStatuses = ["Pending", "Cancel", "Visit & Reschedule", "Close"];
+  if (!validStatuses.includes(status)) {
+    throw new Error("Invalid status");
+  }
+
+  // Verify the request belongs to the employee
+  const request = await prisma.serviceRequest.findUnique({
+    where: { id: requestId },
+    select: { assignedToId: true },
+  });
+
+  if (request?.assignedToId !== session.userId) {
+    redirect("/dashboard");
+  }
+
+  await prisma.serviceRequest.update({
+    where: { id: requestId },
+    data: {
+      status,
+      statusReason: reasonValue || null,
+    },
+  });
 
   revalidatePath("/dashboard");
   redirect("/dashboard");

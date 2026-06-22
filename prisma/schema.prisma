@@ -37,17 +37,19 @@ model CallType {
 }
 
 model ServiceRequest {
-  id            Int       @id @default(autoincrement())
-  docketNumber  String    @unique
-  name          String
-  company       String
-  phoneNumber1  String
-  phoneNumber2  String?
-  fullAddress   String
-  area          String
-  product       String
-  callType      String
-  assignedToId  Int?
-  assignedTo    User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdAt     DateTime  @default(now())
+  id              Int       @id @default(autoincrement())
+  docketNumber    String    @unique
+  name            String
+  company         String
+  phoneNumber1    String
+  phoneNumber2    String?
+  fullAddress     String
+  area            String
+  product         String
+  callType        String
+  status          String?   @default("Pending")
+  statusReason    String?
+  assignedToId    Int?
+  assignedTo      User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
 }

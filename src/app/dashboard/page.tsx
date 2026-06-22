@@ -1,8 +1,12 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { assignServiceCall, logout } from "../actions";
 import { BrandLogo } from "../brand-logo";
+import { DocketDetailsModal } from "../docket-details-modal";
+import { StatusUpdateModal } from "../status-update-modal";
+import { getStatusPillClass } from "../status-utils";
+import { RemarkPopup } from "../remark-popup";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -16,18 +20,18 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  const isAdmin = session.role === APP_ROLES.ADMIN;
+  const isEmployee = session.role === APP_ROLES.EMPLOYEE;
+  const canEditDocket = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
+  const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
 
-  const [requests, employees] = await Promise.all([
+  const visibleWhere = isEmployee ? { assignedToId: session.userId } : undefined;
+
+  const [requests, employees, products, callTypes, totalRequests, assignedRequests] = await Promise.all([
     prisma.serviceRequest.findMany({
-      where: session.role === APP_ROLES.EMPLOYEE ? { assignedToId: session.userId } : undefined,
-      include: {
-        assignedTo: {
-          select: { id: true, name: true, username: true },
-        },
-      },
+      where: visibleWhere,
       orderBy: { id: "asc" },
+      take: 10,
     }),
     canAssign
       ? prisma.user.findMany({
@@ -36,16 +40,16 @@ export default async function DashboardPage() {
           select: { id: true, name: true },
         })
       : Promise.resolve([]),
+    prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.callType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.serviceRequest.count({ where: visibleWhere }),
+    prisma.serviceRequest.count({ where: { ...(visibleWhere ?? {}), assignedToId: { not: null } } }),
   ]);
 
-  const totalRequests = requests.length;
-  const assignedRequests = requests.filter((request) => request.assignedToId !== null).length;
   const unassignedRequests = totalRequests - assignedRequests;
-  const todaysRequests = requests.filter((request) => isToday(request.createdAt)).length;
-  const allocationRate = totalRequests === 0 ? 0 : Math.round((assignedRequests / totalRequests) * 100);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
+    <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
       <section className="grid min-h-[calc(100vh-3rem)] gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="rounded-[2rem] border border-blue-200/70 bg-gradient-to-b from-blue-900 to-blue-700 p-4 text-blue-50 shadow-[0_24px_70px_rgba(30,64,175,0.35)]">
           <div className="rounded-2xl bg-white/10 px-3 py-4 backdrop-blur">
@@ -64,7 +68,7 @@ export default async function DashboardPage() {
               <span className="h-2 w-2 rounded-full bg-white" />
               Dashboard
             </Link>
-            {(isAdmin || canAssign) && (
+            {(session.role === APP_ROLES.ADMIN || canAssign) && (
               <Link
                 href="/form"
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-blue-100 transition hover:bg-white/10"
@@ -73,7 +77,7 @@ export default async function DashboardPage() {
                 New Call
               </Link>
             )}
-            {isAdmin && (
+            {session.role === APP_ROLES.ADMIN && (
               <Link
                 href="/admin"
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-blue-100 transition hover:bg-white/10"
@@ -95,48 +99,25 @@ export default async function DashboardPage() {
         </aside>
 
         <div className="rounded-[2rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(29,78,216,0.12)] dark:border-slate-700 dark:bg-slate-900 sm:p-6">
-          <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-4 py-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 sm:px-5 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
+          <header className={`mb-5 grid gap-3 ${isEmployee ? "" : "xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"}`}>
+            <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-5 py-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800">
               <p className="text-xs uppercase tracking-[0.25em] text-blue-500 dark:text-sky-300">Overview</p>
-              <h2 className="text-2xl font-semibold tracking-tight text-blue-950 dark:text-slate-100">Service dashboard</h2>
-              <p className="text-sm text-blue-700 dark:text-slate-300">
-                {session.role === APP_ROLES.EMPLOYEE
-                  ? "Track calls currently assigned to you."
-                  : "Allocate calls quickly and monitor workload."}
+              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-blue-950 dark:text-slate-100">Service dashboard</h2>
+              <p className="mt-1 text-sm text-blue-700 dark:text-slate-300">
+                {isEmployee
+                  ? "Open any docket to copy number and address details."
+                  : "Open any docket to edit call details and keep data clean."}
               </p>
             </div>
-            <div className="rounded-xl border border-blue-200 bg-white px-4 py-3 text-right dark:border-slate-600 dark:bg-slate-900">
-              <p className="text-xs uppercase tracking-[0.2em] text-blue-500 dark:text-sky-300">Allocation rate</p>
-              <p className="text-2xl font-semibold text-blue-900 dark:text-slate-100">{allocationRate}%</p>
-            </div>
-          </header>
 
-          <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              title="Total Calls"
-              value={totalRequests}
-              tone="from-blue-700 to-blue-500"
-              subtitle="All visible service calls"
-            />
-            <MetricCard
-              title="Assigned"
-              value={assignedRequests}
-              tone="from-blue-800 to-blue-600"
-              subtitle="Allocated to employees"
-            />
-            <MetricCard
-              title="Unassigned"
-              value={unassignedRequests}
-              tone="from-blue-500 to-blue-400"
-              subtitle="Need allocation"
-            />
-            <MetricCard
-              title="Today"
-              value={todaysRequests}
-              tone="from-blue-900 to-blue-700"
-              subtitle="Calls created today"
-            />
-          </section>
+            {showSummaryCards && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MetricCard title="Total Calls" value={totalRequests} subtitle="All visible complaints" />
+                <MetricCard title="Assigned" value={assignedRequests} subtitle="Allocated to employee" />
+                <MetricCard title="Unassigned" value={unassignedRequests} subtitle="Need allocation" />
+              </div>
+            )}
+          </header>
 
           {requests.length === 0 ? (
             <section className="rounded-2xl border border-dashed border-blue-300 bg-blue-50/50 px-6 py-16 text-center text-blue-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -150,25 +131,49 @@ export default async function DashboardPage() {
                   <article key={request.id} className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 text-sm text-blue-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-blue-600 dark:text-sky-300">{request.docketNumber}</p>
-                        <p className="font-semibold">{request.name}</p>
-                        <p className="text-xs text-blue-600 dark:text-slate-300">{request.area}</p>
+                        <div className="text-xs uppercase tracking-[0.12em] text-blue-600 dark:text-sky-300">
+                          <DocketDetailsModal
+                            request={request}
+                            canEdit={canEditDocket}
+                            products={products}
+                            callTypes={callTypes}
+                          />
+                        </div>
+                        <p className="font-semibold text-blue-950 dark:text-slate-100">{request.name}</p>
+                        <p className="text-xs font-normal text-blue-700 dark:text-slate-300">{request.company}</p>
+                        <p className="text-[11px] text-blue-600 dark:text-slate-300">{getComplaintAgeLabel(request.createdAt)}</p>
                       </div>
-                      {request.assignedTo ? (
-                        <StatusPill label="Allocated" className="bg-blue-100 text-blue-800 ring-blue-300 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-700" />
-                      ) : (
-                        <StatusPill label="Pending" className="bg-blue-50 text-blue-700 ring-blue-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-700" />
+                      {!isEmployee && (
+                        <StatusPill
+                          label={request.status || "Pending"}
+                          className={getStatusPillClass(request.status)}
+                        />
                       )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                      <Detail label="Company" value={request.company} />
+                      <Detail label="Location" value={request.area} />
                       <Detail label="Product" value={request.product} />
                       <Detail label="Call Type" value={request.callType} />
-                      <Detail
-                        label="Assigned To"
-                        value={request.assignedTo ? `${request.assignedTo.name} (${request.assignedTo.username})` : "Unassigned"}
-                      />
+                      <Detail label="Phone" value={request.phoneNumber1} />
+                      {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
+                      {isEmployee ? (
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600 dark:text-slate-300">Status</p>
+                          <div className="mt-1">
+                            <StatusUpdateModal request={request} />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <StatusPill label={request.status || "Pending"} className={getStatusPillClass(request.status)} />
+                            {request.statusReason && (
+                              <RemarkPopup remark={request.statusReason} />
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {canAssign ? (
@@ -199,68 +204,62 @@ export default async function DashboardPage() {
                 ))}
               </div>
 
-              <div className="hidden md:block md:overflow-x-auto">
-                <table className="w-full table-fixed divide-y divide-blue-100 text-left text-xs dark:divide-slate-700 sm:text-sm">
-                  <colgroup>
-                    <col style={{ width: "9%" }} />
-                    <col style={{ width: "13%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "13%" }} />
-                    <col style={{ width: "19%" }} />
-                  </colgroup>
+              <div className="hidden md:block">
+                <table className="w-full table-auto divide-y divide-blue-100 text-left text-xs dark:divide-slate-700">
                   <thead className="bg-blue-50 text-blue-700 dark:bg-slate-800 dark:text-slate-200">
                     <tr>
                       <Th>Docket</Th>
+                      <Th>Days Old</Th>
                       <Th>Name</Th>
-                      <Th>Company</Th>
+                      <Th>Location</Th>
                       <Th>Product</Th>
                       <Th>Call Type</Th>
                       <Th>Status</Th>
-                      <Th>Assigned To</Th>
                       {canAssign ? <Th>Allocate</Th> : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-blue-100 bg-white dark:divide-slate-700 dark:bg-slate-900">
                     {requests.map((request) => (
                       <tr key={request.id} className="align-top text-blue-900 dark:text-slate-100">
-                        <Td strong>{request.docketNumber}</Td>
-                        <Td>
-                          <div>
-                            <p className="font-medium text-blue-900 dark:text-slate-100">{request.name}</p>
-                            <p className="text-xs text-blue-600 dark:text-slate-300">{request.area}</p>
-                          </div>
+                        <Td strong>
+                          <DocketDetailsModal
+                            request={request}
+                            canEdit={canEditDocket}
+                            products={products}
+                            callTypes={callTypes}
+                          />
                         </Td>
-                        <Td>{request.company}</Td>
+                        <Td>{getComplaintAgeLabel(request.createdAt)}</Td>
+                        <Td>
+                          <p className="font-semibold text-blue-950 dark:text-slate-100">{request.name}</p>
+                          <p className="mt-0.5 text-xs font-normal text-blue-700 dark:text-slate-300">{request.company}</p>
+                        </Td>
+                        <Td>{request.area}</Td>
                         <Td>{request.product}</Td>
                         <Td>{request.callType}</Td>
                         <Td>
-                          {request.assignedTo ? (
-                            <StatusPill label="Allocated" className="bg-blue-100 text-blue-800 ring-blue-300 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-700" />
+                          {isEmployee ? (
+                            <StatusUpdateModal request={request} />
                           ) : (
-                            <StatusPill label="Pending" className="bg-blue-50 text-blue-700 ring-blue-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-700" />
-                          )}
-                        </Td>
-                        <Td>
-                          {request.assignedTo ? (
-                            <div>
-                              <p className="font-medium text-blue-900 dark:text-slate-100">{request.assignedTo.name}</p>
-                              <p className="text-xs text-blue-600 dark:text-slate-300">{request.assignedTo.username}</p>
+                            <div className="space-y-1">
+                              <StatusPill
+                                label={request.status || "Pending"}
+                                className={getStatusPillClass(request.status)}
+                              />
+                              {request.statusReason && (
+                                <RemarkPopup remark={request.statusReason} />
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-blue-500 dark:text-slate-400">Unassigned</span>
                           )}
                         </Td>
                         {canAssign ? (
                           <Td>
-                            <form action={assignServiceCall} className="flex flex-col gap-2">
+                            <form action={assignServiceCall} className="flex items-center gap-2">
                               <input type="hidden" name="requestId" value={request.id} />
                               <select
                                 name="assignedToId"
                                 defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                                className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                               >
                                 <option value="">Select employee</option>
                                 {employees.map((employee) => (
@@ -271,7 +270,7 @@ export default async function DashboardPage() {
                               </select>
                               <button
                                 type="submit"
-                                className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+                                className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
                               >
                                 Save
                               </button>
@@ -291,33 +290,22 @@ export default async function DashboardPage() {
   );
 }
 
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  tone,
-}: {
-  title: string;
-  value: number;
-  subtitle: string;
-  tone: string;
-}) {
+function MetricCard({ title, value, subtitle }: { title: string; value: number; subtitle: string }) {
   return (
-    <article className="rounded-2xl border border-blue-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-500 dark:text-sky-300">{title}</p>
-          <p className="mt-1 text-2xl font-semibold text-blue-950 dark:text-slate-100">{value}</p>
-          <p className="mt-1 text-xs text-blue-600 dark:text-slate-300">{subtitle}</p>
-        </div>
-        <span className={`h-3 w-14 rounded-full bg-gradient-to-r ${tone}`} />
-      </div>
+    <article className="rounded-xl border border-blue-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+      <p className="text-xs uppercase tracking-[0.2em] text-blue-500 dark:text-sky-300">{title}</p>
+      <p className="mt-1 text-2xl font-semibold text-blue-950 dark:text-slate-100">{value}</p>
+      <p className="mt-1 text-xs text-blue-600 dark:text-slate-300">{subtitle}</p>
     </article>
   );
 }
 
 function StatusPill({ label, className }: { label: string; className: string }) {
-  return <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ring-1 ${className}`}>{label}</span>;
+  return (
+    <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${className}`}>
+      {label}
+    </span>
+  );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -330,20 +318,29 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="break-words px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.12em]">{children}</th>;
+  return <th className="break-words px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em]">{children}</th>;
 }
 
 function Td({ children, strong = false }: { children: React.ReactNode; strong?: boolean }) {
-  return <td className={`px-3 py-3 align-top whitespace-normal break-words ${strong ? "font-semibold text-blue-950 dark:text-slate-100" : ""}`}>{children}</td>;
-}
-
-function isToday(date: Date) {
-  const now = new Date();
-
   return (
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear()
+    <td className={`px-2.5 py-2.5 align-top whitespace-normal break-words text-xs ${strong ? "font-semibold text-blue-950 dark:text-slate-100" : ""}`}>
+      {children}
+    </td>
   );
 }
 
+function getComplaintAgeLabel(date: Date) {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+
+  if (days === 0) {
+    return "Today";
+  }
+
+  if (days === 1) {
+    return "1 day";
+  }
+
+  return `${days} days`;
+}
