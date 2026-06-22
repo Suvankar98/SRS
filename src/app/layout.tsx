@@ -1,6 +1,7 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeToggle } from "./theme-toggle";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "SRS Service Desk",
@@ -20,6 +21,7 @@ export default function RootLayout({
       >
         <ThemeToggle />
         {children}
+        <Analytics />
       </body>
     </html>
   );
