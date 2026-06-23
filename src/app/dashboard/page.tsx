@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
 
   const visibleWhere = isEmployee ? { assignedToId: session.userId } : undefined;
 
-  const [requests, employees, products, callTypes, totalRequests, assignedRequests] = await Promise.all([
+  const [requests, employees, products, callTypes, totalRequests, assignedRequests, currentUser] = await Promise.all([
     prisma.serviceRequest.findMany({
       where: visibleWhere,
       orderBy: { id: "asc" },
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
     prisma.callType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.serviceRequest.count({ where: visibleWhere }),
     prisma.serviceRequest.count({ where: { ...(visibleWhere ?? {}), assignedToId: { not: null } } }),
+    prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } }),
   ]);
 
   const unassignedRequests = totalRequests - assignedRequests;
@@ -100,15 +102,33 @@ export default async function DashboardPage() {
 
         <div className="rounded-[2rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(29,78,216,0.12)] dark:border-slate-700 dark:bg-slate-900 sm:p-6">
           <header className={`mb-5 grid gap-3 ${isEmployee ? "" : "xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"}`}>
-            <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-5 py-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800">
-              <p className="text-xs uppercase tracking-[0.25em] text-blue-500 dark:text-sky-300">Overview</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-blue-950 dark:text-slate-100">Service dashboard</h2>
-              <p className="mt-1 text-sm text-blue-700 dark:text-slate-300">
-                {isEmployee
-                  ? "Open any docket to copy number and address details."
-                  : "Open any docket to edit call details and keep data clean."}
-              </p>
-            </div>
+            {isEmployee ? (
+              <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-5 py-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800">
+                <div className="flex items-center gap-4">
+                  <Image
+                    src={getEmployeeAvatarDataUri(currentUser?.name || "Employee")}
+                    alt={`${currentUser?.name || "Employee"} profile photo`}
+                    width={56}
+                    height={56}
+                    className="h-14 w-14 rounded-full border border-blue-200 object-cover shadow-sm dark:border-slate-600"
+                  />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.25em] text-blue-500 dark:text-sky-300">Employee</p>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight text-blue-950 dark:text-slate-100">
+                      {currentUser?.name || "Employee"}
+                    </h2>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-5 py-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800">
+                <p className="text-xs uppercase tracking-[0.25em] text-blue-500 dark:text-sky-300">Overview</p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight text-blue-950 dark:text-slate-100">Service dashboard</h2>
+                <p className="mt-1 text-sm text-blue-700 dark:text-slate-300">
+                  Open any docket to edit call details and keep data clean.
+                </p>
+              </div>
+            )}
 
             {showSummaryCards && (
               <div className="grid gap-3 sm:grid-cols-3">
@@ -343,4 +363,19 @@ function getComplaintAgeLabel(date: Date) {
   }
 
   return `${days} days`;
+}
+
+function getEmployeeAvatarDataUri(name: string) {
+  const trimmedName = name.trim() || "Employee";
+  const initials = trimmedName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "E";
+
+  const safeLabel = trimmedName.replace(/[<>&"']/g, "");
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0%' stop-color='#1d4ed8'/><stop offset='100%' stop-color='#0ea5e9'/></linearGradient></defs><rect width='96' height='96' rx='48' fill='url(#g)'/><text x='48' y='52' dominant-baseline='middle' text-anchor='middle' font-size='34' font-family='Arial, sans-serif' font-weight='700' fill='white'>${initials}</text><title>${safeLabel}</title></svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

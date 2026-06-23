@@ -197,6 +197,44 @@ export async function deleteStaff(formData: FormData) {
   redirect("/admin?tab=staff");
 }
 
+export async function updateStaff(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN]);
+
+  const id = Number(getRequiredField(formData, "id"));
+  const name = getRequiredField(formData, "name");
+  const username = getRequiredField(formData, "username");
+  const role = getRequiredField(formData, "role");
+  const whatsappRaw = formData.get("whatsappNumber");
+  const whatsappNumber = typeof whatsappRaw === "string" && whatsappRaw.trim() !== "" ? whatsappRaw.trim() : null;
+
+  if (role !== APP_ROLES.MANAGER && role !== APP_ROLES.EMPLOYEE) {
+    throw new Error("Invalid role selected");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { role: true },
+  });
+
+  if (!user || (user.role !== APP_ROLES.MANAGER && user.role !== APP_ROLES.EMPLOYEE)) {
+    redirect("/admin?tab=staff");
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data: {
+      name,
+      username,
+      role,
+      whatsappNumber,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  redirect("/admin?tab=staff");
+}
+
 export async function addProduct(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 

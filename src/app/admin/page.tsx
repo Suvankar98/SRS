@@ -10,6 +10,7 @@ import {
   deleteProduct,
   logout,
   updateCallType,
+  updateStaff,
   updateProduct,
 } from "../actions";
 import { BrandLogo } from "../brand-logo";
@@ -19,12 +20,23 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+type AdminPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getSession();
 
   if (!session || session.role !== APP_ROLES.ADMIN) {
     redirect("/dashboard");
   }
+
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const editStaffParam = resolvedSearchParams.editStaff;
+  const editingStaffId = Number(
+    Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam,
+  );
+  const hasEditingStaff = Number.isFinite(editingStaffId) && editingStaffId > 0;
 
   const [staffMembers, products, callTypes] = await Promise.all([
     prisma.user.findMany({
@@ -120,31 +132,93 @@ export default async function AdminPage() {
           </div>
           <div className="mt-3 max-h-[26rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {staffMembers.map((member) => (
-              <form
+              <div
                 key={member.id}
-                action={deleteStaff}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-blue-200 bg-white px-3 py-3 text-blue-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
-                <input type="hidden" name="id" value={member.id} />
                 <div className="min-w-0">
-                  <p className="font-semibold text-blue-900 dark:text-slate-100">{member.name}</p>
-                  <p className="text-xs text-blue-600 dark:text-slate-300">@{member.username}</p>
-                  <p className="mt-1 text-xs text-blue-700 dark:text-slate-200">
-                    WhatsApp: {member.whatsappNumber ? member.whatsappNumber : "Not provided"}
-                  </p>
-                  <span className="mt-2 inline-flex rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:bg-slate-600 dark:text-slate-100">
-                    {member.role.toLowerCase()}
-                  </span>
+                  {hasEditingStaff && editingStaffId === member.id ? (
+                    <form action={updateStaff} className="space-y-2">
+                      <input type="hidden" name="id" value={member.id} />
+                      <input
+                        name="name"
+                        defaultValue={member.name}
+                        placeholder="Full name"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        required
+                      />
+                      <input
+                        name="username"
+                        defaultValue={member.username}
+                        placeholder="Username"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        required
+                      />
+                      <input
+                        name="whatsappNumber"
+                        defaultValue={member.whatsappNumber ?? ""}
+                        placeholder="WhatsApp number"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                      />
+                      <select
+                        name="role"
+                        defaultValue={member.role}
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        required
+                      >
+                        <option value={APP_ROLES.EMPLOYEE}>Employee</option>
+                        <option value={APP_ROLES.MANAGER}>Manager</option>
+                      </select>
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+                        >
+                          Save
+                        </button>
+                        <Link
+                          href="/admin?tab=staff"
+                          className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                        >
+                          Cancel
+                        </Link>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-blue-900 dark:text-slate-100">{member.name}</p>
+                      <p className="text-xs text-blue-600 dark:text-slate-300">@{member.username}</p>
+                      <p className="mt-1 text-xs text-blue-700 dark:text-slate-200">
+                        WhatsApp: {member.whatsappNumber ? member.whatsappNumber : "Not provided"}
+                      </p>
+                      <span className="mt-2 inline-flex rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:bg-slate-600 dark:text-slate-100">
+                        {member.role.toLowerCase()}
+                      </span>
+                    </>
+                  )}
                 </div>
-                <button
-                  type="submit"
-                  aria-label={`Delete ${member.name}`}
-                  title="Delete user"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300"
-                >
-                  <TrashIcon />
-                </button>
-              </form>
+                <div className="flex flex-col gap-2">
+                  <form action={deleteStaff}>
+                    <input type="hidden" name="id" value={member.id} />
+                    <button
+                      type="submit"
+                      aria-label={`Delete ${member.name}`}
+                      title="Delete user"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </form>
+                  <Link
+                    href={`/admin?tab=staff&editStaff=${member.id}`}
+                    aria-label={`Edit ${member.name}`}
+                    title="Edit profile"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-700"
+                  >
+                    <EditIcon />
+                  </Link>
+                </div>
+              </div>
             ))}
           </div>
         </article>
@@ -250,6 +324,20 @@ function TrashIcon() {
     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
       <path
         d="M4 7H20M10 11V17M14 11V17M7 7L8 19C8.09 20.05 8.96 20.85 10.01 20.85H13.99C15.04 20.85 15.91 20.05 16 19L17 7M9 7V4.5C9 3.67 9.67 3 10.5 3H13.5C14.33 3 15 3.67 15 4.5V7"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M4 20H8L18.5 9.5C19.33 8.67 19.33 7.33 18.5 6.5C17.67 5.67 16.33 5.67 15.5 6.5L5 17V20H4ZM14.5 7.5L17.5 10.5"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
