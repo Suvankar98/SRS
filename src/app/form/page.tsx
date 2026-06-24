@@ -168,8 +168,7 @@ export default async function FormPage() {
             </label>
           </div>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-blue-500">Submitting this form creates a docket.</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="submit"
               className="inline-flex w-full items-center justify-center rounded-full bg-blue-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-blue-800 sm:w-auto"

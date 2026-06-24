@@ -103,43 +103,43 @@ export function DocketDetailsModal({
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-          <div className="my-4 w-full max-w-2xl rounded-2xl border border-blue-200 bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 border-b border-blue-200 bg-white px-5 py-4">
-              <h3 className="text-lg font-semibold text-blue-950">
+          <div className="my-4 w-full max-w-4xl rounded-[2rem] border border-blue-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.12)]">
+            <div className="sticky top-0 z-10 border-b border-blue-200 bg-white px-5 py-4 sm:px-6">
+              <h3 className="text-2xl font-semibold tracking-tight text-blue-950">
                 Docket Details
               </h3>
-              <p className="text-sm text-blue-600">{request.docketNumber}</p>
+              <p className="text-sm leading-6 text-blue-600">{request.docketNumber}</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 p-5">
-              <GridField label="Name">
+            <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-6">
+              <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <GridField label="Name">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   readOnly={!canEdit}
                   required
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                  className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                 />
               </GridField>
 
-              <GridField label="Company">
+                <GridField label="Company">
                 <input
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   readOnly={!canEdit}
                   required
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                  className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                 />
               </GridField>
 
-              <div className="grid gap-4 sm:grid-cols-2">
                 <GridField label="Phone Number 1">
                   <input
                     value={phoneNumber1}
                     onChange={(e) => setPhoneNumber1(e.target.value)}
                     readOnly={!canEdit}
                     required
-                    className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                    className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                   />
                 </GridField>
 
@@ -148,18 +148,16 @@ export function DocketDetailsModal({
                     value={phoneNumber2}
                     onChange={(e) => setPhoneNumber2(e.target.value)}
                     readOnly={!canEdit}
-                    className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                    className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                   />
                 </GridField>
-              </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
                 <GridField label="Area">
                   {canEdit ? (
                     <select
                       value={area}
                       onChange={(e) => setArea(e.target.value)}
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
                     >
                       {AREAS.map((item) => (
                         <option key={item} value={item}>
@@ -171,7 +169,7 @@ export function DocketDetailsModal({
                     <input
                       value={area}
                       readOnly
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900"
+                      className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950"
                     />
                   )}
                 </GridField>
@@ -181,7 +179,7 @@ export function DocketDetailsModal({
                     <select
                       value={product}
                       onChange={(e) => setProduct(e.target.value)}
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
                     >
                       {products.map((item) => (
                         <option key={item.id} value={item.name}>
@@ -193,7 +191,7 @@ export function DocketDetailsModal({
                     <input
                       value={product}
                       readOnly
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900"
+                      className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950"
                     />
                   )}
                 </GridField>
@@ -203,7 +201,7 @@ export function DocketDetailsModal({
                     <select
                       value={callType}
                       onChange={(e) => setCallType(e.target.value)}
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                      className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
                     >
                       {callTypes.map((item) => (
                         <option key={item.id} value={item.name}>
@@ -215,7 +213,7 @@ export function DocketDetailsModal({
                     <input
                       value={callType}
                       readOnly
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900"
+                      className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950"
                     />
                   )}
                 </GridField>
@@ -228,7 +226,7 @@ export function DocketDetailsModal({
                   onChange={(e) => setFullAddress(e.target.value)}
                   readOnly={!canEdit}
                   required
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                  className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                 />
               </GridField>
 
@@ -239,22 +237,22 @@ export function DocketDetailsModal({
                   onChange={(e) => setComplaintDetails(e.target.value)}
                   readOnly={!canEdit}
                   required
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                  className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                 />
               </GridField>
 
-              <div className="flex flex-col-reverse gap-2 border-t border-blue-200 pt-4 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-3 border-t border-blue-200 pt-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                  className="inline-flex items-center justify-center rounded-full border border-blue-200 px-5 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
                 >
                   Close
                 </button>
                 {canEdit && (
                   <button
                     type="submit"
-                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+                    className="inline-flex items-center justify-center rounded-full bg-blue-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-blue-800"
                   >
                     Save Changes
                   </button>
@@ -271,7 +269,7 @@ export function DocketDetailsModal({
 function GridField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-blue-600">
+      <span className="mb-2 block text-sm font-medium text-blue-700">
         {label}
       </span>
       {children}
