@@ -1,15 +1,8 @@
 ﻿@import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 :root {
   --background: #f4f9ff;
   --foreground: #003d73;
-}
-
-.dark {
-  --background: #020617;
-  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -32,25 +25,6 @@ body {
 ::selection {
   background: rgba(0, 91, 170, 0.28);
   color: #003d73;
-}
-
-.dark {
-  color-scheme: dark;
-}
-
-.dark ::selection {
-  background: rgba(56, 189, 248, 0.3);
-  color: #e2e8f0;
-}
-
-.dark .danger-btn {
-  border-color: #ef4444;
-  background: #dc2626;
-}
-
-.dark .danger-btn:hover {
-  border-color: #f87171;
-  background: #b91c1c;
 }
 
 .danger-btn {

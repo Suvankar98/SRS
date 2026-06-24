@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
@@ -14,6 +14,7 @@ import {
   updateProduct,
 } from "../actions";
 import { BrandLogo } from "../brand-logo";
+import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -47,25 +48,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <header className="mb-6 flex flex-col gap-4 rounded-[2rem] border border-blue-200 bg-white px-6 py-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900 md:flex-row md:items-end md:justify-between">
+      <header className="mb-6 flex flex-col gap-4 rounded-[2rem] border border-blue-200 bg-white px-6 py-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
           <div className="inline-flex rounded-xl border border-blue-200 bg-[#003d73] p-2">
             <BrandLogo width={170} className="h-auto w-auto" />
           </div>
-          <p className="text-sm uppercase tracking-[0.3em] text-blue-500 dark:text-sky-300">Admin</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-blue-950 dark:text-slate-100">Admin panel</h1>
-          <p className="text-sm leading-6 text-blue-600 dark:text-slate-300">Manage employees, managers, products, and call types.</p>
+          <p className="text-sm uppercase tracking-[0.3em] text-blue-500">Admin</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-blue-950">Admin panel</h1>
+          <p className="text-sm leading-6 text-blue-600">Manage employees, managers, products, and call types.</p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center md:w-auto md:justify-end">
           <Link
             href="/dashboard"
-            className="inline-flex h-12 w-full items-center justify-center rounded-full border border-blue-300 bg-white px-4 text-sm font-medium text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full border border-blue-300 bg-white px-4 text-sm font-medium text-blue-700 transition hover:bg-blue-50 sm:w-auto"
           >
             Dashboard
           </Link>
           <Link
             href="/form"
-            className="inline-flex h-12 w-full items-center justify-center rounded-full bg-blue-950 px-4 text-sm font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500 sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full bg-blue-950 px-4 text-sm font-medium text-white transition hover:bg-blue-800 sm:w-auto"
           >
             New call
           </Link>
@@ -81,38 +82,38 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </header>
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="text-lg font-semibold text-blue-950 dark:text-slate-100">Add employee or manager</h2>
+        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-blue-950">Add employee or manager</h2>
           <form action={addStaff} className="mt-4 space-y-3">
             <input
               name="name"
               placeholder="Full name"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
               required
             />
             <input
               name="username"
               placeholder="Unique username"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
               required
             />
             <input
               name="password"
               type="password"
               placeholder="Password"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
               required
             />
             <input
               name="whatsappNumber"
               type="tel"
               placeholder="WhatsApp number (e.g. +919876543210)"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
             />
             <select
               name="role"
               defaultValue={APP_ROLES.EMPLOYEE}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
               required
             >
               <option value={APP_ROLES.EMPLOYEE}>Employee</option>
@@ -120,19 +121,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </select>
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-xl bg-blue-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-blue-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
             >
               Add member
             </button>
           </form>
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-700">
             Team members: {staffMembers.length}
           </div>
           <div className="mt-3 max-h-[26rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {staffMembers.map((member) => (
               <div
                 key={member.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-blue-200 bg-white px-3 py-3 text-blue-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-blue-200 bg-white px-3 py-3 text-blue-700 shadow-sm"
               >
                 <div className="min-w-0">
                   {hasEditingStaff && editingStaffId === member.id ? (
@@ -142,26 +143,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         name="name"
                         defaultValue={member.name}
                         placeholder="Full name"
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
                         required
                       />
                       <input
                         name="username"
                         defaultValue={member.username}
                         placeholder="Username"
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
                         required
                       />
                       <input
                         name="whatsappNumber"
                         defaultValue={member.whatsappNumber ?? ""}
                         placeholder="WhatsApp number"
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
                       />
                       <select
                         name="role"
                         defaultValue={member.role}
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
                         required
                       >
                         <option value={APP_ROLES.EMPLOYEE}>Employee</option>
@@ -170,13 +171,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <div className="flex gap-2">
                         <button
                           type="submit"
-                          className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+                          className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-800"
                         >
                           Save
                         </button>
                         <Link
                           href="/admin?tab=staff"
-                          className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                          className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
                         >
                           Cancel
                         </Link>
@@ -184,12 +185,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </form>
                   ) : (
                     <>
-                      <p className="font-semibold text-blue-900 dark:text-slate-100">{member.name}</p>
-                      <p className="text-xs text-blue-600 dark:text-slate-300">@{member.username}</p>
-                      <p className="mt-1 text-xs text-blue-700 dark:text-slate-200">
+                      <p className="font-semibold text-blue-900">{member.name}</p>
+                      <p className="text-xs text-blue-600">@{member.username}</p>
+                      <p className="mt-1 text-xs text-blue-700">
                         WhatsApp: {member.whatsappNumber ? member.whatsappNumber : "Not provided"}
                       </p>
-                      <span className="mt-2 inline-flex rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:bg-slate-600 dark:text-slate-100">
+                      <span className="mt-2 inline-flex rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
                         {member.role.toLowerCase()}
                       </span>
                     </>
@@ -198,20 +199,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <div className="flex flex-col gap-2">
                   <form action={deleteStaff}>
                     <input type="hidden" name="id" value={member.id} />
-                    <button
-                      type="submit"
-                      aria-label={`Delete ${member.name}`}
+                    <ConfirmSubmitButton
+                      confirmMessage={`Are you sure you want to delete ${member.name}?`}
+                      ariaLabel={`Delete ${member.name}`}
                       title="Delete user"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
                     >
                       <TrashIcon />
-                    </button>
+                    </ConfirmSubmitButton>
                   </form>
                   <Link
                     href={`/admin?tab=staff&editStaff=${member.id}`}
                     aria-label={`Edit ${member.name}`}
                     title="Edit profile"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-700"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50"
                   >
                     <EditIcon />
                   </Link>
@@ -221,94 +222,102 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         </article>
 
-        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="text-lg font-semibold text-blue-950 dark:text-slate-100">Products</h2>
+        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-blue-950">Products</h2>
           <form action={addProduct} className="mt-4 flex gap-2">
             <input
               name="name"
               placeholder="New product"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
               required
             />
             <button
               type="submit"
-              className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+              className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
             >
               Add
             </button>
           </form>
           <div className="mt-4 space-y-2">
             {products.map((product) => (
-              <form key={product.id} action={updateProduct} className="flex flex-col gap-2 sm:flex-row">
-                <input type="hidden" name="id" value={product.id} />
-                <input
-                  name="name"
-                  defaultValue={product.name}
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 sm:whitespace-nowrap"
-                >
-                  Update
-                </button>
-                <button
-                  type="submit"
-                  formAction={deleteProduct}
-                  aria-label={`Delete ${product.name}`}
-                  title="Delete product"
-                  className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300 sm:w-10"
-                >
-                  <TrashIcon />
-                </button>
-              </form>
+              <div key={product.id} className="flex flex-col gap-2 sm:flex-row">
+                <form action={updateProduct} className="flex w-full flex-col gap-2 sm:flex-row">
+                  <input type="hidden" name="id" value={product.id} />
+                  <input
+                    name="name"
+                    defaultValue={product.name}
+                    className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50 sm:whitespace-nowrap"
+                  >
+                    Update
+                  </button>
+                </form>
+                <form action={deleteProduct}>
+                  <input type="hidden" name="id" value={product.id} />
+                  <ConfirmSubmitButton
+                    confirmMessage={`Are you sure you want to delete product ${product.name}?`}
+                    ariaLabel={`Delete ${product.name}`}
+                    title="Delete product"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 sm:w-10"
+                  >
+                    <TrashIcon />
+                  </ConfirmSubmitButton>
+                </form>
+              </div>
             ))}
           </div>
         </article>
 
-        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="text-lg font-semibold text-blue-950 dark:text-slate-100">Call types</h2>
+        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-blue-950">Call types</h2>
           <form action={addCallType} className="mt-4 flex gap-2">
             <input
               name="name"
               placeholder="New call type"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
               required
             />
             <button
               type="submit"
-              className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+              className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
             >
               Add
             </button>
           </form>
           <div className="mt-4 space-y-2">
             {callTypes.map((callType) => (
-              <form key={callType.id} action={updateCallType} className="flex flex-col gap-2 sm:flex-row">
-                <input type="hidden" name="id" value={callType.id} />
-                <input
-                  name="name"
-                  defaultValue={callType.name}
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 sm:whitespace-nowrap"
-                >
-                  Update
-                </button>
-                <button
-                  type="submit"
-                  formAction={deleteCallType}
-                  aria-label={`Delete ${callType.name}`}
-                  title="Delete call type"
-                  className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300 sm:w-10"
-                >
-                  <TrashIcon />
-                </button>
-              </form>
+              <div key={callType.id} className="flex flex-col gap-2 sm:flex-row">
+                <form action={updateCallType} className="flex w-full flex-col gap-2 sm:flex-row">
+                  <input type="hidden" name="id" value={callType.id} />
+                  <input
+                    name="name"
+                    defaultValue={callType.name}
+                    className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50 sm:whitespace-nowrap"
+                  >
+                    Update
+                  </button>
+                </form>
+                <form action={deleteCallType}>
+                  <input type="hidden" name="id" value={callType.id} />
+                  <ConfirmSubmitButton
+                    confirmMessage={`Are you sure you want to delete call type ${callType.name}?`}
+                    ariaLabel={`Delete ${callType.name}`}
+                    title="Delete call type"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 sm:w-10"
+                  >
+                    <TrashIcon />
+                  </ConfirmSubmitButton>
+                </form>
+              </div>
             ))}
           </div>
         </article>
@@ -344,4 +353,5 @@ function EditIcon() {
     </svg>
   );
 }
+
 

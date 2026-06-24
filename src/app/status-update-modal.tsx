@@ -3,7 +3,14 @@
 import React from "react";
 import { updateServiceCallStatus } from "./actions";
 
-export function StatusUpdateModal({ request }: { request: any }) {
+type StatusRequest = {
+  id: string;
+  docketNumber: string;
+  status: string | null;
+  statusReason: string | null;
+};
+
+export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [status, setStatus] = React.useState(request.status || "Pending");
   const [reason, setReason] = React.useState(request.statusReason || "");
@@ -33,32 +40,32 @@ export function StatusUpdateModal({ request }: { request: any }) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 transition hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900"
+        className="inline-flex rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 transition hover:bg-blue-200"
       >
         {request.status || "Pending"}
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <div className="border-b border-blue-200 px-6 py-4 dark:border-slate-700">
-              <h3 className="text-lg font-semibold text-blue-950 dark:text-slate-100">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl">
+            <div className="border-b border-blue-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-blue-950">
                 Update Call Status
               </h3>
-              <p className="mt-1 text-sm text-blue-600 dark:text-slate-400">
+              <p className="mt-1 text-sm text-blue-600">
                 Docket: {request.docketNumber}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div>
-                <label className="block text-sm font-medium text-blue-700 dark:text-slate-200">
+                <label className="block text-sm font-medium text-blue-700">
                   Status
                 </label>
                 <select
                   value={status}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                 >
                   <option value="Pending">Pending</option>
                   <option value="Cancel">Cancel</option>
@@ -69,7 +76,7 @@ export function StatusUpdateModal({ request }: { request: any }) {
 
               {showReasonInput && (
                 <div>
-                  <label className="block text-sm font-medium text-blue-700 dark:text-slate-200">
+                  <label className="block text-sm font-medium text-blue-700">
                     Reason <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -77,7 +84,7 @@ export function StatusUpdateModal({ request }: { request: any }) {
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="Enter reason for this status change..."
                     required={showReasonInput}
-                    className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                     rows={4}
                   />
                 </div>
@@ -87,13 +94,13 @@ export function StatusUpdateModal({ request }: { request: any }) {
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="flex-1 rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+                  className="flex-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
                 >
                   Save Status
                 </button>
@@ -105,5 +112,6 @@ export function StatusUpdateModal({ request }: { request: any }) {
     </>
   );
 }
+
 
 

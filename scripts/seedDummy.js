@@ -36,17 +36,29 @@ async function main() {
     },
   ];
 
-  for (const row of rows) {
-    const created = await prisma.serviceRequest.create({
+  const existing = await prisma.serviceRequest.findMany({
+    select: { docketNumber: true },
+  });
+
+  let highest = 0;
+  for (const entry of existing) {
+    const match = /^srs-(\d+)$/i.exec(entry.docketNumber);
+    if (!match) {
+      continue;
+    }
+    const value = Number.parseInt(match[1], 10);
+    if (!Number.isNaN(value)) {
+      highest = Math.max(highest, value);
+    }
+  }
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    await prisma.serviceRequest.create({
       data: {
-        docketNumber: "TEMP",
+        docketNumber: `srs-${highest + index + 1}`,
         ...row,
       },
-    });
-
-    await prisma.serviceRequest.update({
-      where: { id: created.id },
-      data: { docketNumber: `SRS-${created.id}` },
     });
   }
 

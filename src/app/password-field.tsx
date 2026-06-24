@@ -9,10 +9,6 @@ type PasswordFieldProps = {
 export function PasswordField({ compact = false }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);
 
-  const labelClass = compact
-    ? "mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-blue-100"
-    : "mb-2 block text-sm font-medium text-blue-700";
-
   const inputClass = compact
     ? "h-10 w-full rounded-md border border-white/50 bg-white px-3 pr-10 text-sm text-[#003d73] outline-none transition placeholder:text-slate-400 focus:border-white"
     : "w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 pr-12 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white";
@@ -23,10 +19,10 @@ export function PasswordField({ compact = false }: PasswordFieldProps) {
 
   return (
     <label className="block">
-      <span className={labelClass}>Password</span>
       <div className="relative">
         <input
           name="password"
+          aria-label="Password"
           type={visible ? "text" : "password"}
           placeholder="Enter password"
           className={inputClass}

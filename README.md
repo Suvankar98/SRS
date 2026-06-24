@@ -12,11 +12,27 @@ Set these values in your `.env` file:
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_WHATSAPP_FROM=+14155238886
+PROJECT_LINK=https://your-deployed-app-url.example.com
 ```
 
 Notes:
 - `TWILIO_WHATSAPP_FROM` must be your Twilio WhatsApp-enabled sender number.
 - Employee WhatsApp numbers should be saved in international format, for example `+919876543210`.
+- On deployment (Vercel/Render/etc.), add these same variables in the project environment settings.
+- Set `PROJECT_LINK` to your deployed app URL if you want it included in allocation messages.
+
+### 1.1) What gets sent on allocation
+
+When a manager/admin allocates a service call to an employee, the employee receives:
+- Docket number
+- Customer name
+- Company
+- Primary and alternate phone (if available)
+- Full address
+- Area
+- Product
+- Call type
+- Project link
 
 ### 2) Sync schema changes
 

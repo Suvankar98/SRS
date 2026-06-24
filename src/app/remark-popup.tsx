@@ -10,7 +10,7 @@ export function RemarkPopup({ remark }: { remark: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-800 dark:text-sky-400 dark:decoration-sky-600 dark:hover:text-sky-300"
+        className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-800"
       >
         <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3 shrink-0" aria-hidden="true">
           <path
@@ -28,15 +28,15 @@ export function RemarkPopup({ remark }: { remark: string }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-blue-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            className="w-full max-w-sm rounded-2xl border border-blue-200 bg-white p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-blue-950 dark:text-slate-100">Remark</h3>
+              <h3 className="text-sm font-semibold text-blue-950">Remark</h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg p-1 text-blue-400 transition hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-slate-800"
+                className="rounded-lg p-1 text-blue-400 transition hover:bg-blue-50 hover:text-blue-700"
                 aria-label="Close"
               >
                 <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
@@ -44,7 +44,7 @@ export function RemarkPopup({ remark }: { remark: string }) {
                 </svg>
               </button>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-blue-900 dark:text-slate-200">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-blue-900">
               {remark}
             </p>
           </div>
@@ -53,3 +53,4 @@ export function RemarkPopup({ remark }: { remark: string }) {
     </>
   );
 }
+

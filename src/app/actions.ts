@@ -22,6 +22,26 @@ function redirectToDatabaseError() {
   redirect("/?error=2");
 }
 
+function getHighestDocketSequence(docketNumbers: Array<{ docketNumber: string }>) {
+  let highest = 0;
+
+  for (const entry of docketNumbers) {
+    const match = /^srs-(\d+)$/i.exec(entry.docketNumber);
+    if (!match) {
+      continue;
+    }
+
+    const value = Number.parseInt(match[1], 10);
+    if (Number.isNaN(value)) {
+      continue;
+    }
+
+    highest = Math.max(highest, value);
+  }
+
+  return highest;
+}
+
 async function requireSession() {
   const session = await getSession();
   if (!session) {
@@ -55,8 +75,6 @@ export async function login(formData: FormData) {
     console.error("Authentication failed because the database is unavailable.", error);
     redirectToDatabaseError();
   }
-
-  console.log("login attempt", { username, password, user });
 
   if (!user || user.password !== password) {
     redirect("/?error=1");
@@ -95,6 +113,7 @@ export async function createServiceRequest(formData: FormData) {
   const company = getRequiredField(formData, "company");
   const phoneNumber1 = getRequiredField(formData, "phoneNumber1");
   const fullAddress = getRequiredField(formData, "fullAddress");
+  const complaintDetails = getRequiredField(formData, "complaintDetails");
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
@@ -105,24 +124,27 @@ export async function createServiceRequest(formData: FormData) {
       : null;
 
   const request = await prisma.$transaction(async (transaction) => {
+    const existingDockets = await transaction.serviceRequest.findMany({
+      select: { docketNumber: true },
+    });
+    const nextSequence = getHighestDocketSequence(existingDockets) + 1;
+
     const created = await transaction.serviceRequest.create({
       data: {
-        docketNumber: "TEMP",
+        docketNumber: `srs-${nextSequence}`,
         name,
         company,
         phoneNumber1,
         phoneNumber2,
         fullAddress,
+        complaintDetails,
         area,
         product,
         callType,
       },
     });
 
-    return transaction.serviceRequest.update({
-      where: { id: created.id },
-      data: { docketNumber: `SRS-${created.id}` },
-    });
+    return created;
   });
 
   revalidatePath("/form");
@@ -138,6 +160,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
   const company = getRequiredField(formData, "company");
   const phoneNumber1 = getRequiredField(formData, "phoneNumber1");
   const fullAddress = getRequiredField(formData, "fullAddress");
+  const complaintDetails = getRequiredField(formData, "complaintDetails");
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
@@ -155,6 +178,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
       phoneNumber1,
       phoneNumber2,
       fullAddress,
+      complaintDetails,
       area,
       product,
       callType,
@@ -349,6 +373,10 @@ export async function assignServiceCall(formData: FormData) {
       docketNumber: true,
       name: true,
       company: true,
+      phoneNumber1: true,
+      phoneNumber2: true,
+      fullAddress: true,
+      complaintDetails: true,
       area: true,
       product: true,
       callType: true,
@@ -379,6 +407,10 @@ export async function assignServiceCall(formData: FormData) {
           docketNumber: previousRequest.docketNumber,
           customerName: previousRequest.name,
           company: previousRequest.company,
+          phoneNumber1: previousRequest.phoneNumber1,
+          phoneNumber2: previousRequest.phoneNumber2,
+          fullAddress: previousRequest.fullAddress,
+          complaintDetails: previousRequest.complaintDetails,
           area: previousRequest.area,
           product: previousRequest.product,
           callType: previousRequest.callType,

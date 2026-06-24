@@ -1,5 +1,6 @@
 ﻿import { login } from "./actions";
 import { BrandLogo } from "./brand-logo";
+import { PasswordField } from "./password-field";
 
 type HomeProps = {
   searchParams?: Promise<{
@@ -42,23 +43,7 @@ export default async function Home({ searchParams }: HomeProps) {
               />
             </label>
 
-            <label className="relative block">
-              <span className="sr-only">Password</span>
-              <input
-                name="password"
-                type="password"
-                placeholder="Password"
-                className="h-12 w-full rounded-full border border-white bg-white px-5 pr-16 text-base text-[#0170C3] outline-none placeholder:text-[#0170C3]/70 focus:border-white"
-                required
-              />
-              <span className="absolute right-0 top-1/2 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#0170C3] shadow-sm">
-                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
-                  <rect x="6" y="11" width="12" height="9" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M8.5 11V8.5C8.5 6.57 10.07 5 12 5C13.93 5 15.5 6.57 15.5 8.5V11" stroke="currentColor" strokeWidth="1.8" />
-                  <circle cx="12" cy="15.5" r="1" fill="currentColor" />
-                </svg>
-              </span>
-            </label>
+            <PasswordField />
 
             {showError ? (
               <p className="rounded-xl border border-white bg-white px-3 py-2 text-sm text-[#0170C3]">
@@ -79,10 +64,6 @@ export default async function Home({ searchParams }: HomeProps) {
               LOGIN
             </button>
           </form>
-
-          <p className="mt-5 text-center text-xs text-white">
-            Default users: admin/admin123, manager/manager123, employee/employee123
-          </p>
         </div>
       </section>
     </main>

@@ -4,6 +4,10 @@ type AssignmentWhatsAppPayload = {
   docketNumber: string;
   customerName: string;
   company: string;
+  phoneNumber1: string;
+  phoneNumber2?: string | null;
+  fullAddress: string;
+  complaintDetails?: string | null;
   area: string;
   product: string;
   callType: string;
@@ -20,7 +24,8 @@ function normalizePhone(raw: string) {
     return null;
   }
 
-  const cleaned = trimmed.replace(/[\s()-]/g, "");
+  const withoutPrefix = trimmed.replace(/^whatsapp:/i, "");
+  const cleaned = withoutPrefix.replace(/[\s()-]/g, "");
   if (!/^\+?\d{8,15}$/.test(cleaned)) {
     return null;
   }
@@ -29,16 +34,25 @@ function normalizePhone(raw: string) {
 }
 
 function buildAssignmentMessage(payload: AssignmentWhatsAppPayload) {
+  const projectLink = process.env.PROJECT_LINK?.trim();
+
   return [
     `Hello ${payload.employeeName},`,
     `A new service call has been allocated to you.`,
     `Docket: ${payload.docketNumber}`,
     `Customer: ${payload.customerName}`,
     `Company: ${payload.company}`,
+    `Primary Phone: ${payload.phoneNumber1}`,
+    payload.phoneNumber2 ? `Alternate Phone: ${payload.phoneNumber2}` : null,
+    `Address: ${payload.fullAddress}`,
+    payload.complaintDetails ? `Complaint: ${payload.complaintDetails}` : null,
     `Area: ${payload.area}`,
     `Product: ${payload.product}`,
     `Call Type: ${payload.callType}`,
-  ].join("\n");
+    projectLink ? `Project Link: ${projectLink}` : null,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
 }
 
 export async function sendAssignmentWhatsApp(payload: AssignmentWhatsAppPayload): Promise<SendResult> {
