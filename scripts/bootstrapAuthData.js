@@ -66,6 +66,13 @@ async function main() {
   });
 
   await upsertUser({
+    name: "Service Employee",
+    username: "employee",
+    password: "employee123",
+    role: "EMPLOYEE",
+  });
+
+  await upsertUser({
     name: "Service Employee 1",
     username: "employee1",
     password: "employee123",

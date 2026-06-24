@@ -4,12 +4,12 @@ import React from "react";
 import { updateServiceRequestDetails } from "./actions";
 
 type SimpleOption = {
-  id: number;
+  id: string;
   name: string;
 };
 
 type RequestDetails = {
-  id: number;
+  id: string;
   docketNumber: string;
   name: string;
   company: string;
@@ -99,8 +99,8 @@ export function DocketDetailsModal({
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <div className="my-4 w-full max-w-2xl rounded-2xl border border-blue-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div className="sticky top-0 z-10 border-b border-blue-200 bg-white px-5 py-4 dark:border-slate-700 dark:bg-slate-900">
               <h3 className="text-lg font-semibold text-blue-950 dark:text-slate-100">
                 Docket Details

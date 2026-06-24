@@ -3,53 +3,53 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  username       String   @unique
+  password       String
+  role           UserRole
+  createdAt      DateTime @default(now())
+  whatsappNumber String?
+  assignedCalls  ServiceRequest[]
+}
+
+model Product {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model CallType {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model ServiceRequest {
+  id           String   @id @default(uuid()) @db.Uuid
+  docketNumber String   @unique
+  name         String
+  company      String
+  phoneNumber1 String
+  phoneNumber2 String?
+  fullAddress  String
+  area         String
+  product      String
+  callType     String
+  assignedToId String?  @db.Uuid
+  createdAt    DateTime @default(now())
+  status       String?  @default("Pending")
+  statusReason String?
+  assignedTo   User?    @relation(fields: [assignedToId], references: [id])
 }
 
 enum UserRole {
   ADMIN
   MANAGER
   EMPLOYEE
-}
-
-model User {
-  id              Int              @id @default(autoincrement())
-  name            String
-  username        String           @unique
-  password        String
-  whatsappNumber  String?
-  role            UserRole
-  assignedCalls   ServiceRequest[]
-  createdAt       DateTime         @default(now())
-}
-
-model Product {
-  id              Int              @id @default(autoincrement())
-  name            String           @unique
-  createdAt       DateTime         @default(now())
-}
-
-model CallType {
-  id              Int              @id @default(autoincrement())
-  name            String           @unique
-  createdAt       DateTime         @default(now())
-}
-
-model ServiceRequest {
-  id              Int       @id @default(autoincrement())
-  docketNumber    String    @unique
-  name            String
-  company         String
-  phoneNumber1    String
-  phoneNumber2    String?
-  fullAddress     String
-  area            String
-  product         String
-  callType        String
-  status          String?   @default("Pending")
-  statusReason    String?
-  assignedToId    Int?
-  assignedTo      User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdAt       DateTime  @default(now())
 }

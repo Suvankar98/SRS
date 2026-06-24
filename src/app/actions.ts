@@ -18,6 +18,10 @@ function getRequiredField(formData: FormData, key: string) {
   return value.trim();
 }
 
+function redirectToDatabaseError() {
+  redirect("/?error=2");
+}
+
 async function requireSession() {
   const session = await getSession();
   if (!session) {
@@ -40,7 +44,19 @@ export async function login(formData: FormData) {
   const username = getRequiredField(formData, "username");
   const password = getRequiredField(formData, "password");
 
-  const user = await prisma.user.findUnique({ where: { username } });
+  let user;
+
+  try {
+    user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, password: true, role: true },
+    });
+  } catch (error) {
+    console.error("Authentication failed because the database is unavailable.", error);
+    redirectToDatabaseError();
+  }
+
+  console.log("login attempt", { username, password, user });
 
   if (!user || user.password !== password) {
     redirect("/?error=1");
@@ -117,7 +133,7 @@ export async function createServiceRequest(formData: FormData) {
 export async function updateServiceRequestDetails(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
 
-  const requestId = Number(getRequiredField(formData, "requestId"));
+  const requestId = getRequiredField(formData, "requestId");
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
   const phoneNumber1 = getRequiredField(formData, "phoneNumber1");
@@ -180,7 +196,7 @@ export async function addStaff(formData: FormData) {
 export async function deleteStaff(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
-  const id = Number(getRequiredField(formData, "id"));
+  const id = getRequiredField(formData, "id");
   const user = await prisma.user.findUnique({
     where: { id },
     select: { role: true },
@@ -200,7 +216,7 @@ export async function deleteStaff(formData: FormData) {
 export async function updateStaff(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
-  const id = Number(getRequiredField(formData, "id"));
+  const id = getRequiredField(formData, "id");
   const name = getRequiredField(formData, "name");
   const username = getRequiredField(formData, "username");
   const role = getRequiredField(formData, "role");
@@ -250,7 +266,7 @@ export async function addProduct(formData: FormData) {
 export async function updateProduct(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
-  const id = Number(getRequiredField(formData, "id"));
+  const id = getRequiredField(formData, "id");
   const name = getRequiredField(formData, "name");
 
   await prisma.product.update({
@@ -266,7 +282,7 @@ export async function updateProduct(formData: FormData) {
 export async function deleteProduct(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
-  const id = Number(getRequiredField(formData, "id"));
+  const id = getRequiredField(formData, "id");
 
   await prisma.product.delete({ where: { id } });
 
@@ -290,7 +306,7 @@ export async function addCallType(formData: FormData) {
 export async function updateCallType(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
-  const id = Number(getRequiredField(formData, "id"));
+  const id = getRequiredField(formData, "id");
   const name = getRequiredField(formData, "name");
 
   await prisma.callType.update({
@@ -306,7 +322,7 @@ export async function updateCallType(formData: FormData) {
 export async function deleteCallType(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
-  const id = Number(getRequiredField(formData, "id"));
+  const id = getRequiredField(formData, "id");
 
   await prisma.callType.delete({ where: { id } });
 
@@ -322,10 +338,10 @@ export async function assignServiceCall(formData: FormData) {
     redirect("/dashboard");
   }
 
-  const requestId = Number(getRequiredField(formData, "requestId"));
+  const requestId = getRequiredField(formData, "requestId");
   const assignedToIdRaw = formData.get("assignedToId");
   const assignedToIdValue = typeof assignedToIdRaw === "string" ? assignedToIdRaw.trim() : "";
-  const assignedToId = assignedToIdValue === "" ? null : Number(assignedToIdValue);
+  const assignedToId = assignedToIdValue === "" ? null : assignedToIdValue;
   const previousRequest = await prisma.serviceRequest.findUnique({
     where: { id: requestId },
     select: {
@@ -393,7 +409,7 @@ export async function updateServiceCallStatus(formData: FormData) {
     redirect("/dashboard");
   }
 
-  const requestId = Number(getRequiredField(formData, "requestId"));
+  const requestId = getRequiredField(formData, "requestId");
   const status = getRequiredField(formData, "status");
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";

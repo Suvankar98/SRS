@@ -33,10 +33,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const editStaffParam = resolvedSearchParams.editStaff;
-  const editingStaffId = Number(
-    Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam,
-  );
-  const hasEditingStaff = Number.isFinite(editingStaffId) && editingStaffId > 0;
+  const editingStaffId = Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam;
+  const hasEditingStaff = typeof editingStaffId === "string" && editingStaffId.trim() !== "";
 
   const [staffMembers, products, callTypes] = await Promise.all([
     prisma.user.findMany({

@@ -4,11 +4,19 @@ import type { NextRequest } from "next/server";
 const AUTH_USER_ID_COOKIE = "srs_uid";
 const AUTH_ROLE_COOKIE = "srs_role";
 
+function isValidUuid(value: string) {
+  return /^[0-9a-fA-F\-]{36}$/.test(value);
+}
+
+function isRole(value: string | undefined): value is "ADMIN" | "MANAGER" | "EMPLOYEE" {
+  return value === "ADMIN" || value === "MANAGER" || value === "EMPLOYEE";
+}
+
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const userId = request.cookies.get(AUTH_USER_ID_COOKIE)?.value;
   const role = request.cookies.get(AUTH_ROLE_COOKIE)?.value;
-  const isAuthenticated = Boolean(userId && role);
+  const isAuthenticated = Boolean(userId && role && isValidUuid(userId) && isRole(role));
 
   const isAdmin = role === "ADMIN";
   const isManager = role === "MANAGER";
@@ -21,7 +29,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname.startsWith("/form") && !isAdmin) {
+  if (pathname.startsWith("/form") && !(isAdmin || isManager)) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     dashboardUrl.search = "";

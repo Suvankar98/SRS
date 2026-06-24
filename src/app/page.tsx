@@ -10,6 +10,7 @@ type HomeProps = {
 export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = await searchParams;
   const showError = resolvedSearchParams?.error === "1";
+  const showDatabaseError = resolvedSearchParams?.error === "2";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
@@ -62,6 +63,12 @@ export default async function Home({ searchParams }: HomeProps) {
             {showError ? (
               <p className="rounded-xl border border-white bg-white px-3 py-2 text-sm text-[#0170C3]">
                 Invalid username or password.
+              </p>
+            ) : null}
+
+            {showDatabaseError ? (
+              <p className="rounded-xl border border-white bg-white px-3 py-2 text-sm text-[#0170C3]">
+                The service is temporarily unavailable. Please try again later.
               </p>
             ) : null}
 

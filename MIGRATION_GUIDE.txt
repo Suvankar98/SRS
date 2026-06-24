@@ -1,0 +1,383 @@
+================================================================================
+  SRS SERVICE DESK — MIGRATION GUIDE
+  MongoDB + WhatsApp Business API (Meta Cloud API)
+================================================================================
+
+OVERVIEW
+--------
+This file documents two major changes needed:
+  1. Replace SQLite (Prisma + dev.db) with MongoDB Atlas
+  2. Replace Twilio WhatsApp with Meta WhatsApp Business Cloud API
+
+================================================================================
+PART 1 — MIGRATE FROM SQLITE TO MONGODB
+================================================================================
+
+CURRENT STATE
+  - Database:   SQLite (prisma/dev.db)
+  - ORM:        Prisma 6
+  - Schema:     prisma/schema.prisma  (datasource = sqlite)
+  - Client:     src/lib/prisma.ts
+
+STEP 1 — Create a MongoDB Atlas cluster
+  1. Go to https://cloud.mongodb.com
+  2. Create a free M0 cluster (or paid tier for production)
+  3. Under "Database Access", create a user with read/write access
+  4. Under "Network Access", whitelist your server IP (or 0.0.0.0/0 for dev)
+  5. Click "Connect" > "Drivers" and copy the connection string:
+       mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/srs-service?retryWrites=true&w=majority
+
+STEP 2 — Install MongoDB Prisma provider
+  Run in project root:
+    npm install prisma@latest @prisma/client@latest
+
+  NOTE: Prisma supports MongoDB natively — no additional driver needed.
+
+STEP 3 — Update .env
+  Replace:
+    DATABASE_URL="file:./dev.db"
+
+  With:
+    DATABASE_URL="mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/srs-service?retryWrites=true&w=majority"
+
+STEP 4 — Update prisma/schema.prisma
+
+  Change the datasource block:
+
+    BEFORE:
+      datasource db {
+        provider = "sqlite"
+        url      = env("DATABASE_URL")
+      }
+
+    AFTER:
+      datasource db {
+        provider = "mongodb"
+        url      = env("DATABASE_URL")
+      }
+
+  Change all model IDs from INTEGER autoincrement to MongoDB ObjectId:
+
+    BEFORE (User model example):
+      model User {
+        id        Int      @id @default(autoincrement())
+        ...
+        createdAt DateTime @default(now())
+      }
+
+    AFTER:
+      model User {
+        id        String   @id @default(auto()) @map("_id") @db.ObjectId
+        ...
+        createdAt DateTime @default(now())
+      }
+
+  Apply the same pattern to ALL models:
+    - User          → id String @id @default(auto()) @map("_id") @db.ObjectId
+    - Product       → id String @id @default(auto()) @map("_id") @db.ObjectId
+    - CallType      → id String @id @default(auto()) @map("_id") @db.ObjectId
+    - ServiceRequest→ id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  Also update the foreign key relation on ServiceRequest:
+
+    BEFORE:
+      assignedToId Int?
+      assignedTo   User? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+    AFTER:
+      assignedToId String? @db.ObjectId
+      assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  Remove any SQLite-specific enum type (MongoDB uses String):
+
+    BEFORE:
+      enum UserRole {
+        ADMIN
+        MANAGER
+        EMPLOYEE
+      }
+      model User {
+        role UserRole
+      }
+
+    AFTER:
+      model User {
+        role String
+      }
+      (Remove the enum block entirely — MongoDB does not support Prisma enums)
+
+  Remove @unique indexes written as model-level @@unique if any — replace with
+  field-level @unique which MongoDB supports.
+
+STEP 5 — Update src/lib/auth-constants.ts
+  Since we removed the enum, ensure APP_ROLES is a plain object (it already is
+  in this project, so no change needed here unless you used the Prisma enum type
+  directly in code).
+
+STEP 6 — Update all ID references in TypeScript code
+  Because IDs are now String (ObjectId) instead of Int, update every place that
+  uses numeric ID:
+
+  Files to check and update:
+    src/app/actions.ts          — Number(id) → id stays as string, remove Number()
+    src/app/dashboard/page.tsx  — assignedToId comparisons (string vs number)
+    src/app/admin/page.tsx      — member.id passed to forms as value={member.id}
+
+  Example change in actions.ts:
+
+    BEFORE:
+      const id = Number(getRequiredField(formData, "id"));
+      await prisma.user.delete({ where: { id } });
+
+    AFTER:
+      const id = getRequiredField(formData, "id");
+      await prisma.user.delete({ where: { id } });
+
+  Example change for session userId comparison:
+
+    BEFORE:
+      const session: AuthSession = { userId: number; role: AppRole }
+      if (request?.assignedToId !== session.userId)
+
+    AFTER:
+      Change userId in AuthSession from number to string:
+        userId: string
+      And in getSession(), store it as string directly (remove Number() cast).
+
+STEP 7 — Push schema to MongoDB
+  Run in project root:
+    npx prisma db push
+
+  This creates the MongoDB collections with Prisma's metadata (no migrations
+  needed for MongoDB — schema is applied directly).
+
+STEP 8 — Re-seed data
+  Your existing seed scripts use numeric IDs and Prisma's autoincrement.
+  Update scripts/bootstrapAuthData.js:
+    - Remove id: ... fields entirely (MongoDB auto-generates ObjectIds)
+    - Keep name, username, password, role, whatsappNumber fields as-is
+
+  Run:
+    npm run db:bootstrap
+
+STEP 9 — Verify
+  Run dev server:
+    npm run dev
+  Login at localhost:3000 and confirm all reads/writes work.
+
+IMPORTANT NOTES FOR MONGODB
+  - MongoDB does NOT support @default(autoincrement()) — IDs must be ObjectId
+  - MongoDB does NOT support Prisma enums — use String type
+  - MongoDB does NOT support all SQLite-style @@unique on combined fields;
+    use field-level @unique instead
+  - The docketNumber field uses "TEMP" and then updates — this works fine on
+    MongoDB since there is no autoincrement dependency
+
+================================================================================
+PART 2 — REPLACE TWILIO WITH META WHATSAPP BUSINESS CLOUD API
+================================================================================
+
+CURRENT STATE
+  - File:     src/lib/whatsapp.ts
+  - Provider: Twilio (POST to https://api.twilio.com/...)
+  - Env vars: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM
+
+META WHATSAPP BUSINESS CLOUD API SETUP
+  This is the official WhatsApp Business API by Meta (Facebook). It is FREE to
+  use for the first 1,000 user-initiated conversations per month.
+
+STEP 1 — Create Meta Developer Account
+  1. Go to https://developers.facebook.com
+  2. Log in with a Facebook account
+  3. Go to "My Apps" > "Create App"
+  4. Choose app type: "Business"
+  5. Fill in app name (e.g., SRS Service Desk) and contact email
+
+STEP 2 — Add WhatsApp Product
+  1. In the app dashboard, click "Add Product"
+  2. Find "WhatsApp" and click "Set Up"
+  3. You will see the "WhatsApp Business" section in the left sidebar
+
+STEP 3 — Get Credentials
+  In the WhatsApp > Getting Started page:
+    - PHONE_NUMBER_ID  — a numeric ID for your test sender phone number
+    - WHATSAPP_TOKEN   — a temporary access token (for testing) or a permanent
+                         system user token (for production)
+
+  For production:
+    1. Go to Business Settings > System Users
+    2. Create a system user with FULL CONTROL
+    3. Generate a permanent token for the system user
+    4. Assign the WhatsApp app to the system user
+
+STEP 4 — Add a Recipient Phone for Testing
+  In the WhatsApp > Getting Started page:
+    - Add a recipient phone number (must be a real WhatsApp number)
+    - You can send test messages to up to 5 numbers without a business account
+
+STEP 5 — For Production (send to any number)
+  You need to submit your business for verification:
+    1. Go to WhatsApp > Configuration > Business Verification
+    2. Submit documents for Meta Business Verification
+    3. Once verified, you can message any number that has opted in
+
+STEP 6 — Create a Message Template (required for outbound messages)
+  Meta requires you to use pre-approved templates for business-initiated messages.
+    1. Go to WhatsApp > Manage > Message Templates
+    2. Click "Create Template"
+    3. Category: "Utility"
+    4. Name: e.g., "service_call_assignment"
+    5. Language: English
+    6. Create a template like:
+         Hello {{1}},
+         A new service call has been allocated to you.
+         Docket: {{2}}
+         Customer: {{3}}
+         Company: {{4}}
+         Area: {{5}}
+         Product: {{6}}
+         Call Type: {{7}}
+    7. Submit for approval (usually takes a few minutes to a few hours)
+
+    NOTE: Until the template is approved, you can only send freeform messages
+    to numbers that messaged you in the last 24 hours (session messages).
+
+STEP 7 — Update .env
+  Remove old Twilio vars:
+    TWILIO_ACCOUNT_SID=...
+    TWILIO_AUTH_TOKEN=...
+    TWILIO_WHATSAPP_FROM=...
+
+  Add new Meta vars:
+    META_WHATSAPP_TOKEN=your_permanent_system_user_token
+    META_WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
+    META_WHATSAPP_TEMPLATE_NAME=service_call_assignment
+    META_WHATSAPP_TEMPLATE_LANGUAGE=en
+
+STEP 8 — Rewrite src/lib/whatsapp.ts
+
+  Replace the entire file with the following implementation:
+
+  -----------------------------------------------------------------------
+  type AssignmentWhatsAppPayload = {
+    toPhone: string;
+    employeeName: string;
+    docketNumber: string;
+    customerName: string;
+    company: string;
+    area: string;
+    product: string;
+    callType: string;
+  };
+
+  type SendResult = {
+    sent: boolean;
+    reason?: string;
+  };
+
+  function normalizePhone(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const cleaned = trimmed.replace(/[\s()-]/g, "");
+    if (!/^\+?\d{8,15}$/.test(cleaned)) return null;
+    return cleaned.startsWith("+") ? cleaned.slice(1) : cleaned;
+    // Meta API needs number WITHOUT leading + e.g. 919876543210
+  }
+
+  export async function sendAssignmentWhatsApp(
+    payload: AssignmentWhatsAppPayload
+  ): Promise<SendResult> {
+    const token = process.env.META_WHATSAPP_TOKEN;
+    const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+    const templateName = process.env.META_WHATSAPP_TEMPLATE_NAME ?? "service_call_assignment";
+    const templateLanguage = process.env.META_WHATSAPP_TEMPLATE_LANGUAGE ?? "en";
+
+    if (!token || !phoneNumberId) {
+      return { sent: false, reason: "missing-whatsapp-config" };
+    }
+
+    const toPhone = normalizePhone(payload.toPhone);
+    if (!toPhone) {
+      return { sent: false, reason: "invalid-whatsapp-number" };
+    }
+
+    const body = {
+      messaging_product: "whatsapp",
+      to: toPhone,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: templateLanguage },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: payload.employeeName },
+              { type: "text", text: payload.docketNumber },
+              { type: "text", text: payload.customerName },
+              { type: "text", text: payload.company },
+              { type: "text", text: payload.area },
+              { type: "text", text: payload.product },
+              { type: "text", text: payload.callType },
+            ],
+          },
+        ],
+      },
+    };
+
+    const response = await fetch(
+      `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Meta WhatsApp error", err);
+      return { sent: false, reason: `meta-error-${response.status}` };
+    }
+
+    return { sent: true };
+  }
+  -----------------------------------------------------------------------
+
+STEP 9 — Test the integration
+  1. In the Meta Developer console, use the "Send Template Message" test tool
+     to confirm your template reaches the test phone number.
+  2. In the app, assign a service call to an employee with a valid WhatsApp
+     number — check that they receive the templated message.
+
+IMPORTANT NOTES FOR META WHATSAPP API
+  - Phone numbers passed to the API must NOT include the leading "+"
+    (e.g., use 919876543210 not +919876543210)
+  - Templates MUST be approved by Meta before use in production
+  - You can send freeform messages (without templates) ONLY within a 24-hour
+    window after the customer/employee messages you first
+  - Meta API version in the URL (v20.0) should be updated periodically as
+    Meta deprecates older versions — check https://developers.facebook.com/docs/graph-api/changelog
+
+================================================================================
+SUMMARY OF FILES TO CHANGE
+================================================================================
+
+  Change                              File(s)
+  ─────────────────────────────────── ──────────────────────────────────────────
+  DB provider + schema IDs            prisma/schema.prisma
+  Connection string                   .env
+  Remove Number() ID casts            src/app/actions.ts
+  Session userId type string→int fix  src/lib/auth.ts, src/lib/auth-constants.ts
+  Seed scripts update                 scripts/bootstrapAuthData.js
+                                      scripts/seedDummy.js
+  WhatsApp provider rewrite           src/lib/whatsapp.ts
+  Remove Twilio env vars              .env
+  Add Meta env vars                   .env
+
+================================================================================
+END OF MIGRATION GUIDE
+================================================================================
