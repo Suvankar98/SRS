@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { sendAssignmentWhatsApp } from "@/lib/whatsapp";
+import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
 import { cookies } from "next/headers";
@@ -146,6 +146,24 @@ export async function createServiceRequest(formData: FormData) {
 
     return created;
   });
+
+  try {
+    const whatsappResult = await sendCustomerComplaintRegisteredWhatsApp({
+      toPhone: request.phoneNumber1,
+      customerName: request.name,
+      docketNumber: request.docketNumber,
+    });
+
+    if (!whatsappResult.sent) {
+      console.warn("Customer WhatsApp complaint confirmation was not sent", {
+        docketNumber: request.docketNumber,
+        phoneNumber: request.phoneNumber1,
+        reason: whatsappResult.reason,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send customer WhatsApp complaint confirmation", error);
+  }
 
   revalidatePath("/form");
   revalidatePath("/dashboard");

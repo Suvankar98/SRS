@@ -13,6 +13,12 @@ type AssignmentWhatsAppPayload = {
   callType: string;
 };
 
+type CustomerComplaintRegisteredWhatsAppPayload = {
+  toPhone: string;
+  customerName: string;
+  docketNumber: string;
+};
+
 type SendResult = {
   sent: boolean;
   reason?: string;
@@ -55,7 +61,18 @@ function buildAssignmentMessage(payload: AssignmentWhatsAppPayload) {
     .join("\n");
 }
 
-export async function sendAssignmentWhatsApp(payload: AssignmentWhatsAppPayload): Promise<SendResult> {
+function buildCustomerComplaintRegisteredMessage(payload: CustomerComplaintRegisteredWhatsAppPayload) {
+  return [
+    `Hello ${payload.customerName},`,
+    `Your complaint has been registered successfully.`,
+    `Docket Number: ${payload.docketNumber}`,
+    `Please keep this docket number for future reference.`,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+async function sendWhatsAppMessage(toPhoneRaw: string, body: string): Promise<SendResult> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromPhoneRaw = process.env.TWILIO_WHATSAPP_FROM;
@@ -65,7 +82,7 @@ export async function sendAssignmentWhatsApp(payload: AssignmentWhatsAppPayload)
   }
 
   const fromPhone = normalizePhone(fromPhoneRaw);
-  const toPhone = normalizePhone(payload.toPhone);
+  const toPhone = normalizePhone(toPhoneRaw);
 
   if (!fromPhone || !toPhone) {
     return { sent: false, reason: "invalid-whatsapp-number" };
@@ -74,7 +91,7 @@ export async function sendAssignmentWhatsApp(payload: AssignmentWhatsAppPayload)
   const params = new URLSearchParams({
     To: `whatsapp:${toPhone}`,
     From: `whatsapp:${fromPhone}`,
-    Body: buildAssignmentMessage(payload),
+    Body: body,
   });
 
   const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
@@ -92,4 +109,14 @@ export async function sendAssignmentWhatsApp(payload: AssignmentWhatsAppPayload)
   }
 
   return { sent: true };
+}
+
+export async function sendAssignmentWhatsApp(payload: AssignmentWhatsAppPayload): Promise<SendResult> {
+  return sendWhatsAppMessage(payload.toPhone, buildAssignmentMessage(payload));
+}
+
+export async function sendCustomerComplaintRegisteredWhatsApp(
+  payload: CustomerComplaintRegisteredWhatsAppPayload,
+): Promise<SendResult> {
+  return sendWhatsAppMessage(payload.toPhone, buildCustomerComplaintRegisteredMessage(payload));
 }
