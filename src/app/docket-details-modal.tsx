@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { updateServiceRequestDetails } from "./actions";
+import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 type SimpleOption = {
   id: string;
@@ -11,6 +13,7 @@ type SimpleOption = {
 type RequestDetails = {
   id: string;
   docketNumber: string;
+  createdAt: Date | string;
   name: string;
   company: string;
   phoneNumber1: string;
@@ -51,13 +54,12 @@ export function DocketDetailsModal({
   request,
   canEdit,
   products,
-  callTypes,
 }: {
   request: RequestDetails;
   canEdit: boolean;
   products: SimpleOption[];
-  callTypes: SimpleOption[];
 }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [name, setName] = React.useState(request.name);
   const [company, setCompany] = React.useState(request.company);
@@ -68,6 +70,9 @@ export function DocketDetailsModal({
   const [area, setArea] = React.useState(request.area);
   const [product, setProduct] = React.useState(request.product);
   const [callType, setCallType] = React.useState(request.callType);
+  const callTypeOptions = request.callType && !CALL_TYPE_OPTIONS.includes(request.callType as (typeof CALL_TYPE_OPTIONS)[number])
+    ? [request.callType, ...CALL_TYPE_OPTIONS]
+    : [...CALL_TYPE_OPTIONS];
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -89,6 +94,8 @@ export function DocketDetailsModal({
     formData.append("callType", callType);
 
     await updateServiceRequestDetails(formData);
+    setIsOpen(false);
+    router.refresh();
   };
 
   return (
@@ -102,13 +109,26 @@ export function DocketDetailsModal({
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-          <div className="my-4 w-full max-w-4xl rounded-[2rem] border border-blue-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.12)]">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="my-4 w-full max-w-4xl rounded-[2rem] border border-blue-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.12)]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="sticky top-0 z-10 border-b border-blue-200 bg-white px-5 py-4 sm:px-6">
-              <h3 className="text-2xl font-semibold tracking-tight text-blue-950">
-                Docket Details
-              </h3>
-              <p className="text-sm leading-6 text-blue-600">{request.docketNumber}</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="text-2xl font-semibold tracking-tight text-blue-950">
+                    Docket Details
+                  </h3>
+                  <p className="text-sm leading-6 text-blue-600">{request.docketNumber}</p>
+                </div>
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-blue-500">
+                  Registered {formatRequestDateTime(request.createdAt)}
+                </p>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-6">
@@ -203,9 +223,9 @@ export function DocketDetailsModal({
                       onChange={(e) => setCallType(e.target.value)}
                       className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
                     >
-                      {callTypes.map((item) => (
-                        <option key={item.id} value={item.name}>
-                          {item.name}
+                      {callTypeOptions.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
                         </option>
                       ))}
                     </select>
@@ -275,5 +295,14 @@ function GridField({ label, children }: { label: string; children: React.ReactNo
       {children}
     </label>
   );
+}
+
+function formatRequestDateTime(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 

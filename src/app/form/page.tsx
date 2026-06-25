@@ -6,6 +6,7 @@ import { BrandLogo } from "../brand-logo";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,7 @@ export default async function FormPage() {
     redirect("/dashboard");
   }
 
-  const [products, callTypes] = await Promise.all([
-    prisma.product.findMany({ orderBy: { name: "asc" } }),
-    prisma.callType.findMany({ orderBy: { name: "asc" } }),
-  ]);
+  const products = await prisma.product.findMany({ orderBy: { name: "asc" } });
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
@@ -148,9 +146,9 @@ export default async function FormPage() {
                 <option value="" disabled>
                   Select a call type
                 </option>
-                {callTypes.map((callType) => (
-                  <option key={callType.id} value={callType.name}>
-                    {callType.name}
+                {CALL_TYPE_OPTIONS.map((callType) => (
+                  <option key={callType} value={callType}>
+                    {callType}
                   </option>
                 ))}
               </select>

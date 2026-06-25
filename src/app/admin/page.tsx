@@ -2,14 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
-  addCallType,
   addStaff,
   addProduct,
-  deleteCallType,
   deleteStaff,
   deleteProduct,
   logout,
-  updateCallType,
   updateStaff,
   updateProduct,
 } from "../actions";
@@ -18,6 +15,7 @@ import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +35,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const editingStaffId = Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam;
   const hasEditingStaff = typeof editingStaffId === "string" && editingStaffId.trim() !== "";
 
-  const [staffMembers, products, callTypes] = await Promise.all([
+  const [staffMembers, products] = await Promise.all([
     prisma.user.findMany({
       where: { role: { in: [APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE] } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.product.findMany({ orderBy: { name: "asc" } }),
-    prisma.callType.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -273,50 +270,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </article>
 
         <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-          <h2 className="text-lg font-semibold text-blue-950">Call types</h2>
-          <form action={addCallType} className="mt-4 flex gap-2">
-            <input
-              name="name"
-              placeholder="New call type"
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
-              required
-            />
-            <button
-              type="submit"
-              className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-            >
-              Add
-            </button>
-          </form>
-          <div className="mt-4 space-y-2">
-            {callTypes.map((callType) => (
-              <div key={callType.id} className="flex flex-col gap-2 sm:flex-row">
-                <form action={updateCallType} className="flex w-full flex-col gap-2 sm:flex-row">
-                  <input type="hidden" name="id" value={callType.id} />
-                  <input
-                    name="name"
-                    defaultValue={callType.name}
-                    className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50 sm:whitespace-nowrap"
-                  >
-                    Update
-                  </button>
-                </form>
-                <form action={deleteCallType}>
-                  <input type="hidden" name="id" value={callType.id} />
-                  <ConfirmSubmitButton
-                    confirmMessage={`Are you sure you want to delete call type ${callType.name}?`}
-                    ariaLabel={`Delete ${callType.name}`}
-                    title="Delete call type"
-                    className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 sm:w-10"
-                  >
-                    <TrashIcon />
-                  </ConfirmSubmitButton>
-                </form>
+          <h2 className="text-lg font-semibold text-blue-950">Fixed call types</h2>
+          <p className="mt-2 text-sm leading-6 text-blue-600">
+            Service request forms now use a standard call type list.
+          </p>
+          <div className="mt-4 grid gap-2">
+            {CALL_TYPE_OPTIONS.map((callType) => (
+              <div
+                key={callType}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900"
+              >
+                {callType}
               </div>
             ))}
           </div>

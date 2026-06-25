@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { updateServiceCallStatus } from "./actions";
 
 type StatusRequest = {
@@ -11,6 +12,7 @@ type StatusRequest = {
 };
 
 export function StatusUpdateModal({ request }: { request: StatusRequest }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [status, setStatus] = React.useState(request.status || "Pending");
   const [reason, setReason] = React.useState(request.statusReason || "");
@@ -32,13 +34,16 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     formData.append("requestId", String(request.id));
     formData.append("status", status);
     formData.append("statusReason", reason);
-    
+
     await updateServiceCallStatus(formData);
+    setIsOpen(false);
+    router.refresh();
   };
 
   return (
     <>
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
         className="inline-flex rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 transition hover:bg-blue-200"
       >
@@ -46,8 +51,11 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setIsOpen(false)}>
+          <div
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="border-b border-blue-200 px-6 py-4">
               <h3 className="text-lg font-semibold text-blue-950">
                 Update Call Status

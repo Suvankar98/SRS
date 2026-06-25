@@ -204,7 +204,6 @@ export async function updateServiceRequestDetails(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
-  redirect("/dashboard");
 }
 
 export async function addStaff(formData: FormData) {
@@ -485,11 +484,11 @@ export async function updateServiceCallStatus(formData: FormData) {
     data: {
       status,
       statusReason: reasonValue || null,
+      assignedToId: status === "Close" ? null : undefined,
     },
   });
 
   revalidatePath("/dashboard");
-  redirect("/dashboard");
 }
 
 export async function canOpenAdmin(): Promise<boolean> {

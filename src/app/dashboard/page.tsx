@@ -3,8 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { assignServiceCall, logout } from "../actions";
-import { AutoLogout } from "../auto-logout";
 import { BrandLogo } from "../brand-logo";
+import { DashboardFilters } from "./dashboard-filters";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { getStatusPillClass } from "../status-utils";
@@ -15,12 +15,22 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+type DashboardStatus = "Pending" | "Close" | "Cancel" | "Visit & Reschedule";
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getSession();
 
   if (!session) {
     redirect("/");
   }
+
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
+  const selectedStatuses = getSelectedStatuses(resolvedSearchParams.status);
 
   const isEmployee = session.role === APP_ROLES.EMPLOYEE;
   const canEditDocket = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
@@ -29,11 +39,10 @@ export default async function DashboardPage() {
 
   const visibleWhere = isEmployee ? { assignedToId: session.userId } : undefined;
 
-  const [requests, employees, products, callTypes, totalRequests, assignedRequests, currentUser] = await Promise.all([
+  const [allRequests, employees, products, currentUser] = await Promise.all([
     prisma.serviceRequest.findMany({
       where: visibleWhere,
-      orderBy: { id: "asc" },
-      take: 10,
+      orderBy: { createdAt: "desc" },
     }),
     canAssign
       ? prisma.user.findMany({
@@ -43,17 +52,18 @@ export default async function DashboardPage() {
         })
       : Promise.resolve([]),
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.callType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.serviceRequest.count({ where: visibleWhere }),
-    prisma.serviceRequest.count({ where: { ...(visibleWhere ?? {}), assignedToId: { not: null } } }),
     prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } }),
   ]);
+
+  const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
+  const requests = filteredRequests.slice(0, 10);
+  const totalRequests = filteredRequests.length;
+  const assignedRequests = filteredRequests.filter((request) => Boolean(request.assignedToId)).length;
 
   const unassignedRequests = totalRequests - assignedRequests;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
-      <AutoLogout action={logout} timeoutMs={120000} />
       <header className="fixed left-0 right-0 top-0 z-40 border-b border-blue-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[95rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <div className="rounded-md bg-[#003d73] px-2 py-1 shadow-sm">
@@ -163,12 +173,18 @@ export default async function DashboardPage() {
         <div className="rounded-[2rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:p-6">
           {!isEmployee ? (
             <header className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-              <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-5 py-4">
+              <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-5 py-5">
                 <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight text-blue-950">Service dashboard</h2>
-                <p className="mt-1 text-sm text-blue-700">
-                  Open any docket to edit call details and keep data clean.
-                </p>
+                <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="pr-2">
+                    <h2 className="text-3xl font-semibold tracking-tight text-blue-950">Service dashboard</h2>
+                    <p className="mt-1 text-sm text-blue-600">Find calls quickly and filter by live status.</p>
+                  </div>
+                  <DashboardFilters
+                    initialQuery={searchQuery}
+                    initialStatuses={selectedStatuses}
+                  />
+                </div>
               </div>
 
               {showSummaryCards && (
@@ -198,7 +214,6 @@ export default async function DashboardPage() {
                             request={request}
                             canEdit={canEditDocket}
                             products={products}
-                            callTypes={callTypes}
                           />
                         </div>
                         <p className="font-semibold text-blue-950">{request.name}</p>
@@ -231,7 +246,9 @@ export default async function DashboardPage() {
                           <div>
                             <StatusPill label={request.status || "Pending"} className={getStatusPillClass(request.status)} />
                             {request.statusReason && (
-                              <RemarkPopup remark={request.statusReason} />
+                              <div className="mt-2">
+                                <RemarkPopup remark={request.statusReason} />
+                              </div>
                             )}
                           </div>
                         </>
@@ -288,7 +305,6 @@ export default async function DashboardPage() {
                             request={request}
                             canEdit={canEditDocket}
                             products={products}
-                            callTypes={callTypes}
                           />
                         </Td>
                         <Td>{getComplaintAgeLabel(request.createdAt)}</Td>
@@ -309,7 +325,9 @@ export default async function DashboardPage() {
                                 className={getStatusPillClass(request.status)}
                               />
                               {request.statusReason && (
-                                <RemarkPopup remark={request.statusReason} />
+                                <div className="mt-1">
+                                  <RemarkPopup remark={request.statusReason} />
+                                </div>
                               )}
                             </div>
                           )}
@@ -405,6 +423,63 @@ function getComplaintAgeLabel(date: Date) {
   }
 
   return `${days} days`;
+}
+
+function getSearchParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function getSelectedStatuses(value: string | string[] | undefined): DashboardStatus[] {
+  const values = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+  const allowedStatuses: DashboardStatus[] = ["Pending", "Close", "Cancel", "Visit & Reschedule"];
+
+  return values.filter((status): status is DashboardStatus =>
+    allowedStatuses.includes(status as DashboardStatus),
+  );
+}
+
+function filterRequests<
+  T extends {
+    docketNumber: string;
+    name: string;
+    company: string;
+    area: string;
+    product: string;
+    callType: string;
+    phoneNumber1: string;
+    phoneNumber2: string | null;
+    complaintDetails: string | null;
+    fullAddress: string;
+    status: string | null;
+    assignedToId: string | null;
+  },
+>(requests: T[], searchQuery: string, selectedStatuses: DashboardStatus[]) {
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  return requests.filter((request) => {
+    const requestStatus = (request.status || "Pending") as DashboardStatus;
+    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(requestStatus);
+    const matchesSearch =
+      normalizedQuery === "" ||
+      [
+        request.docketNumber,
+        request.name,
+        request.company,
+        request.area,
+        request.product,
+        request.callType,
+        request.phoneNumber1,
+        request.phoneNumber2 || "",
+        request.complaintDetails || "",
+        request.fullAddress,
+      ].some((value) => value.toLowerCase().includes(normalizedQuery));
+
+    return matchesStatus && matchesSearch;
+  });
 }
 
 function getEmployeeAvatarDataUri(name: string) {
