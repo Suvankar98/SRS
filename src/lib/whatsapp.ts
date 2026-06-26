@@ -31,12 +31,24 @@ function normalizePhone(raw: string) {
   }
 
   const withoutPrefix = trimmed.replace(/^whatsapp:/i, "");
-  const cleaned = withoutPrefix.replace(/[\s()-]/g, "");
-  if (!/^\+?\d{8,15}$/.test(cleaned)) {
+  const compact = withoutPrefix.replace(/[\s().-]/g, "");
+  const withoutIntlPrefix = compact.startsWith("00") ? compact.slice(2) : compact;
+
+  if (/^\+\d{8,15}$/.test(withoutIntlPrefix)) {
+    return withoutIntlPrefix;
+  }
+
+  if (!/^\d{8,15}$/.test(withoutIntlPrefix)) {
     return null;
   }
 
-  return cleaned.startsWith("+") ? cleaned : `+${cleaned}`;
+  // Most customer numbers are entered as 10-digit local mobile numbers.
+  // Default to +91 when no country code is supplied.
+  if (withoutIntlPrefix.length === 10) {
+    return `+91${withoutIntlPrefix}`;
+  }
+
+  return `+${withoutIntlPrefix}`;
 }
 
 function buildAssignmentMessage(payload: AssignmentWhatsAppPayload) {
@@ -105,7 +117,19 @@ async function sendWhatsAppMessage(toPhoneRaw: string, body: string): Promise<Se
   });
 
   if (!response.ok) {
-    return { sent: false, reason: `twilio-error-${response.status}` };
+    let detail = "unknown";
+
+    try {
+      const payload = (await response.json()) as { message?: string; code?: number };
+      detail = payload.message || (payload.code ? `code-${payload.code}` : "unknown");
+    } catch {
+      // Ignore parse errors and keep fallback reason.
+    }
+
+    return {
+      sent: false,
+      reason: `twilio-error-${response.status}:${detail}`,
+    };
   }
 
   return { sent: true };
