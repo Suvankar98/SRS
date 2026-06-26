@@ -173,7 +173,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <div className="rounded-[2rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:p-6">
           {!isEmployee ? (
-            <header className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <header className="mb-3 grid gap-2 xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
               <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-5 py-5">
                 <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
                 <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -188,7 +188,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
 
               {showSummaryCards && (
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                 <MetricCard title="Total Calls" value={totalRequests} subtitle="All visible complaints" />
                 <MetricCard title="Assigned" value={assignedRequests} subtitle="Allocated to employee" />
                 <MetricCard title="Unassigned" value={unassignedRequests} subtitle="Need allocation" />
@@ -419,10 +419,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
 function MetricCard({ title, value, subtitle }: { title: string; value: number; subtitle: string }) {
   return (
-    <article className="rounded-xl border border-blue-200 bg-white p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-blue-500">{title}</p>
-      <p className="mt-1 text-2xl font-semibold text-blue-950">{value}</p>
-      <p className="mt-1 text-xs text-blue-600">{subtitle}</p>
+    <article className="rounded-xl border border-blue-200 bg-white px-3 py-2.5 sm:p-4">
+      <div className="flex items-end justify-between sm:block">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500 sm:text-xs sm:tracking-[0.2em]">{title}</p>
+        <p className="text-2xl leading-none font-semibold text-blue-950 sm:mt-1 sm:text-2xl">{value}</p>
+      </div>
+      <p className="mt-1 hidden text-xs text-blue-600 sm:block">{subtitle}</p>
     </article>
   );
 }
