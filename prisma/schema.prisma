@@ -42,10 +42,14 @@ model ServiceRequest {
   area         String
   product      String
   callType     String
+  serviceBillingType String?
+  chargeableAmount Float?
   assignedToId String?  @db.Uuid
   createdAt    DateTime @default(now())
   status       String?  @default("Pending")
   statusReason String?
+  closedByName String?
+  closedAt     DateTime?
   assignedTo   User?    @relation(fields: [assignedToId], references: [id])
 }
 

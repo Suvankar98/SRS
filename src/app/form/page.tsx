@@ -6,7 +6,7 @@ import { BrandLogo } from "../brand-logo";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
+import { ServiceCallBillingFields } from "../service-call-billing-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -135,24 +135,7 @@ export default async function FormPage() {
               </select>
             </label>
 
-            <label>
-              <span className="mb-2 block text-sm font-medium text-blue-700">Call Type</span>
-              <select
-                name="callType"
-                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
-                defaultValue=""
-                required
-              >
-                <option value="" disabled>
-                  Select a call type
-                </option>
-                {CALL_TYPE_OPTIONS.map((callType) => (
-                  <option key={callType} value={callType}>
-                    {callType}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ServiceCallBillingFields />
 
             <label className="md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-blue-700">Complaint Details</span>

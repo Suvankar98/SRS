@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { updateServiceCallStatus } from "./actions";
+import { getStatusLabel } from "./status-utils";
 
 type StatusRequest = {
   id: string;
@@ -47,7 +48,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
         onClick={() => setIsOpen(true)}
         className="inline-flex rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 transition hover:bg-blue-200"
       >
-        {request.status || "Pending"}
+        {getStatusLabel(request.status)}
       </button>
 
       {isOpen && (
@@ -78,7 +79,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   <option value="Pending">Pending</option>
                   <option value="Cancel">Cancel</option>
                   <option value="Visit & Reschedule">Visit & Reschedule</option>
-                  <option value="Close">Close</option>
+                  <option value="Close">Closed</option>
                 </select>
               </div>
 

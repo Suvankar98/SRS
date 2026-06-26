@@ -7,7 +7,7 @@ type DashboardStatus = "Pending" | "Close" | "Cancel" | "Visit & Reschedule";
 
 const STATUS_OPTIONS: Array<{ label: string; value: DashboardStatus }> = [
   { label: "Pending", value: "Pending" },
-  { label: "Close", value: "Close" },
+  { label: "Closed", value: "Close" },
   { label: "Cancel", value: "Cancel" },
   { label: "Reschedule", value: "Visit & Reschedule" },
 ];
@@ -89,11 +89,11 @@ export function DashboardFilters({
           </button>
         )}
       </div>
-      <div className="mt-3 grid grid-cols-4 gap-2 text-xs font-medium text-blue-800">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-medium text-blue-800 sm:grid-cols-4">
         {STATUS_OPTIONS.map((option) => (
           <label
             key={option.value}
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-full border px-2.5 py-1.5 transition ${
+            className={`inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-full border px-2.5 py-1.5 transition ${
               selectedStatuses.includes(option.value)
                 ? "border-blue-300 bg-blue-100 text-blue-900 shadow-sm"
                 : "border-blue-200 bg-white/90 text-blue-700 hover:bg-blue-50"

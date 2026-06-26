@@ -23,7 +23,16 @@ type RequestDetails = {
   area: string;
   product: string;
   callType: string;
+  serviceBillingType: string | null;
+  chargeableAmount: number | null;
 };
+
+type BillingType = "warranty" | "amc" | "chargeable";
+const BILLING_TYPE_OPTIONS: Array<{ id: BillingType; label: string }> = [
+  { id: "warranty", label: "Warranty" },
+  { id: "amc", label: "AMC" },
+  { id: "chargeable", label: "Chargeable" },
+];
 
 const AREAS = [
   "Alipore",
@@ -70,9 +79,32 @@ export function DocketDetailsModal({
   const [area, setArea] = React.useState(request.area);
   const [product, setProduct] = React.useState(request.product);
   const [callType, setCallType] = React.useState(request.callType);
+  const [serviceBillingType, setServiceBillingType] = React.useState<BillingType | "">(
+    request.serviceBillingType && BILLING_TYPE_OPTIONS.some((option) => option.id === request.serviceBillingType)
+      ? (request.serviceBillingType as BillingType)
+      : "",
+  );
+  const [chargeableAmount, setChargeableAmount] = React.useState(
+    request.chargeableAmount !== null && request.chargeableAmount !== undefined ? String(request.chargeableAmount) : "",
+  );
   const callTypeOptions = request.callType && !CALL_TYPE_OPTIONS.includes(request.callType as (typeof CALL_TYPE_OPTIONS)[number])
     ? [request.callType, ...CALL_TYPE_OPTIONS]
     : [...CALL_TYPE_OPTIONS];
+  const isServiceCall = callType === "Service";
+  const isChargeable = isServiceCall && serviceBillingType === "chargeable";
+
+  React.useEffect(() => {
+    if (callType !== "Service") {
+      setServiceBillingType("");
+      setChargeableAmount("");
+    }
+  }, [callType]);
+
+  React.useEffect(() => {
+    if (serviceBillingType !== "chargeable") {
+      setChargeableAmount("");
+    }
+  }, [serviceBillingType]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,6 +124,8 @@ export function DocketDetailsModal({
     formData.append("area", area);
     formData.append("product", product);
     formData.append("callType", callType);
+    formData.append("serviceBillingType", isServiceCall ? serviceBillingType : "");
+    formData.append("chargeableAmount", isChargeable ? chargeableAmount : "");
 
     await updateServiceRequestDetails(formData);
     setIsOpen(false);
@@ -237,6 +271,55 @@ export function DocketDetailsModal({
                     />
                   )}
                 </GridField>
+
+                {isServiceCall ? (
+                  <div className="md:col-span-2">
+                    <span className="mb-2 block text-sm font-medium text-blue-700">Service Type</span>
+                    {canEdit ? (
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                        <div className="flex flex-wrap gap-4">
+                          {BILLING_TYPE_OPTIONS.map((option) => (
+                            <label key={option.id} className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-blue-900">
+                              <input
+                                type="checkbox"
+                                checked={serviceBillingType === option.id}
+                                onChange={() =>
+                                  setServiceBillingType((currentValue) => (currentValue === option.id ? "" : option.id))
+                                }
+                                className="h-4 w-4 rounded border-blue-300 text-blue-700 focus:ring-blue-500"
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+
+                        {isChargeable ? (
+                          <label className="mt-4 block">
+                            <span className="mb-2 block text-sm font-medium text-blue-700">Chargeable Amount</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              value={chargeableAmount}
+                              onChange={(e) => setChargeableAmount(e.target.value)}
+                              className="w-full rounded-2xl border border-blue-200 bg-white px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400"
+                              placeholder="Enter amount"
+                              required
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+                        <p className="font-medium capitalize">{serviceBillingType || "Not specified"}</p>
+                        {serviceBillingType === "chargeable" && request.chargeableAmount !== null ? (
+                          <p className="mt-1 text-blue-700">Amount: {formatCurrency(request.chargeableAmount)}</p>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               <GridField label="Full Address">
@@ -304,5 +387,13 @@ function formatRequestDateTime(value: Date | string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 

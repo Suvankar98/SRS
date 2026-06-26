@@ -15,3 +15,15 @@ export function getStatusPillClass(status?: string | null): string {
   }
 }
 
+export function getStatusLabel(status?: string | null): string {
+  if (!status || status === "Pending") {
+    return "Pending";
+  }
+
+  if (status === "Close") {
+    return "Closed";
+  }
+
+  return status;
+}
+

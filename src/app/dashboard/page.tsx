@@ -7,7 +7,7 @@ import { BrandLogo } from "../brand-logo";
 import { DashboardFilters } from "./dashboard-filters";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
-import { getStatusPillClass } from "../status-utils";
+import { getStatusLabel, getStatusPillClass } from "../status-utils";
 import { RemarkPopup } from "../remark-popup";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
@@ -56,9 +56,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
 
   const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
-  const requests = filteredRequests.slice(0, 10);
-  const totalRequests = filteredRequests.length;
-  const assignedRequests = filteredRequests.filter((request) => Boolean(request.assignedToId)).length;
+  const sortedFilteredRequests = sortByDocketSequenceAscending(filteredRequests);
+  const requests = sortedFilteredRequests.slice(-10);
+  const totalRequests = sortedFilteredRequests.length;
+  const assignedRequests = sortedFilteredRequests.filter((request) => Boolean(request.assignedToId)).length;
 
   const unassignedRequests = totalRequests - assignedRequests;
 
@@ -177,8 +178,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
                 <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="pr-2">
-                    <h2 className="text-3xl font-semibold tracking-tight text-blue-950">Service dashboard</h2>
-                    <p className="mt-1 text-sm text-blue-600">Find calls quickly and filter by live status.</p>
+                    <h2 className="text-3xl font-semibold tracking-tight text-blue-950">Service Dashboard</h2>
                   </div>
                   <DashboardFilters
                     initialQuery={searchQuery}
@@ -206,7 +206,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white">
               <div className="space-y-3 p-3 md:hidden">
                 {requests.map((request) => (
-                  <article key={request.id} className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 text-sm text-blue-900">
+                  <article
+                    key={request.id}
+                    className={`rounded-xl border p-3 text-sm text-blue-900 ${
+                      !isEmployee && isClosedStatus(request.status)
+                        ? "border-emerald-300 bg-emerald-50"
+                        : "border-blue-200 bg-blue-50/40"
+                    }`}
+                  >
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <div>
                         <div className="text-xs uppercase tracking-[0.12em] text-blue-600">
@@ -218,20 +225,38 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         </div>
                         <p className="font-semibold text-blue-950">{request.name}</p>
                         <p className="text-xs font-normal text-blue-700">{request.company}</p>
-                        <p className="text-[11px] text-blue-600">{getComplaintAgeLabel(request.createdAt)}</p>
+                        <p className="text-[11px] text-blue-600">{getComplaintAgeLabel(request)}</p>
                       </div>
                       {!isEmployee && (
-                        <StatusPill
-                          label={request.status || "Pending"}
-                          className={getStatusPillClass(request.status)}
-                        />
+                        <div className="flex flex-col items-end">
+                          <StatusPill
+                            label={getStatusLabel(request.status)}
+                            className={getStatusPillClass(request.status)}
+                          />
+                          {request.statusReason && (
+                            <div className="mt-2">
+                              <RemarkPopup remark={request.statusReason} />
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                       <Detail label="Location" value={request.area} />
                       <Detail label="Product" value={request.product} />
-                      <Detail label="Call Type" value={request.callType} />
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Call Type</p>
+                        <p className="mt-0.5 break-words text-blue-900">{request.callType}</p>
+                        {request.callType === "Service" && request.serviceBillingType ? (
+                          <p className="mt-0.5 text-[11px] font-bold text-blue-700">
+                            {formatServiceBillingType(request.serviceBillingType)}
+                            {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
+                              ? ` - ${formatINRCurrency(request.chargeableAmount)}`
+                              : ""}
+                          </p>
+                        ) : null}
+                      </div>
                       <Detail label="Phone" value={request.phoneNumber1} />
                       {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
                       {isEmployee ? (
@@ -241,43 +266,41 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                             <StatusUpdateModal request={request} />
                           </div>
                         </div>
-                      ) : (
-                        <>
-                          <div>
-                            <StatusPill label={request.status || "Pending"} className={getStatusPillClass(request.status)} />
-                            {request.statusReason && (
-                              <div className="mt-2">
-                                <RemarkPopup remark={request.statusReason} />
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      )}
+                      ) : null}
                     </div>
 
                     {canAssign ? (
-                      <form action={assignServiceCall} className="mt-3 space-y-2">
-                        <input type="hidden" name="requestId" value={request.id} />
-                        <label className="block text-xs font-medium text-blue-700">Allocate employee</label>
-                        <select
-                          name="assignedToId"
-                          defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                          className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                        >
-                          <option value="">Select employee</option>
-                          {employees.map((employee) => (
-                            <option key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="submit"
-                          className="w-full rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-                        >
-                          Save
-                        </button>
-                      </form>
+                      isClosedStatus(request.status) ? (
+                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-emerald-900">
+                            <span className="uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
+                            {getClosedByName(request)}
+                          </p>
+                        </div>
+                      ) : (
+                        <form action={assignServiceCall} className="mt-3 space-y-2">
+                          <input type="hidden" name="requestId" value={request.id} />
+                          <label className="block text-xs font-medium text-blue-700">Allocate employee</label>
+                          <select
+                            name="assignedToId"
+                            defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
+                            className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                          >
+                            <option value="">Select employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="submit"
+                            className="w-full rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+                          >
+                            Save
+                          </button>
+                        </form>
+                      )
                     ) : null}
                   </article>
                 ))}
@@ -299,7 +322,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   </thead>
                   <tbody className="divide-y divide-blue-100 bg-white">
                     {requests.map((request) => (
-                      <tr key={request.id} className="align-top text-blue-900">
+                      <tr
+                        key={request.id}
+                        className={`align-top text-blue-900 ${
+                          !isEmployee && isClosedStatus(request.status) ? "bg-emerald-50/80" : ""
+                        }`}
+                      >
                         <Td strong>
                           <DocketDetailsModal
                             request={request}
@@ -307,21 +335,31 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                             products={products}
                           />
                         </Td>
-                        <Td>{getComplaintAgeLabel(request.createdAt)}</Td>
+                        <Td>{getComplaintAgeLabel(request)}</Td>
                         <Td>
                           <p className="font-semibold text-blue-950">{request.name}</p>
                           <p className="mt-0.5 text-xs font-normal text-blue-700">{request.company}</p>
                         </Td>
                         <Td>{request.area}</Td>
                         <Td>{request.product}</Td>
-                        <Td>{request.callType}</Td>
+                        <Td>
+                          <p>{request.callType}</p>
+                          {request.callType === "Service" && request.serviceBillingType ? (
+                            <p className="mt-1 text-[11px] font-bold text-blue-700">
+                              {formatServiceBillingType(request.serviceBillingType)}
+                              {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
+                                ? ` - ${formatINRCurrency(request.chargeableAmount)}`
+                                : ""}
+                            </p>
+                          ) : null}
+                        </Td>
                         <Td>
                           {isEmployee ? (
                             <StatusUpdateModal request={request} />
                           ) : (
                             <div className="space-y-1">
                               <StatusPill
-                                label={request.status || "Pending"}
+                                label={getStatusLabel(request.status)}
                                 className={getStatusPillClass(request.status)}
                               />
                               {request.statusReason && (
@@ -334,27 +372,36 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         </Td>
                         {canAssign ? (
                           <Td>
-                            <form action={assignServiceCall} className="flex items-center gap-2">
-                              <input type="hidden" name="requestId" value={request.id} />
-                              <select
-                                name="assignedToId"
-                                defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                                className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                              >
-                                <option value="">Select employee</option>
-                                {employees.map((employee) => (
-                                  <option key={employee.id} value={employee.id}>
-                                    {employee.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="submit"
-                                className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
-                              >
-                                Save
-                              </button>
-                            </form>
+                            {isClosedStatus(request.status) ? (
+                              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
+                                <p className="text-xs font-semibold text-emerald-900">
+                                  <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
+                                  {getClosedByName(request)}
+                                </p>
+                              </div>
+                            ) : (
+                              <form action={assignServiceCall} className="flex items-center gap-2">
+                                <input type="hidden" name="requestId" value={request.id} />
+                                <select
+                                  name="assignedToId"
+                                  defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
+                                  className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+                                >
+                                  <option value="">Select employee</option>
+                                  {employees.map((employee) => (
+                                    <option key={employee.id} value={employee.id}>
+                                      {employee.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="submit"
+                                  className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
+                                >
+                                  Save
+                                </button>
+                              </form>
+                            )}
                           </Td>
                         ) : null}
                       </tr>
@@ -409,10 +456,14 @@ function Td({ children, strong = false }: { children: React.ReactNode; strong?: 
   );
 }
 
-function getComplaintAgeLabel(date: Date) {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+function getComplaintAgeLabel(request: { createdAt: Date; status: string | null } & Record<string, unknown>) {
+  const createdAt = request.createdAt;
+  const closedAt = getClosedAt(request);
+  const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
+
+  const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
+  const createdDay = getDayNumberInTimeZone(createdAt, "Asia/Kolkata");
+  const days = Math.max(0, endDay - createdDay);
 
   if (days === 0) {
     return "Today";
@@ -423,6 +474,71 @@ function getComplaintAgeLabel(date: Date) {
   }
 
   return `${days} days`;
+}
+
+function getDayNumberInTimeZone(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+
+  return Math.floor(Date.UTC(year, month - 1, day) / (1000 * 60 * 60 * 24));
+}
+
+function isClosedStatus(status: string | null) {
+  return (status || "Pending") === "Close";
+}
+
+function getClosedByName(request: Record<string, unknown>) {
+  const value = request.closedByName;
+  return typeof value === "string" && value.trim() !== "" ? value : "Unknown";
+}
+
+function getClosedAt(request: Record<string, unknown>) {
+  const value = request.closedAt;
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function formatServiceBillingType(value: string) {
+  if (value === "amc") {
+    return "AMC";
+  }
+
+  if (value === "warranty") {
+    return "Warranty";
+  }
+
+  if (value === "chargeable") {
+    return "Chargeable";
+  }
+
+  return value;
+}
+
+function formatINRCurrency(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function getSearchParamValue(value: string | string[] | undefined) {
@@ -479,6 +595,32 @@ function filterRequests<
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
 
     return matchesStatus && matchesSearch;
+  });
+}
+
+function getDocketSequence(docketNumber: string) {
+  const match = /^srs-(\d+)$/i.exec(docketNumber.trim());
+  if (!match) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const value = Number.parseInt(match[1], 10);
+  return Number.isNaN(value) ? Number.MAX_SAFE_INTEGER : value;
+}
+
+function sortByDocketSequenceAscending<T extends { docketNumber: string }>(requests: T[]) {
+  return [...requests].sort((a, b) => {
+    const aSequence = getDocketSequence(a.docketNumber);
+    const bSequence = getDocketSequence(b.docketNumber);
+
+    if (aSequence !== bSequence) {
+      return aSequence - bSequence;
+    }
+
+    return a.docketNumber.localeCompare(b.docketNumber, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 }
 

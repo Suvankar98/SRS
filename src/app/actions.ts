@@ -18,6 +18,46 @@ function getRequiredField(formData: FormData, key: string) {
   return value.trim();
 }
 
+const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
+type ServiceBillingType = (typeof SERVICE_BILLING_TYPES)[number];
+
+function getServiceBillingFields(formData: FormData, callType: string) {
+  const serviceBillingTypeRaw = formData.get("serviceBillingType");
+  const serviceBillingTypeValue =
+    typeof serviceBillingTypeRaw === "string" ? serviceBillingTypeRaw.trim().toLowerCase() : "";
+
+  let serviceBillingType: ServiceBillingType | null = null;
+  let chargeableAmount: number | null = null;
+
+  if (callType === "Service") {
+    if (serviceBillingTypeValue !== "") {
+      if (!SERVICE_BILLING_TYPES.includes(serviceBillingTypeValue as ServiceBillingType)) {
+        throw new Error("Invalid service billing type");
+      }
+
+      serviceBillingType = serviceBillingTypeValue as ServiceBillingType;
+    }
+
+    if (serviceBillingType === "chargeable") {
+      const amountRaw = formData.get("chargeableAmount");
+      const amountValue = typeof amountRaw === "string" ? amountRaw.trim() : "";
+
+      if (amountValue === "") {
+        throw new Error("Chargeable amount is required for chargeable service calls");
+      }
+
+      const parsedAmount = Number.parseFloat(amountValue);
+      if (Number.isNaN(parsedAmount) || parsedAmount < 0) {
+        throw new Error("Invalid chargeable amount");
+      }
+
+      chargeableAmount = parsedAmount;
+    }
+  }
+
+  return { serviceBillingType, chargeableAmount };
+}
+
 function redirectToDatabaseError() {
   redirect("/?error=2");
 }
@@ -117,6 +157,7 @@ export async function createServiceRequest(formData: FormData) {
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
+  const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
   const phoneNumber2Value = formData.get("phoneNumber2");
   const phoneNumber2 =
     typeof phoneNumber2Value === "string" && phoneNumber2Value.trim() !== ""
@@ -141,6 +182,8 @@ export async function createServiceRequest(formData: FormData) {
         area,
         product,
         callType,
+        serviceBillingType,
+        chargeableAmount,
       },
     });
 
@@ -182,6 +225,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
+  const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
   const phoneNumber2Raw = formData.get("phoneNumber2");
   const phoneNumber2 =
     typeof phoneNumber2Raw === "string" && phoneNumber2Raw.trim() !== ""
@@ -200,6 +244,8 @@ export async function updateServiceRequestDetails(formData: FormData) {
       area,
       product,
       callType,
+      serviceBillingType,
+      chargeableAmount,
     },
   });
 
@@ -472,19 +518,38 @@ export async function updateServiceCallStatus(formData: FormData) {
   // Verify the request belongs to the employee
   const request = await prisma.serviceRequest.findUnique({
     where: { id: requestId },
-    select: { assignedToId: true },
+    select: {
+      assignedToId: true,
+      assignedTo: {
+        select: {
+          name: true,
+        },
+      },
+    },
   });
 
   if (request?.assignedToId !== session.userId) {
     redirect("/dashboard");
   }
 
+  const employee = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true },
+  });
+
   await prisma.serviceRequest.update({
     where: { id: requestId },
     data: {
       status,
       statusReason: reasonValue || null,
+      // On close, unassign the employee so it leaves the employee queue.
+      // Admin/manager dashboards fetch all requests, so closed calls remain visible there.
       assignedToId: status === "Close" ? null : undefined,
+      closedByName:
+        status === "Close"
+          ? (employee?.name || request?.assignedTo?.name || "Unknown")
+          : null,
+      closedAt: status === "Close" ? new Date() : null,
     },
   });
 
