@@ -252,6 +252,19 @@ export async function updateServiceRequestDetails(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function deleteServiceRequest(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+
+  const requestId = getRequiredField(formData, "requestId");
+
+  await prisma.serviceRequest.delete({
+    where: { id: requestId },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/form");
+}
+
 export async function addStaff(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 

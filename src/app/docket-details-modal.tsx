@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { updateServiceRequestDetails } from "./actions";
+import { deleteServiceRequest, updateServiceRequestDetails } from "./actions";
 import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 type SimpleOption = {
@@ -87,24 +87,33 @@ export function DocketDetailsModal({
   const [chargeableAmount, setChargeableAmount] = React.useState(
     request.chargeableAmount !== null && request.chargeableAmount !== undefined ? String(request.chargeableAmount) : "",
   );
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const callTypeOptions = request.callType && !CALL_TYPE_OPTIONS.includes(request.callType as (typeof CALL_TYPE_OPTIONS)[number])
     ? [request.callType, ...CALL_TYPE_OPTIONS]
     : [...CALL_TYPE_OPTIONS];
   const isServiceCall = callType === "Service";
   const isChargeable = isServiceCall && serviceBillingType === "chargeable";
 
-  React.useEffect(() => {
-    if (callType !== "Service") {
+  const handleCallTypeChange = (value: string) => {
+    setCallType(value);
+
+    if (value !== "Service") {
       setServiceBillingType("");
       setChargeableAmount("");
     }
-  }, [callType]);
+  };
 
-  React.useEffect(() => {
-    if (serviceBillingType !== "chargeable") {
-      setChargeableAmount("");
-    }
-  }, [serviceBillingType]);
+  const toggleServiceBillingType = (optionId: BillingType) => {
+    setServiceBillingType((currentValue) => {
+      const nextValue = currentValue === optionId ? "" : optionId;
+
+      if (nextValue !== "chargeable") {
+        setChargeableAmount("");
+      }
+
+      return nextValue;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -130,6 +139,32 @@ export function DocketDetailsModal({
     await updateServiceRequestDetails(formData);
     setIsOpen(false);
     router.refresh();
+  };
+
+  const handleDelete = async () => {
+    if (!canEdit || isDeleting) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete ${request.docketNumber}? This will permanently remove this service request.`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("requestId", String(request.id));
+      await deleteServiceRequest(formData);
+      setIsOpen(false);
+      router.refresh();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -254,7 +289,7 @@ export function DocketDetailsModal({
                   {canEdit ? (
                     <select
                       value={callType}
-                      onChange={(e) => setCallType(e.target.value)}
+                      onChange={(e) => handleCallTypeChange(e.target.value)}
                       className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
                     >
                       {callTypeOptions.map((item) => (
@@ -283,9 +318,7 @@ export function DocketDetailsModal({
                               <input
                                 type="checkbox"
                                 checked={serviceBillingType === option.id}
-                                onChange={() =>
-                                  setServiceBillingType((currentValue) => (currentValue === option.id ? "" : option.id))
-                                }
+                                onChange={() => toggleServiceBillingType(option.id)}
                                 className="h-4 w-4 rounded border-blue-300 text-blue-700 focus:ring-blue-500"
                               />
                               <span>{option.label}</span>
@@ -344,7 +377,19 @@ export function DocketDetailsModal({
                 />
               </GridField>
 
-              <div className="flex flex-col-reverse gap-3 border-t border-blue-200 pt-5 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-3 border-t border-blue-200 pt-5 sm:flex-row sm:justify-between">
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="inline-flex items-center justify-center rounded-full bg-rose-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </button>
+                ) : (
+                  <span />
+                )}
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}

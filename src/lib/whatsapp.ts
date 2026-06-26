@@ -42,10 +42,20 @@ function normalizePhone(raw: string) {
     return null;
   }
 
-  // Most customer numbers are entered as 10-digit local mobile numbers.
+  // Most customer numbers are entered as local Indian mobile numbers.
+  // Handle both 10-digit format and 11-digit numbers with leading 0.
+  if (withoutIntlPrefix.length === 11 && withoutIntlPrefix.startsWith("0")) {
+    return `+91${withoutIntlPrefix.slice(1)}`;
+  }
+
   // Default to +91 when no country code is supplied.
   if (withoutIntlPrefix.length === 10) {
     return `+91${withoutIntlPrefix}`;
+  }
+
+  // Handle explicit India country code without + prefix.
+  if (withoutIntlPrefix.length === 12 && withoutIntlPrefix.startsWith("91")) {
+    return `+${withoutIntlPrefix}`;
   }
 
   return `+${withoutIntlPrefix}`;
