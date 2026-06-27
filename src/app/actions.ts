@@ -578,3 +578,82 @@ export async function canCreateService(): Promise<boolean> {
   const session = await getSession();
   return !!session && roleCanCreateService(session.role);
 }
+
+export async function uploadEmployeeImage(formData: FormData) {
+  const session = await requireSession();
+
+  // Only employees may upload images for their gallery
+  if (session.role !== APP_ROLES.EMPLOYEE) {
+    redirect("/dashboard");
+  }
+
+  const requestId = getRequiredField(formData, "requestId");
+  const file = formData.get("file") as File | null;
+  if (!file || typeof file === "string") {
+    throw new Error("No file uploaded");
+  }
+
+  const allowedTypes = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/gif",
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/ogg",
+    "video/x-msvideo",
+    "video/x-matroska",
+    "video/3gpp",
+    "video/x-ms-wmv",
+    "video/x-m4v",
+  ];
+  const allowedExtensions = [
+    "png",
+    "jpeg",
+    "jpg",
+    "webp",
+    "gif",
+    "mp4",
+    "m4v",
+    "webm",
+    "mov",
+    "qt",
+    "ogv",
+    "avi",
+    "mkv",
+    "3gp",
+    "wmv",
+  ];
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const isAllowedType = file.type ? allowedTypes.includes(file.type) : false;
+  const isAllowedExtension = allowedExtensions.includes(extension);
+
+  if (!isAllowedType && !isAllowedExtension) {
+    throw new Error("Unsupported file type");
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const path = await import("path");
+  const fs = await import("fs");
+
+  const uploadsBase = path.join(process.cwd(), "public", "uploads");
+  const requestDir = path.join(uploadsBase, session.userId, requestId);
+
+  await fs.promises.mkdir(requestDir, { recursive: true });
+
+  const timestamp = Date.now();
+  const safeName = `${timestamp}-${sanitizeFileName(file.name)}`;
+  const filePath = path.join(requestDir, safeName);
+
+  await fs.promises.writeFile(filePath, buffer);
+
+  revalidatePath("/dashboard");
+}
+
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 200);
+}

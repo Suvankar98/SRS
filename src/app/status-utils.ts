@@ -27,3 +27,23 @@ export function getStatusLabel(status?: string | null): string {
   return status;
 }
 
+export function formatServiceBillingType(value: string) {
+  if (value === "amc") {
+    return "AMC";
+  }
+
+  if (value === "chargeable") {
+    return "Chargeable";
+  }
+
+  return value;
+}
+
+export function formatINRCurrency(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+

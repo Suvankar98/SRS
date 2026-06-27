@@ -9,6 +9,9 @@ import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { getStatusLabel, getStatusPillClass } from "../status-utils";
 import { RemarkPopup } from "../remark-popup";
+import { EmployeeMediaUpload } from "./employee-media-upload";
+import { CopyPhoneButton } from "./copy-phone-button";
+import { DashboardRequestRow } from "./dashboard-request-row";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -94,6 +97,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </Link>
             {(session.role === APP_ROLES.ADMIN || canAssign) && (
               <Link
+                href="/gallery"
+                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+              >
+                Gallery
+              </Link>
+            )}
+            {(session.role === APP_ROLES.ADMIN || canAssign) && (
+              <Link
                 href="/form"
                 className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
               >
@@ -147,6 +158,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     New Call
                   </Link>
                 )}
+                {(session.role === APP_ROLES.ADMIN || canAssign) && (
+                  <Link
+                    href="/gallery"
+                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                  >
+                    Gallery
+                  </Link>
+                )}
                 {session.role === APP_ROLES.ADMIN && (
                   <Link
                     href="/admin"
@@ -172,246 +191,196 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <section className="min-h-[calc(100vh-3rem)] pt-20">
 
         <div className="rounded-[2rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:p-6">
-          {!isEmployee ? (
-            <header className="mb-3 grid gap-2 xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-              <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-5 py-5">
-                <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
-                <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="pr-2">
-                    <h2 className="text-3xl font-semibold tracking-tight text-blue-950">Service Dashboard</h2>
+          <div>
+              {!isEmployee ? (
+                <header className="mb-3 grid gap-2 xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                  <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-5 py-5">
+                    <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
+                    <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="pr-2">
+                        <h2 className="text-3xl font-semibold tracking-tight text-blue-950">Service Dashboard</h2>
+                      </div>
+                      <DashboardFilters
+                        initialQuery={searchQuery}
+                        initialStatuses={selectedStatuses}
+                      />
+                    </div>
                   </div>
-                  <DashboardFilters
-                    initialQuery={searchQuery}
-                    initialStatuses={selectedStatuses}
-                  />
-                </div>
-              </div>
 
-              {showSummaryCards && (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-                <MetricCard title="Total Calls" value={totalRequests} subtitle="All visible complaints" />
-                <MetricCard title="Assigned" value={assignedRequests} subtitle="Allocated to employee" />
-                <MetricCard title="Unassigned" value={unassignedRequests} subtitle="Need allocation" />
-              </div>
-              )}
-            </header>
-          ) : null}
-
-          {requests.length === 0 ? (
-            <section className="rounded-2xl border border-dashed border-blue-300 bg-blue-50/50 px-6 py-16 text-center text-blue-700">
-              <p className="text-lg font-semibold text-blue-900">No service requests available</p>
-              <p className="mt-2 text-sm">New calls will appear here once created.</p>
-            </section>
-          ) : (
-            <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white">
-              <div className="space-y-3 p-3 md:hidden">
-                {requests.map((request) => (
-                  <article
-                    key={request.id}
-                    className={`rounded-xl border p-3 text-sm text-blue-900 ${
-                      !isEmployee && isClosedStatus(request.status)
-                        ? "border-emerald-300 bg-emerald-50"
-                        : "border-blue-200 bg-blue-50/40"
-                    }`}
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.12em] text-blue-600">
-                          <DocketDetailsModal
-                            request={request}
-                            canEdit={canEditDocket}
-                            products={products}
-                          />
-                        </div>
-                        <p className="font-semibold text-blue-950">{request.name}</p>
-                        <p className="text-xs font-normal text-blue-700">{request.company}</p>
-                        <p className="text-[11px] text-blue-600">{getComplaintAgeLabel(request)}</p>
-                      </div>
-                      {!isEmployee && (
-                        <div className="flex flex-col items-end">
-                          <StatusPill
-                            label={getStatusLabel(request.status)}
-                            className={getStatusPillClass(request.status)}
-                          />
-                          {request.statusReason && (
-                            <div className="mt-2">
-                              <RemarkPopup remark={request.statusReason} />
-                            </div>
-                          )}
-                        </div>
-                      )}
+                  {showSummaryCards && (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+                      <MetricCard title="Total Calls" value={totalRequests} subtitle="All visible complaints" />
+                      <MetricCard title="Assigned" value={assignedRequests} subtitle="Allocated to employee" />
+                      <MetricCard title="Unassigned" value={unassignedRequests} subtitle="Need allocation" />
                     </div>
+                  )}
+                </header>
+              ) : null}
 
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                      <Detail label="Location" value={request.area} />
-                      <Detail label="Product" value={request.product} />
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Call Type</p>
-                        <p className="mt-0.5 break-words text-blue-900">{request.callType}</p>
-                        {request.callType === "Service" && request.serviceBillingType ? (
-                          <p className="mt-0.5 text-[11px] font-bold text-blue-700">
-                            {formatServiceBillingType(request.serviceBillingType)}
-                            {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
-                              ? ` - ${formatINRCurrency(request.chargeableAmount)}`
-                              : ""}
-                          </p>
-                        ) : null}
-                      </div>
-                      <Detail label="Phone" value={request.phoneNumber1} />
-                      {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
-                      {isEmployee ? (
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Status</p>
-                          <div className="mt-1">
-                            <StatusUpdateModal request={request} />
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {canAssign ? (
-                      isClosedStatus(request.status) ? (
-                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-emerald-900">
-                            <span className="uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
-                            {getClosedByName(request)}
-                          </p>
-                        </div>
-                      ) : (
-                        <form action={assignServiceCall} className="mt-3 space-y-2">
-                          <input type="hidden" name="requestId" value={request.id} />
-                          <label className="block text-xs font-medium text-blue-700">Allocate employee</label>
-                          <select
-                            name="assignedToId"
-                            defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                            className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                          >
-                            <option value="">Select employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="submit"
-                            className="w-full rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-                          >
-                            Save
-                          </button>
-                        </form>
-                      )
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-
-              <div className="hidden md:block">
-                <table className="w-full table-auto divide-y divide-blue-100 text-left text-xs">
-                  <thead className="bg-blue-50 text-blue-700">
-                    <tr>
-                      <Th>Docket</Th>
-                      <Th>Days Old</Th>
-                      <Th>Name</Th>
-                      <Th>Location</Th>
-                      <Th>Product</Th>
-                      <Th>Call Type</Th>
-                      <Th>Status</Th>
-                      {canAssign ? <Th>Allocate</Th> : null}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-blue-100 bg-white">
+              {requests.length === 0 ? (
+                <section className="rounded-2xl border border-dashed border-blue-300 bg-blue-50/50 px-6 py-16 text-center text-blue-700">
+                  <p className="text-lg font-semibold text-blue-900">No service requests available</p>
+                  <p className="mt-2 text-sm">New calls will appear here once created.</p>
+                </section>
+              ) : (
+                <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white">
+                  <div className="space-y-3 p-3 md:hidden">
                     {requests.map((request) => (
-                      <tr
+                      <article
                         key={request.id}
-                        className={`align-top text-blue-900 ${
-                          !isEmployee && isClosedStatus(request.status) ? "bg-emerald-50/80" : ""
+                        className={`rounded-xl border p-3 text-sm text-blue-900 ${
+                          !isEmployee && isClosedStatus(request.status)
+                            ? "border-emerald-300 bg-emerald-50"
+                            : "border-blue-200 bg-blue-50/40"
                         }`}
                       >
-                        <Td strong>
-                          <DocketDetailsModal
-                            request={request}
-                            canEdit={canEditDocket}
-                            products={products}
-                          />
-                        </Td>
-                        <Td>{getComplaintAgeLabel(request)}</Td>
-                        <Td>
-                          <p className="font-semibold text-blue-950">{request.name}</p>
-                          <p className="mt-0.5 text-xs font-normal text-blue-700">{request.company}</p>
-                        </Td>
-                        <Td>{request.area}</Td>
-                        <Td>{request.product}</Td>
-                        <Td>
-                          <p>{request.callType}</p>
-                          {request.callType === "Service" && request.serviceBillingType ? (
-                            <p className="mt-1 text-[11px] font-bold text-blue-700">
-                              {formatServiceBillingType(request.serviceBillingType)}
-                              {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
-                                ? ` - ${formatINRCurrency(request.chargeableAmount)}`
-                                : ""}
-                            </p>
-                          ) : null}
-                        </Td>
-                        <Td>
-                          {isEmployee ? (
-                            <StatusUpdateModal request={request} />
-                          ) : (
-                            <div className="space-y-1">
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-xs uppercase tracking-[0.12em] text-blue-600">
+                              <DocketDetailsModal
+                                request={request}
+                                canEdit={canEditDocket}
+                                products={products}
+                              />
+                            </div>
+                            <p className="font-semibold text-blue-950">{request.name}</p>
+                            <p className="text-xs font-normal text-blue-700">{request.company}</p>
+                            <p className="text-[11px] text-blue-600">{getComplaintAgeLabel(request)}</p>
+                          </div>
+                          {!isEmployee && (
+                            <div className="flex flex-col items-end">
                               <StatusPill
                                 label={getStatusLabel(request.status)}
                                 className={getStatusPillClass(request.status)}
                               />
                               {request.statusReason && (
-                                <div className="mt-1">
+                                <div className="mt-2">
                                   <RemarkPopup remark={request.statusReason} />
                                 </div>
                               )}
                             </div>
                           )}
-                        </Td>
-                        {canAssign ? (
-                          <Td>
-                            {isClosedStatus(request.status) ? (
-                              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                                <p className="text-xs font-semibold text-emerald-900">
-                                  <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
-                                  {getClosedByName(request)}
-                                </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                          <Detail label="Location" value={request.area} />
+                          <Detail label="Product" value={request.product} />
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Call Type</p>
+                            <p className="mt-0.5 break-words text-blue-900">{request.callType}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Billing</p>
+                            <p className="mt-0.5 break-words text-blue-900">
+                              {request.callType === "Service" && request.serviceBillingType ? (
+                                <span className="font-bold text-blue-700">
+                                  {formatServiceBillingType(request.serviceBillingType)}
+                                  {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
+                                    ? ` - ${formatINRCurrency(request.chargeableAmount)}`
+                                    : ""}
+                                </span>
+                              ) : (
+                                <span className="text-blue-600">Not applicable</span>
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Phone</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-blue-900">
+                              <span>{request.phoneNumber1}</span>
+                              {isEmployee ? (
+                                <span className="inline-flex items-center gap-2 sm:gap-3">
+                                  <CopyPhoneButton value={request.phoneNumber1} />
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
+                          {isEmployee ? (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Status</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <StatusUpdateModal request={request} />
+                                <EmployeeMediaUpload requestId={request.id} />
                               </div>
-                            ) : (
-                              <form action={assignServiceCall} className="flex items-center gap-2">
-                                <input type="hidden" name="requestId" value={request.id} />
-                                <select
-                                  name="assignedToId"
-                                  defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                                  className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                                >
-                                  <option value="">Select employee</option>
-                                  {employees.map((employee) => (
-                                    <option key={employee.id} value={employee.id}>
-                                      {employee.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="submit"
-                                  className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
-                                >
-                                  Save
-                                </button>
-                              </form>
-                            )}
-                          </Td>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {isEmployee ? null : null}
+
+                        {canAssign ? (
+                          isClosedStatus(request.status) ? (
+                            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                              <p className="text-xs font-semibold text-emerald-900">
+                                <span className="uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
+                                {getClosedByName(request)}
+                              </p>
+                            </div>
+                          ) : (
+                            <form action={assignServiceCall} className="mt-3 space-y-2">
+                              <input type="hidden" name="requestId" value={request.id} />
+                              <label className="block text-xs font-medium text-blue-700">Allocate employee</label>
+                              <select
+                                name="assignedToId"
+                                defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
+                                className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                              >
+                                <option value="">Select employee</option>
+                                {employees.map((employee) => (
+                                  <option key={employee.id} value={employee.id}>
+                                    {employee.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="submit"
+                                className="w-full rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+                              >
+                                Save
+                              </button>
+                            </form>
+                          )
                         ) : null}
-                      </tr>
+                      </article>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-        </div>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <table className="w-full table-auto divide-y divide-blue-100 text-left text-xs">
+                      <thead className="bg-blue-50 text-blue-700">
+                        <tr>
+                          <Th>Docket</Th>
+                          <Th>Days Old</Th>
+                          <Th>Name</Th>
+                          <Th>Location</Th>
+                          <Th>Product</Th>
+                          <Th>Call Type</Th>
+                          <Th>Billing</Th>
+                          <Th>Status</Th>
+                          {isEmployee ? <Th>Media</Th> : null}
+                          {canAssign ? <Th>Allocate</Th> : null}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-blue-100 bg-white">
+                      {requests.map((request) => (
+                        <DashboardRequestRow
+                          key={request.id}
+                          request={request}
+                          products={products}
+                          employees={employees}
+                          canEditDocket={canEditDocket}
+                          canAssign={canAssign}
+                          isEmployee={isEmployee}
+                        />
+                      ))}
+                    </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
       </section>
     </main>
   );
@@ -640,4 +609,5 @@ function getEmployeeAvatarDataUri(name: string) {
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
+
 

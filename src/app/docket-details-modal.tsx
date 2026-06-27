@@ -63,13 +63,24 @@ export function DocketDetailsModal({
   request,
   canEdit,
   products,
+  renderTrigger,
+  onReady,
 }: {
   request: RequestDetails;
   canEdit: boolean;
   products: SimpleOption[];
+  renderTrigger?: (open: () => void) => React.ReactNode;
+  onReady?: (open: () => void) => void;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
+  const openModal = () => setIsOpen(true);
+
+  React.useEffect(() => {
+    if (onReady) {
+      onReady(openModal);
+    }
+  }, [onReady]);
   const [name, setName] = React.useState(request.name);
   const [company, setCompany] = React.useState(request.company);
   const [phoneNumber1, setPhoneNumber1] = React.useState(request.phoneNumber1);
@@ -169,13 +180,20 @@ export function DocketDetailsModal({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-600"
-      >
-        {request.docketNumber}
-      </button>
+      {renderTrigger ? (
+        renderTrigger(openModal)
+      ) : (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            openModal();
+          }}
+          className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-600"
+        >
+          {request.docketNumber}
+        </button>
+      )}
 
       {isOpen && (
         <div
@@ -377,33 +395,35 @@ export function DocketDetailsModal({
                 />
               </GridField>
 
-              <div className="flex flex-col-reverse gap-3 border-t border-blue-200 pt-5 sm:flex-row sm:justify-between">
+              <div className="grid gap-3 border-t border-blue-200 pt-5 sm:grid-cols-3">
                 {canEdit ? (
                   <button
                     type="button"
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="inline-flex items-center justify-center rounded-full bg-rose-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="mx-auto max-w-[10rem] rounded-full bg-rose-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isDeleting ? "Deleting..." : "Delete"}
                   </button>
                 ) : (
-                  <span />
+                  <div />
                 )}
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="inline-flex items-center justify-center rounded-full border border-blue-200 px-5 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                  className="mx-auto max-w-[10rem] rounded-full border border-emerald-200 bg-transparent px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
                 >
                   Close
                 </button>
-                {canEdit && (
+                {canEdit ? (
                   <button
                     type="submit"
-                    className="inline-flex items-center justify-center rounded-full bg-blue-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-blue-800"
+                    className="mx-auto max-w-[10rem] rounded-full bg-blue-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
                   >
-                    Save Changes
+                    Save
                   </button>
+                ) : (
+                  <div />
                 )}
               </div>
             </form>
