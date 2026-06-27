@@ -25,7 +25,7 @@ export default async function GalleryPage() {
     redirect("/");
   }
 
-  if (!roleCanAssign(session.role) && session.role !== APP_ROLES.ADMIN) {
+  if (!roleCanAssign(session.role)) {
     redirect("/dashboard");
   }
 
