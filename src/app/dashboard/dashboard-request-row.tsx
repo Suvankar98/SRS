@@ -18,7 +18,7 @@ type DashboardRequestRowProps = {
   request: {
     id: string;
     docketNumber: string;
-    createdAt: string;
+    createdAt: Date;
     name: string;
     company: string;
     phoneNumber1: string;
@@ -33,6 +33,7 @@ type DashboardRequestRowProps = {
     assignedToId: string | null;
     status: string | null;
     statusReason: string | null;
+    closedAt: Date | null;
     closedByName: string | null;
   };
   products: Array<{ id: string; name: string }>;
@@ -60,8 +61,8 @@ export function DashboardRequestRow({
 }: DashboardRequestRowProps) {
   const openModalRef = React.useRef<() => void>(() => {});
 
-  const getComplaintAgeLabel = (request: { createdAt: string; status: string | null }) => {
-    const createdAt = new Date(request.createdAt);
+  const getComplaintAgeLabel = (request: { createdAt: Date; status: string | null }) => {
+    const createdAt = request.createdAt;
     const closedAt = getClosedAt(request);
     const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
 
@@ -89,14 +90,11 @@ export function DashboardRequestRow({
     return (status || "Pending") === "Close";
   };
 
-  const getClosedAt = (request: { createdAt: string; status: string | null } & Record<string, unknown>) => {
+  const getClosedAt = (request: { createdAt: Date; status: string | null } & Record<string, unknown>) => {
     const value = (request as any).closedAt;
 
-    if (typeof value === "string") {
-      const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) {
-        return parsed;
-      }
+    if (value instanceof Date) {
+      return value;
     }
 
     return null;
