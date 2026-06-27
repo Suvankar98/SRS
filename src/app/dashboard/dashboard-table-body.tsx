@@ -2,13 +2,26 @@
 
 import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
-import { StatusPill } from "../status-update-modal";
 import { RemarkPopup } from "../remark-popup";
+import { StatusUpdateModal } from "../status-update-modal";
 import { EmployeeMediaUpload } from "./employee-media-upload";
 import { CopyPhoneButton } from "./copy-phone-button";
 import { assignServiceCall } from "../actions";
 import { formatServiceBillingType, formatINRCurrency } from "../status-utils";
 import { ServiceRequest } from "@prisma/client";
+
+type StatusPillProps = {
+  label: string;
+  className: string;
+};
+
+function StatusPill({ label, className }: StatusPillProps) {
+  return (
+    <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${className}`}>
+      {label}
+    </span>
+  );
+}
 
 export type SimpleOption = {
   id: string;
