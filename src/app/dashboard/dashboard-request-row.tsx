@@ -160,30 +160,32 @@ export function DashboardRequestRow({
             </span>
           )}
         />
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMoveUp?.();
-            }}
-            disabled={!canMoveUp}
-            className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMoveDown?.();
-            }}
-            disabled={!canMoveDown}
-            className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            ↓
-          </button>
-        </div>
+        {!isEmployee ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onMoveUp?.();
+              }}
+              disabled={!canMoveUp}
+              className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onMoveDown?.();
+              }}
+              disabled={!canMoveDown}
+              className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ↓
+            </button>
+          </div>
+        ) : null}
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
         <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">

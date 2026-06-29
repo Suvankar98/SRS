@@ -85,12 +85,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
 
           <div className="hidden items-center gap-2 md:flex">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Dashboard
-            </Link>
+            {!isEmployee && (
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+              >
+                Dashboard
+              </Link>
+            )}
             {(session.role === APP_ROLES.ADMIN || canAssign) && (
               <Link
                 href="/gallery"
@@ -138,14 +140,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <p className="mt-1 text-sm font-semibold text-blue-950">{currentUser?.name || "User"}</p>
               </div>
               <div className="space-y-2">
-                {!isEmployee && (
-                  <Link
-                    href="/dashboard"
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                  >
-                    Dashboard
-                  </Link>
-                )}
                 {(session.role === APP_ROLES.ADMIN || canAssign) && (
                   <Link
                     href="/form"

@@ -99,7 +99,7 @@ export function DashboardRequestList({
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-x-3 gap-y-2 text-xs sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
               <Detail label="Location" value={request.area} />
               <Detail label="Product" value={request.product} />
               <div>
@@ -122,7 +122,7 @@ export function DashboardRequestList({
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-blue-900">
                   <span>{request.phoneNumber1}</span>
                   {isEmployee ? (
-                    <span className="inline-flex items-center gap-2 sm:gap-3">
+                    <span className="inline-flex items-center gap-2">
                       <CopyPhoneButton value={request.phoneNumber1} />
                     </span>
                   ) : null}

@@ -12,7 +12,7 @@ const nunitoSans = Nunito_Sans({
 
 export const metadata: Metadata = {
   title: "SRS Service Desk",
-  description: "Service request form with SQLite-backed dashboard and docket numbers.",
+  description: "SRS Service Desk for managing service requests, employee assignments, and status updates with WhatsApp notifications.",
 };
 
 export default function RootLayout({
