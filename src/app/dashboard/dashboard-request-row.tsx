@@ -69,9 +69,9 @@ export function DashboardRequestRow({
 }: DashboardRequestRowProps) {
   const openModalRef = React.useRef<() => void>(() => {});
 
-  const getComplaintAgeLabel = (request: { createdAt: Date | string; status: string | null }) => {
+  const getComplaintAgeLabel = (request: { createdAt: Date | string; status: string | null; closedAt?: Date | string | null }) => {
     const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
-    const closedAt = getClosedAt(request);
+    const closedAt = getClosedAt(request as { createdAt: Date | string; status: string | null; closedAt?: Date | string | null } & Record<string, unknown>);
     const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
 
     const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
@@ -98,8 +98,8 @@ export function DashboardRequestRow({
     return (status || "Pending") === "Close";
   };
 
-  const getClosedAt = (request: { createdAt: Date; status: string | null } & Record<string, unknown>) => {
-    const value = (request as any).closedAt;
+  const getClosedAt = (request: { createdAt: Date | string; status: string | null; closedAt?: Date | string | null } & Record<string, unknown>) => {
+    const value = request.closedAt;
 
     if (value instanceof Date) {
       return value;
