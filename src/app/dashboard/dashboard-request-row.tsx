@@ -18,7 +18,7 @@ type DashboardRequestRowProps = {
   request: {
     id: string;
     docketNumber: string;
-    createdAt: Date;
+    createdAt: Date | string;
     name: string;
     company: string;
     phoneNumber1: string;
@@ -33,7 +33,7 @@ type DashboardRequestRowProps = {
     assignedToId: string | null;
     status: string | null;
     statusReason: string | null;
-    closedAt: Date | null;
+    closedAt: Date | string | null;
     closedByName: string | null;
   };
   products: Array<{ id: string; name: string }>;
@@ -41,6 +41,10 @@ type DashboardRequestRowProps = {
   canEditDocket: boolean;
   canAssign: boolean;
   isEmployee: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 };
 
 function StatusPill({ label, className }: { label: string; className: string }) {
@@ -58,6 +62,10 @@ export function DashboardRequestRow({
   canEditDocket,
   canAssign,
   isEmployee,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }: DashboardRequestRowProps) {
   const openModalRef = React.useRef<() => void>(() => {});
 
@@ -95,6 +103,13 @@ export function DashboardRequestRow({
 
     if (value instanceof Date) {
       return value;
+    }
+
+    if (typeof value === "string") {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
     }
 
     return null;
@@ -145,8 +160,36 @@ export function DashboardRequestRow({
             </span>
           )}
         />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onMoveUp?.();
+            }}
+            disabled={!canMoveUp}
+            className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onMoveDown?.();
+            }}
+            disabled={!canMoveDown}
+            className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ↓
+          </button>
+        </div>
       </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{getComplaintAgeLabel(request)}</td>
+      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
+        <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">
+          {getComplaintAgeLabel(request)}
+        </span>
+      </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
         <p className="font-semibold text-blue-950">{request.name}</p>
         <p className="mt-0.5 text-xs font-normal text-blue-700">{request.company}</p>
@@ -155,18 +198,14 @@ export function DashboardRequestRow({
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
         <p>{request.callType}</p>
-      </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
-        {request.callType === "Service" && request.serviceBillingType ? (
-          <p className="text-[11px] font-bold text-blue-700">
-            {formatServiceBillingType(request.serviceBillingType)}
-            {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
-              ? ` - ${formatINRCurrency(request.chargeableAmount)}`
-              : ""}
+        {request.callType === "Service" ? (
+          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+            {request.serviceBillingType ? formatServiceBillingType(request.serviceBillingType) : "Not specified"}
           </p>
-        ) : (
-          <p className="text-blue-600">Not applicable</p>
-        )}
+        ) : null}
+      </td>
+      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
+        {formatINRCurrency(request.serviceBillingType === "chargeable" ? request.chargeableAmount ?? 0 : 0)}
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
         {isEmployee ? (

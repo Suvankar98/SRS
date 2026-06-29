@@ -11,7 +11,7 @@ import { getStatusLabel, getStatusPillClass } from "../status-utils";
 import { RemarkPopup } from "../remark-popup";
 import { EmployeeMediaUpload } from "./employee-media-upload";
 import { CopyPhoneButton } from "./copy-phone-button";
-import { DashboardRequestRow } from "./dashboard-request-row";
+import { DashboardRequestList } from "./dashboard-request-list";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -223,161 +223,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <p className="mt-2 text-sm">New calls will appear here once created.</p>
                 </section>
               ) : (
-                <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white">
-                  <div className="space-y-3 p-3 md:hidden">
-                    {requests.map((request) => (
-                      <article
-                        key={request.id}
-                        className={`rounded-xl border p-3 text-sm text-blue-900 ${
-                          !isEmployee && isClosedStatus(request.status)
-                            ? "border-emerald-300 bg-emerald-50"
-                            : "border-blue-200 bg-blue-50/40"
-                        }`}
-                      >
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <div>
-                            <div className="text-xs uppercase tracking-[0.12em] text-blue-600">
-                              <DocketDetailsModal
-                                request={request}
-                                canEdit={canEditDocket}
-                                products={products}
-                              />
-                            </div>
-                            <p className="font-semibold text-blue-950">{request.name}</p>
-                            <p className="text-xs font-normal text-blue-700">{request.company}</p>
-                            <p className="text-[11px] text-blue-600">{getComplaintAgeLabel(request)}</p>
-                          </div>
-                          {!isEmployee && (
-                            <div className="flex flex-col items-end">
-                              <StatusPill
-                                label={getStatusLabel(request.status)}
-                                className={getStatusPillClass(request.status)}
-                              />
-                              {request.statusReason && (
-                                <div className="mt-2">
-                                  <RemarkPopup remark={request.statusReason} />
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                          <Detail label="Location" value={request.area} />
-                          <Detail label="Product" value={request.product} />
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Call Type</p>
-                            <p className="mt-0.5 break-words text-blue-900">{request.callType}</p>
-                          </div>
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Billing</p>
-                            <p className="mt-0.5 break-words text-blue-900">
-                              {request.callType === "Service" && request.serviceBillingType ? (
-                                <span className="font-bold text-blue-700">
-                                  {formatServiceBillingType(request.serviceBillingType)}
-                                  {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
-                                    ? ` - ${formatINRCurrency(request.chargeableAmount)}`
-                                    : ""}
-                                </span>
-                              ) : (
-                                <span className="text-blue-600">Not applicable</span>
-                              )}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Phone</p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-blue-900">
-                              <span>{request.phoneNumber1}</span>
-                              {isEmployee ? (
-                                <span className="inline-flex items-center gap-2 sm:gap-3">
-                                  <CopyPhoneButton value={request.phoneNumber1} />
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                          {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
-                          {isEmployee ? (
-                            <div className="flex flex-col gap-2">
-                              <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Status</p>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <StatusUpdateModal request={request} />
-                                <EmployeeMediaUpload requestId={request.id} />
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {isEmployee ? null : null}
-
-                        {canAssign ? (
-                          isClosedStatus(request.status) ? (
-                            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                              <p className="text-xs font-semibold text-emerald-900">
-                                <span className="uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
-                                {getClosedByName(request)}
-                              </p>
-                            </div>
-                          ) : (
-                            <form action={assignServiceCall} className="mt-3 space-y-2">
-                              <input type="hidden" name="requestId" value={request.id} />
-                              <label className="block text-xs font-medium text-blue-700">Allocate employee</label>
-                              <select
-                                name="assignedToId"
-                                defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                                className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                              >
-                                <option value="">Select employee</option>
-                                {employees.map((employee) => (
-                                  <option key={employee.id} value={employee.id}>
-                                    {employee.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="submit"
-                                className="w-full rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-                              >
-                                Save
-                              </button>
-                            </form>
-                          )
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-
-                  <div className="hidden md:block">
-                    <table className="w-full table-auto divide-y divide-blue-100 text-left text-xs">
-                      <thead className="bg-blue-50 text-blue-700">
-                        <tr>
-                          <Th>Docket</Th>
-                          <Th>Days Old</Th>
-                          <Th>Name</Th>
-                          <Th>Location</Th>
-                          <Th>Product</Th>
-                          <Th>Call Type</Th>
-                          <Th>Billing</Th>
-                          <Th>Status</Th>
-                          {isEmployee ? <Th>Media</Th> : null}
-                          {canAssign ? <Th>Allocate</Th> : null}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-blue-100 bg-white">
-                      {requests.map((request) => (
-                        <DashboardRequestRow
-                          key={request.id}
-                          request={request}
-                          products={products}
-                          employees={employees}
-                          canEditDocket={canEditDocket}
-                          canAssign={canAssign}
-                          isEmployee={isEmployee}
-                        />
-                      ))}
-                    </tbody>
-                    </table>
-                  </div>
-                </section>
+                <DashboardRequestList
+                  requests={requests}
+                  products={products}
+                  employees={employees}
+                  canEditDocket={canEditDocket}
+                  canAssign={canAssign}
+                  isEmployee={isEmployee}
+                />
               )}
             </div>
           </div>
@@ -416,7 +269,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="break-words px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em]">{children}</th>;
+  return <th className="break-words px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-600">{children}</th>;
 }
 
 function Td({ children, strong = false }: { children: React.ReactNode; strong?: boolean }) {
