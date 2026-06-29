@@ -69,8 +69,8 @@ export function DashboardRequestRow({
 }: DashboardRequestRowProps) {
   const openModalRef = React.useRef<() => void>(() => {});
 
-  const getComplaintAgeLabel = (request: { createdAt: Date; status: string | null }) => {
-    const createdAt = request.createdAt;
+  const getComplaintAgeLabel = (request: { createdAt: Date | string; status: string | null }) => {
+    const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
     const closedAt = getClosedAt(request);
     const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
 
