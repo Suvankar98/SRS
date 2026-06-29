@@ -2,15 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { assignServiceCall, logout } from "../actions";
+import { logout } from "../actions";
 import { BrandLogo } from "../brand-logo";
 import { DashboardFilters } from "./dashboard-filters";
-import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { getStatusLabel, getStatusPillClass } from "../status-utils";
-import { RemarkPopup } from "../remark-popup";
-import { EmployeeMediaUpload } from "./employee-media-upload";
-import { CopyPhoneButton } from "./copy-phone-button";
 import { DashboardRequestList } from "./dashboard-request-list";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
