@@ -364,9 +364,9 @@ export function DocketDetailsModal({
                     ) : (
                       <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
                         <p className="font-medium capitalize">{serviceBillingType || "Not specified"}</p>
-                        {serviceBillingType === "chargeable" && request.chargeableAmount !== null ? (
-                          <p className="mt-1 text-blue-700">Amount: {formatCurrency(request.chargeableAmount)}</p>
-                        ) : null}
+                        <p className="mt-1 text-blue-700">
+                          Amount: {formatCurrency(serviceBillingType === "chargeable" ? request.chargeableAmount ?? 0 : 0)}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -411,7 +411,7 @@ export function DocketDetailsModal({
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="mx-auto max-w-[10rem] rounded-full border border-emerald-200 bg-transparent px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+                  className="mx-auto max-w-[10rem] rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
                 >
                   Close
                 </button>
