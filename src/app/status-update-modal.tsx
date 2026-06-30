@@ -20,6 +20,8 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [showReasonInput, setShowReasonInput] = React.useState(
     request.status === "Cancel" || request.status === "Visit & Reschedule"
   );
+  const [submitError, setSubmitError] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleStatusChange = (newStatus: string) => {
     setStatus(newStatus);
@@ -31,14 +33,23 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData();
-    formData.append("requestId", String(request.id));
-    formData.append("status", status);
-    formData.append("statusReason", reason);
+    setSubmitError("");
+    setIsSubmitting(true);
 
-    await updateServiceCallStatus(formData);
-    setIsOpen(false);
-    router.refresh();
+    try {
+      const formData = new FormData();
+      formData.append("requestId", String(request.id));
+      formData.append("status", status);
+      formData.append("statusReason", reason);
+
+      await updateServiceCallStatus(formData);
+      setIsOpen(false);
+      router.refresh();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to update status.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -99,6 +110,11 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 </div>
               )}
 
+              <p className="text-sm text-blue-600">
+                Media upload is required before changing the status.
+              </p>
+              {submitError ? <p className="text-sm font-medium text-red-600">{submitError}</p> : null}
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -109,9 +125,10 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+                  disabled={isSubmitting}
+                  className="flex-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Save Status
+                  {isSubmitting ? "Saving..." : "Save Status"}
                 </button>
               </div>
             </form>

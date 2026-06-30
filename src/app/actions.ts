@@ -545,6 +545,19 @@ export async function updateServiceCallStatus(formData: FormData) {
     redirect("/dashboard");
   }
 
+  const path = await import("path");
+  const fs = await import("fs");
+  const uploadsBase = path.join(process.cwd(), "public", "uploads");
+  const requestDir = path.join(uploadsBase, session.userId, requestId);
+  const hasMedia = await fs.promises
+    .readdir(requestDir)
+    .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
+    .catch(() => false);
+
+  if (!hasMedia) {
+    throw new Error("Please upload at least one image or video before updating the status.");
+  }
+
   const employee = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { name: true },

@@ -110,6 +110,7 @@ export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
         </button>
       </div>
       {fileError ? <p className="text-xs text-red-600">{fileError}</p> : null}
+      <p className="text-[10px] text-blue-600">Required before status update.</p>
     </form>
   );
 }
