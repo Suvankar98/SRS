@@ -1,6 +1,7 @@
 "use client";
 
 import { addCallType, deleteCallType, updateCallType } from "../actions";
+import { ConfirmSubmitButton } from "../confirm-submit-button";
 
 type FixedCallTypeItem = {
   id: string;
@@ -55,13 +56,14 @@ export function FixedCallTypesSection({ initialCallTypes }: FixedCallTypesSectio
             </form>
             <form action={deleteCallType}>
               <input type="hidden" name="id" value={callType.id} />
-              <button
-                type="submit"
+              <ConfirmSubmitButton
+                confirmMessage={`Are you sure you want to delete fixed call type ${callType.name}?`}
+                ariaLabel={`Delete ${callType.name}`}
+                title="Delete fixed call type"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
-                aria-label={`Delete ${callType.name}`}
               >
                 <TrashIcon />
-              </button>
+              </ConfirmSubmitButton>
             </form>
           </div>
         ))}
