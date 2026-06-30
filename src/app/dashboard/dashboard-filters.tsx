@@ -3,13 +3,13 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 
-type DashboardStatus = "Pending" | "Close" | "Cancel" | "Visit & Reschedule";
+type DashboardStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
 const STATUS_OPTIONS: Array<{ label: string; value: DashboardStatus }> = [
-  { label: "Pending", value: "Pending" },
-  { label: "Closed", value: "Close" },
+  { label: "New Call", value: "New Call" },
+  { label: "In Process", value: "In Process" },
+  { label: "Completed", value: "Completed" },
   { label: "Cancel", value: "Cancel" },
-  { label: "Reschedule", value: "Visit & Reschedule" },
 ];
 
 export function DashboardFilters({

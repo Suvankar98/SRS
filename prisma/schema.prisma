@@ -46,7 +46,7 @@ model ServiceRequest {
   chargeableAmount Float?
   assignedToId String?  @db.Uuid
   createdAt    DateTime @default(now())
-  status       String?  @default("Pending")
+  status       String?  @default("New Call")
   statusReason String?
   closedByName String?
   closedAt     DateTime?

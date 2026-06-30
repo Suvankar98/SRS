@@ -218,7 +218,7 @@ export function DashboardRequestList({
 function getComplaintAgeLabel(request: DashboardListRequest) {
   const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
   const closedAt = getClosedAt(request);
-  const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
+  const endDate = request.status === "Completed" && closedAt ? closedAt : new Date();
 
   const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
   const createdDay = getDayNumberInTimeZone(createdAt, "Asia/Kolkata");
@@ -268,7 +268,7 @@ function getDayNumberInTimeZone(value: Date, timeZone: string) {
 }
 
 function isClosedStatus(status: string | null) {
-  return (status || "Pending") === "Close";
+  return (status || "New Call") === "Completed";
 }
 
 function StatusPill({ label, className }: { label: string; className: string }) {

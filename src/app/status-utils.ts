@@ -5,23 +5,23 @@ export function getStatusPillClass(status?: string | null): string {
   switch (status) {
     case "Cancel":
       return "bg-red-100 text-red-800 ring-red-300";
-    case "Visit & Reschedule":
+    case "In Process":
       return "bg-yellow-100 text-yellow-800 ring-yellow-300";
-    case "Close":
+    case "Completed":
       return "bg-green-100 text-green-800 ring-green-300";
-    case "Pending":
+    case "New Call":
     default:
       return "bg-blue-100 text-blue-800 ring-blue-300";
   }
 }
 
 export function getStatusLabel(status?: string | null): string {
-  if (!status || status === "Pending") {
-    return "Pending";
+  if (!status || status === "New Call") {
+    return "New Call";
   }
 
-  if (status === "Close") {
-    return "Closed";
+  if (status === "Completed") {
+    return "Completed";
   }
 
   return status;

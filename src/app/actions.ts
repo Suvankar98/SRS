@@ -523,7 +523,7 @@ export async function updateServiceCallStatus(formData: FormData) {
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
 
   // Validate status values
-  const validStatuses = ["Pending", "Cancel", "Visit & Reschedule", "Close"];
+  const validStatuses = ["New Call", "In Process", "Completed", "Cancel"];
   if (!validStatuses.includes(status)) {
     throw new Error("Invalid status");
   }
@@ -568,14 +568,14 @@ export async function updateServiceCallStatus(formData: FormData) {
     data: {
       status,
       statusReason: reasonValue || null,
-      // On close, unassign the employee so it leaves the employee queue.
-      // Admin/manager dashboards fetch all requests, so closed calls remain visible there.
-      assignedToId: status === "Close" ? null : undefined,
+      // On completion, unassign the employee so it leaves the employee queue.
+      // Admin/manager dashboards fetch all requests, so completed calls remain visible there.
+      assignedToId: status === "Completed" ? null : undefined,
       closedByName:
-        status === "Close"
+        status === "Completed"
           ? (employee?.name || request?.assignedTo?.name || "Unknown")
           : null,
-      closedAt: status === "Close" ? new Date() : null,
+      closedAt: status === "Completed" ? new Date() : null,
     },
   });
 

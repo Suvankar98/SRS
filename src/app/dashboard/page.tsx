@@ -18,7 +18,7 @@ type DashboardPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-type DashboardStatus = "Pending" | "Close" | "Cancel" | "Visit & Reschedule";
+type DashboardStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getSession();
@@ -365,7 +365,7 @@ function getSearchParamValue(value: string | string[] | undefined) {
 
 function getSelectedStatuses(value: string | string[] | undefined): DashboardStatus[] {
   const values = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-  const allowedStatuses: DashboardStatus[] = ["Pending", "Close", "Cancel", "Visit & Reschedule"];
+  const allowedStatuses: DashboardStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
 
   return values.filter((status): status is DashboardStatus =>
     allowedStatuses.includes(status as DashboardStatus),

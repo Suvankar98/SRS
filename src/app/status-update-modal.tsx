@@ -15,18 +15,18 @@ type StatusRequest = {
 export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-  const [status, setStatus] = React.useState(request.status || "Pending");
+  const [status, setStatus] = React.useState(request.status || "New Call");
   const [reason, setReason] = React.useState(request.statusReason || "");
   const [showReasonInput, setShowReasonInput] = React.useState(
-    request.status === "Cancel" || request.status === "Visit & Reschedule"
+    request.status === "Cancel"
   );
   const [submitError, setSubmitError] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleStatusChange = (newStatus: string) => {
     setStatus(newStatus);
-    setShowReasonInput(newStatus === "Cancel" || newStatus === "Visit & Reschedule");
-    if (newStatus !== "Cancel" && newStatus !== "Visit & Reschedule") {
+    setShowReasonInput(newStatus === "Cancel");
+    if (newStatus !== "Cancel") {
       setReason("");
     }
   };
@@ -87,10 +87,10 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                 >
-                  <option value="Pending">Pending</option>
+                  <option value="New Call">New Call</option>
+                  <option value="In Process">In Process</option>
+                  <option value="Completed">Completed</option>
                   <option value="Cancel">Cancel</option>
-                  <option value="Visit & Reschedule">Visit & Reschedule</option>
-                  <option value="Close">Closed</option>
                 </select>
               </div>
 
