@@ -12,10 +12,10 @@ import {
 } from "../actions";
 import { BrandLogo } from "../brand-logo";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
+import { FixedCallTypesSection } from "./fixed-call-types-section";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +35,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const editingStaffId = Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam;
   const hasEditingStaff = typeof editingStaffId === "string" && editingStaffId.trim() !== "";
 
-  const [staffMembers, products] = await Promise.all([
+  const [staffMembers, products, callTypes] = await Promise.all([
     prisma.user.findMany({
       where: { role: { in: [APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE] } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.product.findMany({ orderBy: { name: "asc" } }),
+    prisma.callType.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -269,22 +270,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         </article>
 
-        <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-          <h2 className="text-lg font-semibold text-blue-950">Fixed call types</h2>
-          <p className="mt-2 text-sm leading-6 text-blue-600">
-            Service request forms now use a standard call type list.
-          </p>
-          <div className="mt-4 grid gap-2">
-            {CALL_TYPE_OPTIONS.map((callType) => (
-              <div
-                key={callType}
-                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900"
-              >
-                {callType}
-              </div>
-            ))}
-          </div>
-        </article>
+        <FixedCallTypesSection initialCallTypes={callTypes.map((callType) => ({ id: callType.id, name: callType.name }))} />
       </section>
     </main>
   );
