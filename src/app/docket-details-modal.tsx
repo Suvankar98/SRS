@@ -178,6 +178,16 @@ export function DocketDetailsModal({
     }
   };
 
+  const handleOpenMap = () => {
+    const address = fullAddress.trim();
+    if (!address) {
+      return;
+    }
+
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <>
       {renderTrigger ? (
@@ -373,7 +383,23 @@ export function DocketDetailsModal({
                 ) : null}
               </div>
 
-              <GridField label="Full Address">
+              <GridField
+                label="Full Address"
+                action={
+                  <button
+                    type="button"
+                    onClick={handleOpenMap}
+                    disabled={!fullAddress.trim()}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M12 21C15.866 21 19 17.866 19 14C19 10.134 14 4 12 4C10 4 5 10.134 5 14C5 17.866 8.134 21 12 21Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="14" r="2.5" stroke="currentColor" strokeWidth="1.8"/>
+                    </svg>
+                    Map
+                  </button>
+                }
+              >
                 <textarea
                   rows={4}
                   value={fullAddress}
@@ -395,13 +421,13 @@ export function DocketDetailsModal({
                 />
               </GridField>
 
-              <div className="grid gap-3 border-t border-blue-200 pt-5 sm:grid-cols-3">
+              <div className="grid grid-cols-3 gap-2 border-t border-blue-200 pt-5 sm:gap-3">
                 {canEdit ? (
                   <button
                     type="button"
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="mx-auto max-w-[10rem] rounded-full bg-rose-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-full bg-rose-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isDeleting ? "Deleting..." : "Delete"}
                   </button>
@@ -411,14 +437,14 @@ export function DocketDetailsModal({
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="mx-auto max-w-[10rem] rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
+                  className="w-full rounded-full bg-emerald-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
                 >
                   Close
                 </button>
                 {canEdit ? (
                   <button
                     type="submit"
-                    className="mx-auto max-w-[10rem] rounded-full bg-blue-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+                    className="w-full rounded-full bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
                   >
                     Save
                   </button>
@@ -434,12 +460,21 @@ export function DocketDetailsModal({
   );
 }
 
-function GridField({ label, children }: { label: string; children: React.ReactNode }) {
+function GridField({
+  label,
+  children,
+  action,
+}: {
+  label: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-blue-700">
-        {label}
-      </span>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="block text-sm font-medium text-blue-700">{label}</span>
+        {action ? <div>{action}</div> : null}
+      </div>
       {children}
     </label>
   );
