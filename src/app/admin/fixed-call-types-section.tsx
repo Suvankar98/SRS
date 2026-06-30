@@ -14,36 +14,41 @@ type FixedCallTypesSectionProps = {
 
 export function FixedCallTypesSection({ initialCallTypes }: FixedCallTypesSectionProps) {
   return (
-    <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-      <h2 className="text-lg font-semibold text-blue-950">Fixed call types</h2>
-      <p className="mt-2 text-sm leading-6 text-blue-600">
-        Service request forms now use a standard call type list.
-      </p>
+    <article className="rounded-[2rem] border border-blue-200 bg-gradient-to-br from-white via-sky-50 to-blue-100 p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-blue-950">Fixed call types</h2>
+          <p className="mt-1 text-sm text-blue-600">Standardise the choices used in the service request form.</p>
+        </div>
+        <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700 shadow-sm">
+          {initialCallTypes.length} types
+        </span>
+      </div>
 
-      <form action={addCallType} className="mt-4 flex gap-2">
+      <form action={addCallType} className="mt-5 flex flex-col gap-3 sm:flex-row">
         <input
           name="name"
           placeholder="New call type"
-          className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full rounded-2xl border border-blue-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-400"
           required
         />
         <button
           type="submit"
-          className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+          className="rounded-2xl bg-blue-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-800 sm:min-w-[7rem]"
         >
           Add
         </button>
       </form>
 
-      <div className="mt-4 grid gap-2">
+      <div className="mt-5 grid gap-3">
         {initialCallTypes.map((callType) => (
-          <div key={callType.id} className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
+          <div key={callType.id} className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-white/80 px-3 py-2 shadow-sm">
             <form action={updateCallType} className="flex flex-1 items-center gap-2">
               <input type="hidden" name="id" value={callType.id} />
               <input
                 name="name"
                 defaultValue={callType.name}
-                className="w-full rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm font-medium text-blue-900 outline-none focus:border-blue-400"
+                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-2 text-sm font-medium text-blue-900 outline-none focus:border-blue-400"
                 aria-label={`Edit call type ${callType.name}`}
               />
               <button
