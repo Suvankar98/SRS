@@ -13,7 +13,9 @@ type StatusRequest = {
   statusReason: string | null;
 };
 
-function getInitialEditableStatus(rawStatus: string | null) {
+type EditableStatus = "In Process" | "Completed" | "Cancel";
+
+function getInitialEditableStatus(rawStatus: string | null): EditableStatus {
   const normalizedStatus = normalizeStatus(rawStatus);
   return normalizedStatus === "New Call" ? "In Process" : normalizedStatus;
 }
@@ -38,7 +40,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setIsOpen(true);
   };
 
-  const handleStatusChange = (newStatus: string) => {
+  const handleStatusChange = (newStatus: EditableStatus) => {
     setStatus(newStatus);
     setShowReasonInput(newStatus === "Cancel");
     if (newStatus !== "Cancel") {
@@ -104,7 +106,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 </label>
                 <select
                   value={status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
+                  onChange={(e) => handleStatusChange(e.target.value as EditableStatus)}
                   className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                 >
                   <option value="In Process">In Process</option>
