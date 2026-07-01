@@ -46,6 +46,12 @@ export default async function GalleryPage() {
           >
             Back to Dashboard
           </Link>
+          <Link
+            href="/report"
+            className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+          >
+            Reports
+          </Link>
         </div>
       </div>
 

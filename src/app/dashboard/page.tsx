@@ -5,9 +5,8 @@ import { redirect } from "next/navigation";
 import { logout } from "../actions";
 import { BrandLogo } from "../brand-logo";
 import { DashboardFilters } from "./dashboard-filters";
-import { StatusUpdateModal } from "../status-update-modal";
-import { getStatusLabel, getStatusPillClass } from "../status-utils";
 import { DashboardRequestList } from "./dashboard-request-list";
+import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -36,7 +35,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
 
-  const visibleWhere = isEmployee ? { assignedToId: session.userId } : undefined;
+  const visibleWhere = isEmployee
+    ? {
+        assignedToId: session.userId,
+        OR: [{ status: "New Call" }, { status: null }],
+      }
+    : undefined;
 
   const [allRequests, employees, products, currentUser] = await Promise.all([
     prisma.serviceRequest.findMany({
@@ -103,6 +107,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
             {(session.role === APP_ROLES.ADMIN || canAssign) && (
               <Link
+                href="/report"
+                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+              >
+                Reports
+              </Link>
+            )}
+            {(session.role === APP_ROLES.ADMIN || canAssign) && (
+              <Link
                 href="/form"
                 className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
               >
@@ -154,6 +166,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
                   >
                     Gallery
+                  </Link>
+                )}
+                {(session.role === APP_ROLES.ADMIN || canAssign) && (
+                  <Link
+                    href="/report"
+                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                  >
+                    Reports
                   </Link>
                 )}
                 {session.role === APP_ROLES.ADMIN && (
@@ -214,6 +234,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </section>
               ) : (
                 <DashboardRequestList
+                  key={requests.map((request) => `${request.id}:${request.status ?? ""}:${request.assignedToId ?? ""}`).join("|")}
                   requests={requests}
                   products={products}
                   employees={employees}
@@ -273,7 +294,7 @@ function Td({ children, strong = false }: { children: React.ReactNode; strong?: 
 function getComplaintAgeLabel(request: { createdAt: Date; status: string | null } & Record<string, unknown>) {
   const createdAt = request.createdAt;
   const closedAt = getClosedAt(request);
-  const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
+  const endDate = request.status === "Completed" && closedAt ? closedAt : new Date();
 
   const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
   const createdDay = getDayNumberInTimeZone(createdAt, "Asia/Kolkata");
@@ -306,7 +327,7 @@ function getDayNumberInTimeZone(value: Date, timeZone: string) {
 }
 
 function isClosedStatus(status: string | null) {
-  return (status || "Pending") === "Close";
+  return normalizeStatus(status) === "Completed";
 }
 
 function getClosedByName(request: Record<string, unknown>) {
@@ -391,7 +412,7 @@ function filterRequests<
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   return requests.filter((request) => {
-    const requestStatus = (request.status || "Pending") as DashboardStatus;
+    const requestStatus = normalizeStatus(request.status);
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(requestStatus);
     const matchesSearch =
       normalizedQuery === "" ||

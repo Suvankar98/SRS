@@ -4,7 +4,6 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
-import { EmployeeMediaUpload } from "./employee-media-upload";
 import { CopyPhoneButton } from "./copy-phone-button";
 import { assignServiceCall } from "../actions";
 import {
@@ -72,7 +71,7 @@ export function DashboardRequestRow({
   const getComplaintAgeLabel = (request: { createdAt: Date | string; status: string | null; closedAt?: Date | string | null }) => {
     const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
     const closedAt = getClosedAt(request as { createdAt: Date | string; status: string | null; closedAt?: Date | string | null } & Record<string, unknown>);
-    const endDate = request.status === "Close" && closedAt ? closedAt : new Date();
+    const endDate = request.status === "Completed" && closedAt ? closedAt : new Date();
 
     const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
     const createdDay = getDayNumberInTimeZone(createdAt, "Asia/Kolkata");
@@ -95,7 +94,7 @@ export function DashboardRequestRow({
   };
 
   const isClosedStatus = (status: string | null) => {
-    return (status || "Pending") === "Close";
+    return (status || "New Call") === "Completed";
   };
 
   const getClosedAt = (request: { createdAt: Date | string; status: string | null; closedAt?: Date | string | null } & Record<string, unknown>) => {
@@ -225,11 +224,6 @@ export function DashboardRequestRow({
           </div>
         )}
       </td>
-      {isEmployee ? (
-        <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs text-right" onClick={(event) => event.stopPropagation()}>
-          <EmployeeMediaUpload requestId={request.id} />
-        </td>
-      ) : null}
       {canAssign ? (
         <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
           {isClosedStatus(request.status) ? (

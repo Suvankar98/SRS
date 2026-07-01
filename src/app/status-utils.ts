@@ -2,7 +2,7 @@
  * Get the CSS class for a status pill based on the status value
  */
 export function getStatusPillClass(status?: string | null): string {
-  switch (status) {
+  switch (normalizeStatus(status)) {
     case "Cancel":
       return "bg-red-100 text-red-800 ring-red-300";
     case "In Process":
@@ -16,15 +16,35 @@ export function getStatusPillClass(status?: string | null): string {
 }
 
 export function getStatusLabel(status?: string | null): string {
-  if (!status || status === "New Call") {
+  return normalizeStatus(status);
+}
+
+export function normalizeStatus(status?: string | null): "New Call" | "In Process" | "Completed" | "Cancel" {
+  const normalized = (status || "").trim().toLowerCase();
+
+  if (normalized === "" || normalized === "new call" || normalized === "pending" || normalized === "new") {
     return "New Call";
   }
 
-  if (status === "Completed") {
+  if (
+    normalized === "in process" ||
+    normalized === "in-process" ||
+    normalized === "visit & reschedule" ||
+    normalized === "visit and reschedule" ||
+    normalized === "reschedule"
+  ) {
+    return "In Process";
+  }
+
+  if (normalized === "completed" || normalized === "close" || normalized === "closed") {
     return "Completed";
   }
 
-  return status;
+  if (normalized === "cancel" || normalized === "cancelled" || normalized === "canceled") {
+    return "Cancel";
+  }
+
+  return "New Call";
 }
 
 export function formatServiceBillingType(value: string) {

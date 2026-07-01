@@ -69,6 +69,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 Dashboard
               </Link>
               <Link
+                href="/report"
+                className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-white transition hover:bg-white/20 sm:w-auto"
+              >
+                Reports
+              </Link>
+              <Link
                 href="/form"
                 className="inline-flex h-12 w-full items-center justify-center rounded-full bg-white px-4 text-sm font-medium text-blue-950 transition hover:bg-blue-50 sm:w-auto"
               >

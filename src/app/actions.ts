@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
+import { normalizeStatus } from "./status-utils";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -532,6 +533,7 @@ export async function updateServiceCallStatus(formData: FormData) {
   const request = await prisma.serviceRequest.findUnique({
     where: { id: requestId },
     select: {
+      status: true,
       assignedToId: true,
       assignedTo: {
         select: {
@@ -545,17 +547,28 @@ export async function updateServiceCallStatus(formData: FormData) {
     redirect("/dashboard");
   }
 
-  const path = await import("path");
-  const fs = await import("fs");
-  const uploadsBase = path.join(process.cwd(), "public", "uploads");
-  const requestDir = path.join(uploadsBase, session.userId, requestId);
-  const hasMedia = await fs.promises
-    .readdir(requestDir)
-    .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
-    .catch(() => false);
+  const currentStatus = normalizeStatus(request?.status);
+  if (currentStatus !== "New Call") {
+    throw new Error("Status can only be updated once per allotted call.");
+  }
 
-  if (!hasMedia) {
-    throw new Error("Please upload at least one image or video before updating the status.");
+  if (status === "New Call") {
+    throw new Error("Please choose a status other than New Call.");
+  }
+
+  if (status === "Completed") {
+    const path = await import("path");
+    const fs = await import("fs");
+    const uploadsBase = path.join(process.cwd(), "public", "uploads");
+    const requestDir = path.join(uploadsBase, session.userId, requestId);
+    const hasMedia = await fs.promises
+      .readdir(requestDir)
+      .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
+      .catch(() => false);
+
+    if (!hasMedia) {
+      throw new Error("Please upload at least one image or video before marking this call as Completed.");
+    }
   }
 
   const employee = await prisma.user.findUnique({
@@ -568,9 +581,8 @@ export async function updateServiceCallStatus(formData: FormData) {
     data: {
       status,
       statusReason: reasonValue || null,
-      // On completion, unassign the employee so it leaves the employee queue.
-      // Admin/manager dashboards fetch all requests, so completed calls remain visible there.
-      assignedToId: status === "Completed" ? null : undefined,
+      // Any update beyond New Call removes this item from the employee queue.
+      assignedToId: status !== "New Call" ? null : undefined,
       closedByName:
         status === "Completed"
           ? (employee?.name || request?.assignedTo?.name || "Unknown")

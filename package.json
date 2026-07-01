@@ -9,6 +9,8 @@
     "lint": "eslint",
     "db:push": "prisma db push",
     "db:bootstrap": "node scripts/bootstrapAuthData.js",
+    "db:normalize-statuses": "node scripts/normalizeStatuses.js",
+    "db:normalize-statuses:apply": "node scripts/normalizeStatuses.js --apply",
     "db:seed": "node scripts/seedDummy.js",
     "db:distribute-samples": "node scripts/distributeSampleCalls.js",
     "db:update-dashboard": "node scripts/updateDashboardDummy.js",
@@ -16,10 +18,13 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",
+    "@types/pdfkit": "^0.17.6",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "mongodb": "^7.3.0",
     "next": "16.2.9",
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.19.1",
     "prisma": "^6.16.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"

@@ -3,7 +3,8 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { updateServiceCallStatus } from "./actions";
-import { getStatusLabel } from "./status-utils";
+import { getStatusLabel, normalizeStatus } from "./status-utils";
+import { EmployeeMediaUpload } from "./dashboard/employee-media-upload";
 
 type StatusRequest = {
   id: string;
@@ -12,16 +13,30 @@ type StatusRequest = {
   statusReason: string | null;
 };
 
+function getInitialEditableStatus(rawStatus: string | null) {
+  const normalizedStatus = normalizeStatus(rawStatus);
+  return normalizedStatus === "New Call" ? "In Process" : normalizedStatus;
+}
+
 export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-  const [status, setStatus] = React.useState(request.status || "New Call");
+  const [status, setStatus] = React.useState(getInitialEditableStatus(request.status));
   const [reason, setReason] = React.useState(request.statusReason || "");
   const [showReasonInput, setShowReasonInput] = React.useState(
-    request.status === "Cancel"
+    getInitialEditableStatus(request.status) === "Cancel"
   );
   const [submitError, setSubmitError] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const openModal = () => {
+    const editableStatus = getInitialEditableStatus(request.status);
+    setStatus(editableStatus);
+    setReason(request.statusReason || "");
+    setShowReasonInput(editableStatus === "Cancel");
+    setSubmitError("");
+    setIsOpen(true);
+  };
 
   const handleStatusChange = (newStatus: string) => {
     setStatus(newStatus);
@@ -31,9 +46,14 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setSubmitError("");
+
+    if (showReasonInput && reason.trim() === "") {
+      setSubmitError("Reason is required when status is Cancel.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -56,7 +76,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={openModal}
         className="inline-flex rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 transition hover:bg-blue-200"
       >
         {getStatusLabel(request.status)}
@@ -77,7 +97,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
               <div>
                 <label className="block text-sm font-medium text-blue-700">
                   Status
@@ -87,11 +107,11 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                 >
-                  <option value="New Call">New Call</option>
                   <option value="In Process">In Process</option>
                   <option value="Completed">Completed</option>
                   <option value="Cancel">Cancel</option>
                 </select>
+                <p className="mt-2 text-xs text-blue-600">This can be changed only once for this allotted call.</p>
               </div>
 
               {showReasonInput && (
@@ -103,16 +123,18 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="Enter reason for this status change..."
-                    required={showReasonInput}
                     className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                     rows={4}
                   />
                 </div>
               )}
 
-              <p className="text-sm text-blue-600">
-                Media upload is required before changing the status.
-              </p>
+              {status === "Completed" ? (
+                <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                  <p className="text-sm text-blue-700">Upload media before marking this call as Completed.</p>
+                  <EmployeeMediaUpload requestId={request.id} />
+                </div>
+              ) : null}
               {submitError ? <p className="text-sm font-medium text-red-600">{submitError}</p> : null}
 
               <div className="flex gap-3 pt-4">
@@ -124,14 +146,15 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmit}
                   disabled={isSubmitting}
                   className="flex-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSubmitting ? "Saving..." : "Save Status"}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

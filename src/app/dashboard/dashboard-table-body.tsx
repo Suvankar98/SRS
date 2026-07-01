@@ -4,7 +4,6 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
-import { EmployeeMediaUpload } from "./employee-media-upload";
 import { CopyPhoneButton } from "./copy-phone-button";
 import { assignServiceCall } from "../actions";
 import { formatServiceBillingType, formatINRCurrency } from "../status-utils";
@@ -165,11 +164,6 @@ function DashboardTableRow({
           </div>
         )}
       </td>
-      {isEmployee ? (
-        <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs text-right">
-          <EmployeeMediaUpload requestId={request.id} />
-        </td>
-      ) : null}
       {canAssign ? (
         <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
           {isClosedStatus(request.status) ? (

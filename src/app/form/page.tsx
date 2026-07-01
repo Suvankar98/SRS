@@ -40,6 +40,12 @@ export default async function FormPage() {
             View dashboard
           </Link>
           <Link
+            href="/report"
+            className="inline-flex w-full items-center justify-center rounded-full border border-blue-300/40 bg-blue-300/10 px-5 py-3 text-center text-sm font-medium text-blue-100 transition hover:bg-blue-300/20 sm:w-auto"
+          >
+            Reports
+          </Link>
+          <Link
             href="/admin"
             className="inline-flex w-full items-center justify-center rounded-full border border-blue-300/40 bg-blue-300/10 px-5 py-3 text-center text-sm font-medium text-blue-100 transition hover:bg-blue-300/20 sm:w-auto"
           >

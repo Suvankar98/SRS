@@ -1,0 +1,652 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { Prisma } from "@prisma/client";
+
+import { logout } from "../actions";
+import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
+import { APP_ROLES } from "@/lib/auth-constants";
+import { getSession, roleCanAssign } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
+
+const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
+
+type ReportPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function ReportPage({ searchParams }: ReportPageProps) {
+  const session = await getSession();
+
+  if (!session) {
+    redirect("/");
+  }
+
+  if (!roleCanAssign(session.role)) {
+    redirect("/dashboard");
+  }
+
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
+  const selectedStatus = getCanonicalStatus(getSearchParamValue(resolvedSearchParams.status));
+  const selectedEmployee = getSearchParamValue(resolvedSearchParams.employeeId).trim();
+  const selectedCallType = getSearchParamValue(resolvedSearchParams.callType).trim();
+  const selectedArea = getSearchParamValue(resolvedSearchParams.area).trim();
+  const fromDate = getSearchParamValue(resolvedSearchParams.from).trim();
+  const toDate = getSearchParamValue(resolvedSearchParams.to).trim();
+
+  const [employees, callTypeOptions, areaOptions] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: APP_ROLES.EMPLOYEE },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.serviceRequest.findMany({
+      distinct: ["callType"],
+      select: { callType: true },
+      orderBy: { callType: "asc" },
+    }),
+    prisma.serviceRequest.findMany({
+      distinct: ["area"],
+      select: { area: true },
+      orderBy: { area: "asc" },
+    }),
+  ]);
+
+  const where: Prisma.ServiceRequestWhereInput = buildReportWhere({
+    searchQuery,
+    selectedStatus,
+    selectedEmployee,
+    selectedCallType,
+    selectedArea,
+    fromDate,
+    toDate,
+    employees,
+  });
+
+  const requests = await prisma.serviceRequest.findMany({
+    where,
+    select: {
+      id: true,
+      docketNumber: true,
+      name: true,
+      company: true,
+      status: true,
+      assignedToId: true,
+      createdAt: true,
+      closedByName: true,
+      callType: true,
+      area: true,
+      assignedTo: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const statusCounts: Record<CanonicalStatus, number> = {
+    "New Call": 0,
+    "In Process": 0,
+    Completed: 0,
+    Cancel: 0,
+  };
+
+  for (const request of requests) {
+    const status = normalizeStatus(request.status);
+    statusCounts[status] += 1;
+  }
+
+  const totalCalls = requests.length;
+  const completedCalls = statusCounts.Completed;
+  const cancelCalls = statusCounts.Cancel;
+  const activeCalls = statusCounts["New Call"] + statusCounts["In Process"];
+  const unassignedCalls = requests.filter((request) => request.assignedToId === null).length;
+  const todayCalls = requests.filter((request) => isTodayInIndia(request.createdAt)).length;
+  const activeFilters = getActiveFilterCount({
+    searchQuery,
+    selectedStatus,
+    selectedEmployee,
+    selectedCallType,
+    selectedArea,
+    fromDate,
+    toDate,
+  });
+  const exportParams = new URLSearchParams();
+  if (searchQuery !== "") exportParams.set("q", searchQuery);
+  if (selectedStatus !== "") exportParams.set("status", selectedStatus);
+  if (selectedEmployee !== "") exportParams.set("employeeId", selectedEmployee);
+  if (selectedCallType !== "") exportParams.set("callType", selectedCallType);
+  if (selectedArea !== "") exportParams.set("area", selectedArea);
+  if (fromDate !== "") exportParams.set("from", fromDate);
+  if (toDate !== "") exportParams.set("to", toDate);
+  const exportQuery = exportParams.toString();
+  const csvExportHref = `/api/report/export?format=csv${exportQuery ? `&${exportQuery}` : ""}`;
+  const pdfExportHref = `/api/report/export?format=pdf${exportQuery ? `&${exportQuery}` : ""}`;
+
+  const employeeRows = employees
+    .map((employee) => {
+      const activeAssigned = requests.filter(
+        (request) =>
+          request.assignedToId === employee.id &&
+          ["New Call", "In Process"].includes(normalizeStatus(request.status)),
+      ).length;
+
+      const completedByEmployee = requests.filter(
+        (request) =>
+          normalizeStatus(request.status) === "Completed" &&
+          equalsIgnoreCase(request.closedByName, employee.name),
+      ).length;
+
+      const totalHandled = activeAssigned + completedByEmployee;
+      const completionRate = totalHandled === 0 ? 0 : Math.round((completedByEmployee / totalHandled) * 100);
+
+      return {
+        id: employee.id,
+        name: employee.name,
+        activeAssigned,
+        completedByEmployee,
+        completionRate,
+      };
+    })
+    .sort((a, b) => b.completedByEmployee - a.completedByEmployee || a.name.localeCompare(b.name));
+
+  const recentCalls = requests.slice(0, 50);
+
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
+      <header className="mb-5 rounded-[2rem] border border-blue-200 bg-white p-5 shadow-[0_20px_80px_rgba(29,78,216,0.12)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-blue-500">Service analytics</p>
+            <h1 className="mt-1 text-3xl font-semibold text-blue-950">Report Dashboard</h1>
+            <p className="mt-2 text-sm text-blue-700">Accessible only to Admin and Manager roles.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/form"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              New Call
+            </Link>
+            <Link
+              href="/gallery"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Gallery
+            </Link>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="danger-btn inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium"
+              >
+                Logout
+              </button>
+            </form>
+          </div>
+        </div>
+      </header>
+
+      <section className="mb-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-blue-950">Filters</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
+              {activeFilters} active
+            </span>
+            <a
+              href={csvExportHref}
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Download CSV
+            </a>
+            <a
+              href={pdfExportHref}
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Download PDF
+            </a>
+            <Link
+              href="/report"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Reset
+            </Link>
+          </div>
+        </div>
+
+        <form className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Search</span>
+            <input
+              name="q"
+              defaultValue={searchQuery}
+              placeholder="Docket, customer, company..."
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Status</span>
+            <select
+              name="status"
+              defaultValue={selectedStatus}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            >
+              <option value="">All</option>
+              {STATUS_ORDER.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Assigned To</span>
+            <select
+              name="employeeId"
+              defaultValue={selectedEmployee}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            >
+              <option value="">All</option>
+              <option value="unassigned">Unassigned</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Call Type</span>
+            <select
+              name="callType"
+              defaultValue={selectedCallType}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            >
+              <option value="">All</option>
+              {callTypeOptions.map((row) => (
+                <option key={row.callType} value={row.callType}>
+                  {row.callType}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Area</span>
+            <select
+              name="area"
+              defaultValue={selectedArea}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            >
+              <option value="">All</option>
+              {areaOptions.map((row) => (
+                <option key={row.area} value={row.area}>
+                  {row.area}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">From Date</span>
+            <input
+              type="date"
+              name="from"
+              defaultValue={fromDate}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">To Date</span>
+            <input
+              type="date"
+              name="to"
+              defaultValue={toDate}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            />
+          </label>
+
+          <div className="flex items-end gap-2 xl:justify-end">
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+            >
+              Apply Filters
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <MetricCard title="Filtered Calls" value={String(totalCalls)} subtitle="Matches current filters" />
+        <MetricCard title="Active" value={String(activeCalls)} subtitle="New + In Process" />
+        <MetricCard title="Completed" value={String(completedCalls)} subtitle="Successfully closed" />
+        <MetricCard title="Cancelled" value={String(cancelCalls)} subtitle="Cancelled calls" />
+        <MetricCard title="Unassigned" value={String(unassignedCalls)} subtitle="No current owner" />
+        <MetricCard title="Created Today" value={String(todayCalls)} subtitle="Today in IST" />
+      </section>
+
+      <section className="mt-5 grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-blue-950">Status Breakdown</h2>
+          <div className="mt-4 space-y-3">
+            {STATUS_ORDER.map((status) => (
+              <div key={status} className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
+                      status,
+                    )}`}
+                  >
+                    {getStatusLabel(status)}
+                  </span>
+                  <span className="text-lg font-semibold text-blue-950">{statusCounts[status]}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
+          {employeeRows.length === 0 ? (
+            <p className="mt-3 text-sm text-blue-700">No employees found.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
+                <thead className="bg-blue-50 text-blue-700">
+                  <tr>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Employee</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Active Assigned</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Completed</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Completion Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-blue-100 bg-white">
+                  {employeeRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-2.5 py-2.5 text-blue-950">{row.name}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{row.activeAssigned}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{row.completedByEmployee}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{row.completionRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </article>
+      </section>
+
+      <section className="mt-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+        <h2 className="text-lg font-semibold text-blue-950">Recent Calls (Filtered)</h2>
+        {recentCalls.length === 0 ? (
+          <p className="mt-3 text-sm text-blue-700">No calls found for selected filters.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
+              <thead className="bg-blue-50 text-blue-700">
+                <tr>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Docket</th>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Customer</th>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Area</th>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
+                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-blue-100 bg-white">
+                {recentCalls.map((request) => {
+                  const status = normalizeStatus(request.status);
+                  return (
+                    <tr key={request.id}>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">
+                        <div>
+                          <p className="font-medium">{request.name}</p>
+                          <p className="text-[11px] text-blue-600">{request.company}</p>
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{request.area}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{request.callType}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{request.assignedTo?.name ?? "Unassigned"}</td>
+                      <td className="px-2.5 py-2.5">
+                        <span
+                          className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
+                            status,
+                          )}`}
+                        >
+                          {getStatusLabel(status)}
+                        </span>
+                      </td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{formatDateTime(request.createdAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function buildReportWhere({
+  searchQuery,
+  selectedStatus,
+  selectedEmployee,
+  selectedCallType,
+  selectedArea,
+  fromDate,
+  toDate,
+  employees,
+}: {
+  searchQuery: string;
+  selectedStatus: CanonicalStatus | "";
+  selectedEmployee: string;
+  selectedCallType: string;
+  selectedArea: string;
+  fromDate: string;
+  toDate: string;
+  employees: Array<{ id: string; name: string }>;
+}): Prisma.ServiceRequestWhereInput {
+  const andClauses: Prisma.ServiceRequestWhereInput[] = [];
+
+  if (searchQuery !== "") {
+    andClauses.push({
+      OR: [
+        { docketNumber: { contains: searchQuery, mode: "insensitive" } },
+        { name: { contains: searchQuery, mode: "insensitive" } },
+        { company: { contains: searchQuery, mode: "insensitive" } },
+        { area: { contains: searchQuery, mode: "insensitive" } },
+        { callType: { contains: searchQuery, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (selectedStatus !== "") {
+    andClauses.push(getStatusWhereClause(selectedStatus));
+  }
+
+  if (selectedEmployee === "unassigned") {
+    andClauses.push({ assignedToId: null });
+  } else if (selectedEmployee !== "" && employees.some((employee) => employee.id === selectedEmployee)) {
+    andClauses.push({ assignedToId: selectedEmployee });
+  }
+
+  if (selectedCallType !== "") {
+    andClauses.push({ callType: selectedCallType });
+  }
+
+  if (selectedArea !== "") {
+    andClauses.push({ area: selectedArea });
+  }
+
+  const createdAtFilter = getCreatedAtFilter(fromDate, toDate);
+  if (createdAtFilter) {
+    andClauses.push({ createdAt: createdAtFilter });
+  }
+
+  if (andClauses.length === 0) {
+    return {};
+  }
+
+  return { AND: andClauses };
+}
+
+function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhereInput {
+  if (status === "New Call") {
+    return {
+      OR: [{ status: null }, { status: "New Call" }, { status: "Pending" }, { status: "New" }],
+    };
+  }
+
+  if (status === "In Process") {
+    return {
+      OR: [
+        { status: "In Process" },
+        { status: "in process" },
+        { status: "Visit & Reschedule" },
+        { status: "Visit and Reschedule" },
+        { status: "Reschedule" },
+      ],
+    };
+  }
+
+  if (status === "Completed") {
+    return {
+      OR: [{ status: "Completed" }, { status: "Close" }, { status: "Closed" }],
+    };
+  }
+
+  return {
+    OR: [{ status: "Cancel" }, { status: "Cancelled" }, { status: "Canceled" }],
+  };
+}
+
+function getCreatedAtFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
+  const from = parseDateInput(fromDate, false);
+  const to = parseDateInput(toDate, true);
+
+  if (!from && !to) {
+    return undefined;
+  }
+
+  return {
+    gte: from || undefined,
+    lte: to || undefined,
+  };
+}
+
+function parseDateInput(value: string, endOfDay: boolean): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (endOfDay) {
+    date.setUTCHours(23, 59, 59, 999);
+  }
+
+  return date;
+}
+
+function getCanonicalStatus(value: string): CanonicalStatus | "" {
+  if (STATUS_ORDER.includes(value as CanonicalStatus)) {
+    return value as CanonicalStatus;
+  }
+
+  return "";
+}
+
+function getSearchParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function getActiveFilterCount({
+  searchQuery,
+  selectedStatus,
+  selectedEmployee,
+  selectedCallType,
+  selectedArea,
+  fromDate,
+  toDate,
+}: {
+  searchQuery: string;
+  selectedStatus: CanonicalStatus | "";
+  selectedEmployee: string;
+  selectedCallType: string;
+  selectedArea: string;
+  fromDate: string;
+  toDate: string;
+}) {
+  return [searchQuery, selectedStatus, selectedEmployee, selectedCallType, selectedArea, fromDate, toDate].filter(
+    (value) => value !== "",
+  ).length;
+}
+
+function MetricCard({ title, value, subtitle }: { title: string; value: string; subtitle: string }) {
+  return (
+    <article className="rounded-xl border border-blue-200 bg-white px-3 py-2.5 sm:p-4">
+      <div className="flex items-end justify-between sm:block">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500 sm:text-xs sm:tracking-[0.2em]">{title}</p>
+        <p className="text-2xl leading-none font-semibold text-blue-950 sm:mt-1 sm:text-2xl">{value}</p>
+      </div>
+      <p className="mt-1 hidden text-xs text-blue-600 sm:block">{subtitle}</p>
+    </article>
+  );
+}
+
+function formatDateTime(value: Date) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  }).format(value);
+}
+
+function isTodayInIndia(value: Date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const today = formatter.format(new Date());
+  const target = formatter.format(value);
+  return today === target;
+}
+
+function equalsIgnoreCase(a: string | null, b: string) {
+  if (!a) {
+    return false;
+  }
+
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}

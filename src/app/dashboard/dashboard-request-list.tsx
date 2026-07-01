@@ -4,10 +4,9 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
-import { EmployeeMediaUpload } from "./employee-media-upload";
 import { CopyPhoneButton } from "./copy-phone-button";
 import { DashboardRequestRow } from "./dashboard-request-row";
-import { getStatusLabel, getStatusPillClass } from "../status-utils";
+import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 
 export type DashboardListRequest = {
   id: string;
@@ -136,7 +135,6 @@ export function DashboardRequestList({
                   <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Status</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusUpdateModal request={request} />
-                    <EmployeeMediaUpload requestId={request.id} />
                   </div>
                 </div>
               ) : null}
@@ -188,7 +186,6 @@ export function DashboardRequestList({
               <Th>Call Type</Th>
               <Th>Amount</Th>
               <Th>Status</Th>
-              {isEmployee ? <Th>Media</Th> : null}
               {canAssign ? <Th>Allocate</Th> : null}
             </tr>
           </thead>
@@ -268,7 +265,7 @@ function getDayNumberInTimeZone(value: Date, timeZone: string) {
 }
 
 function isClosedStatus(status: string | null) {
-  return (status || "New Call") === "Completed";
+  return normalizeStatus(status) === "Completed";
 }
 
 function StatusPill({ label, className }: { label: string; className: string }) {
