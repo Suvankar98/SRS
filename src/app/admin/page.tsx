@@ -231,6 +231,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                           <>
                             <p className="font-semibold text-blue-950">{member.name}</p>
                             <p className="mt-1 text-xs text-blue-600">@{member.username}</p>
+                            <p className="mt-2 text-xs font-medium text-blue-800">Points: {member.performancePoints}</p>
                             <p className="mt-2 text-xs text-blue-700">
                               WhatsApp: {member.whatsappNumber ? member.whatsappNumber : "Not provided"}
                             </p>

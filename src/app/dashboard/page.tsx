@@ -38,7 +38,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const visibleWhere = isEmployee
     ? {
         assignedToId: session.userId,
-        OR: [{ status: "New Call" }, { status: null }],
       }
     : undefined;
 
@@ -55,12 +54,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         })
       : Promise.resolve([]),
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } }),
+    prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, performancePoints: true } }),
   ]);
 
   const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
-  const sortedFilteredRequests = sortByDocketSequenceAscending(filteredRequests);
-  const requests = sortedFilteredRequests.slice(-10);
+  const visibleRequests = isEmployee
+    ? filteredRequests.filter((request) => normalizeStatus(request.status) !== "Completed")
+    : filteredRequests;
+  const sortedFilteredRequests = isEmployee
+    ? sortByEmployeeQueueOrder(visibleRequests)
+    : sortByDocketSequenceAscending(visibleRequests);
+  const requests = isEmployee ? sortedFilteredRequests : sortedFilteredRequests.slice(-10);
   const totalRequests = sortedFilteredRequests.length;
   const assignedRequests = sortedFilteredRequests.filter((request) => Boolean(request.assignedToId)).length;
 
@@ -85,6 +89,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="min-w-0 text-center">
               <p className="text-[10px] uppercase tracking-[0.22em] text-blue-500">{session.role}</p>
               <p className="truncate text-base font-semibold text-blue-950">{currentUser?.name || "User"}</p>
+              {isEmployee ? <p className="text-xs text-blue-600">Points: {currentUser?.performancePoints ?? 0}</p> : null}
             </div>
           </div>
 
@@ -150,6 +155,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/80 p-2.5">
                 <p className="text-[10px] uppercase tracking-[0.2em] text-blue-500">{session.role}</p>
                 <p className="mt-1 text-sm font-semibold text-blue-950">{currentUser?.name || "User"}</p>
+                {isEmployee ? <p className="mt-1 text-xs text-blue-600">Points: {currentUser?.performancePoints ?? 0}</p> : null}
               </div>
               <div className="space-y-2">
                 {(session.role === APP_ROLES.ADMIN || canAssign) && (
@@ -456,6 +462,19 @@ function sortByDocketSequenceAscending<T extends { docketNumber: string }>(reque
       numeric: true,
       sensitivity: "base",
     });
+  });
+}
+
+function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt: Date }>(requests: T[]) {
+  return [...requests].sort((a, b) => {
+    const aTime = (a.assignedAt ?? a.createdAt).getTime();
+    const bTime = (b.assignedAt ?? b.createdAt).getTime();
+
+    if (aTime !== bTime) {
+      return bTime - aTime;
+    }
+
+    return b.createdAt.getTime() - a.createdAt.getTime();
   });
 }
 

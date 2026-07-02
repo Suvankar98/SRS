@@ -15,6 +15,7 @@ model User {
   role           UserRole
   createdAt      DateTime @default(now())
   whatsappNumber String?
+  performancePoints Int   @default(0)
   assignedCalls  ServiceRequest[]
 }
 
@@ -45,9 +46,14 @@ model ServiceRequest {
   serviceBillingType String?
   chargeableAmount Float?
   assignedToId String?  @db.Uuid
+  assignedAt   DateTime?
   createdAt    DateTime @default(now())
   status       String?  @default("New Call")
   statusReason String?
+  customerReview String?
+  statusSubmittedAt DateTime?
+  statusPointsDelta Int?
+  reviewPointsDelta Int?
   closedByName String?
   closedAt     DateTime?
   assignedTo   User?    @relation(fields: [assignedToId], references: [id])

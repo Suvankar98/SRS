@@ -13,6 +13,8 @@ type StatusRequest = {
   statusReason: string | null;
 };
 
+type CustomerReview = "Excellent" | "Good" | "Poor" | "Complain" | "No Review";
+
 type EditableStatus = "In Process" | "Completed" | "Cancel";
 
 function getInitialEditableStatus(rawStatus: string | null): EditableStatus {
@@ -28,6 +30,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [showReasonInput, setShowReasonInput] = React.useState(
     getInitialEditableStatus(request.status) === "Cancel"
   );
+  const [customerReview, setCustomerReview] = React.useState<CustomerReview | "">("");
   const [submitError, setSubmitError] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -36,6 +39,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setStatus(editableStatus);
     setReason(request.statusReason || "");
     setShowReasonInput(editableStatus === "Cancel");
+    setCustomerReview("");
     setSubmitError("");
     setIsOpen(true);
   };
@@ -56,6 +60,11 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       return;
     }
 
+    if (customerReview === "") {
+      setSubmitError("Customer review is required before submitting status.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -63,6 +72,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       formData.append("requestId", String(request.id));
       formData.append("status", status);
       formData.append("statusReason", reason);
+      formData.append("customerReview", customerReview);
 
       await updateServiceCallStatus(formData);
       setIsOpen(false);
@@ -130,6 +140,24 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   />
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-blue-700">
+                  Customer Review <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={customerReview}
+                  onChange={(e) => setCustomerReview(e.target.value as CustomerReview | "")}
+                  className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                >
+                  <option value="">Select customer review</option>
+                  <option value="Excellent">Excellent (5 star, +3 pts)</option>
+                  <option value="Good">Good (4 star, +1 pt)</option>
+                  <option value="Poor">Poor (-2 pts)</option>
+                  <option value="Complain">Complain (-5 pts)</option>
+                  <option value="No Review">No Review (0 pts)</option>
+                </select>
+              </div>
 
               {status === "Completed" ? (
                 <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">

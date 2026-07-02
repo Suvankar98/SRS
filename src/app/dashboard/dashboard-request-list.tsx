@@ -6,6 +6,7 @@ import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
 import { CopyPhoneButton } from "./copy-phone-button";
 import { DashboardRequestRow } from "./dashboard-request-row";
+import { assignServiceCall } from "../actions";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 
 export type DashboardListRequest = {
@@ -143,31 +144,35 @@ export function DashboardRequestList({
             <div className="mt-3 flex items-center justify-between gap-2">
               <div className="flex-1" />
               {canAssign ? (
-                isClosedStatus(request.status) ? (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <p className="text-xs font-semibold text-emerald-900">
-                      <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span> {request.closedByName ?? "Unknown"}
-                    </p>
-                  </div>
-                ) : (
-                  <form action="#" className="flex flex-col gap-2 sm:flex-row sm:items-center" onClick={(event) => event.stopPropagation()}>
-                    <select
-                      name="assignedToId"
-                      defaultValue={request.assignedToId ?? ""}
-                      className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 sm:w-auto"
-                    >
-                      <option value="">Select employee</option>
-                      {employees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" className="rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">
-                      Save
-                    </button>
-                  </form>
-                )
+                <div className="space-y-2">
+                  {isClosedStatus(request.status) ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                      <p className="text-xs font-semibold text-emerald-900">
+                        <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span> {request.closedByName ?? "Unknown"}
+                      </p>
+                    </div>
+                  ) : null}
+                  {!isClosedStatus(request.status) ? (
+                    <form action={assignServiceCall} className="flex flex-col gap-2 sm:flex-row sm:items-center" onClick={(event) => event.stopPropagation()}>
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <select
+                        name="assignedToId"
+                        defaultValue={request.assignedToId ?? ""}
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 sm:w-auto"
+                      >
+                        <option value="">Select employee</option>
+                        {employees.map((employee) => (
+                          <option key={employee.id} value={employee.id}>
+                            {employee.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="submit" className="rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">
+                        Save
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           </article>

@@ -19,6 +19,77 @@ function getRequiredField(formData: FormData, key: string) {
   return value.trim();
 }
 
+const STATUS_SCORING_TIME_ZONE = "Asia/Kolkata";
+const CUSTOMER_REVIEW_VALUES = ["Excellent", "Good", "Poor", "Complain", "No Review"] as const;
+type CustomerReview = (typeof CUSTOMER_REVIEW_VALUES)[number];
+
+function getLocalDateTimeParts(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+
+  const lookup = (type: Intl.DateTimeFormatPartTypes) => {
+    const part = parts.find((entry) => entry.type === type)?.value;
+
+    if (!part) {
+      throw new Error(`Missing ${type} date part`);
+    }
+
+    return Number.parseInt(part, 10);
+  };
+
+  return {
+    year: lookup("year"),
+    month: lookup("month"),
+    day: lookup("day"),
+    hour: lookup("hour"),
+    minute: lookup("minute"),
+  };
+}
+
+function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
+  const assignedParts = getLocalDateTimeParts(assignedAt, STATUS_SCORING_TIME_ZONE);
+  const submittedParts = getLocalDateTimeParts(submittedAt, STATUS_SCORING_TIME_ZONE);
+
+  const isSameAllocationDay =
+    assignedParts.year === submittedParts.year &&
+    assignedParts.month === submittedParts.month &&
+    assignedParts.day === submittedParts.day;
+
+  if (!isSameAllocationDay) {
+    return -5;
+  }
+
+  const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
+  return submittedMinutes <= 21 * 60 ? 2 : -2;
+}
+
+function getCustomerReviewPoints(review: CustomerReview) {
+  if (review === "Excellent") {
+    return 3;
+  }
+
+  if (review === "Good") {
+    return 1;
+  }
+
+  if (review === "Poor") {
+    return -2;
+  }
+
+  if (review === "Complain") {
+    return -5;
+  }
+
+  return 0;
+}
+
 const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
 type ServiceBillingType = (typeof SERVICE_BILLING_TYPES)[number];
 
@@ -452,6 +523,7 @@ export async function assignServiceCall(formData: FormData) {
     where: { id: requestId },
     select: {
       assignedToId: true,
+      status: true,
       docketNumber: true,
       name: true,
       company: true,
@@ -465,9 +537,32 @@ export async function assignServiceCall(formData: FormData) {
     },
   });
 
+  if (!previousRequest) {
+    redirect("/dashboard");
+  }
+
+  if (normalizeStatus(previousRequest.status) === "Completed") {
+    redirect("/dashboard");
+  }
+
+  const shouldReopenForQueue =
+    assignedToId !== null &&
+    !!previousRequest &&
+    (assignedToId !== previousRequest.assignedToId || normalizeStatus(previousRequest.status) !== "New Call");
+
+  const allocationChanged = assignedToId !== previousRequest?.assignedToId;
+
   await prisma.serviceRequest.update({
     where: { id: requestId },
-    data: { assignedToId },
+    data: {
+      assignedToId,
+      assignedAt:
+        assignedToId === null
+          ? null
+          : shouldReopenForQueue || allocationChanged
+            ? new Date()
+            : undefined,
+    },
   });
 
   const shouldNotify =
@@ -525,6 +620,7 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   const requestId = getRequiredField(formData, "requestId");
   const status = getRequiredField(formData, "status");
+  const customerReview = getRequiredField(formData, "customerReview");
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
 
@@ -534,11 +630,18 @@ export async function updateServiceCallStatus(formData: FormData) {
     throw new Error("Invalid status");
   }
 
+  if (!CUSTOMER_REVIEW_VALUES.includes(customerReview as CustomerReview)) {
+    throw new Error("Invalid customer review");
+  }
+
   // Verify the request belongs to the employee
   const request = await prisma.serviceRequest.findUnique({
     where: { id: requestId },
     select: {
+      createdAt: true,
       status: true,
+      assignedAt: true,
+      statusSubmittedAt: true,
       assignedToId: true,
       assignedTo: {
         select: {
@@ -553,8 +656,16 @@ export async function updateServiceCallStatus(formData: FormData) {
   }
 
   const currentStatus = normalizeStatus(request?.status);
-  if (currentStatus !== "New Call") {
-    throw new Error("Status can only be updated once per allotted call.");
+  if (currentStatus === "Completed") {
+    throw new Error("Completed calls are locked and cannot be updated.");
+  }
+
+  const allocationStartedAt = request.assignedAt ?? request.createdAt;
+  const alreadyUpdatedForCurrentAllocation =
+    !!request.statusSubmittedAt && request.statusSubmittedAt.getTime() >= allocationStartedAt.getTime();
+
+  if (alreadyUpdatedForCurrentAllocation) {
+    throw new Error("Status can only be updated once per allotment.");
   }
 
   if (status === "New Call") {
@@ -581,19 +692,39 @@ export async function updateServiceCallStatus(formData: FormData) {
     select: { name: true },
   });
 
-  await prisma.serviceRequest.update({
-    where: { id: requestId },
-    data: {
-      status,
-      statusReason: reasonValue || null,
-      // Any update beyond New Call removes this item from the employee queue.
-      assignedToId: status !== "New Call" ? null : undefined,
-      closedByName:
-        status === "Completed"
-          ? (employee?.name || request?.assignedTo?.name || "Unknown")
-          : null,
-      closedAt: status === "Completed" ? new Date() : null,
-    },
+  const submittedAt = new Date();
+  const pointsDelta = getStatusSubmissionPoints(request.assignedAt ?? request.createdAt, submittedAt);
+  const reviewPointsDelta = getCustomerReviewPoints(customerReview as CustomerReview);
+  const totalPointsDelta = pointsDelta + reviewPointsDelta;
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        status,
+        statusReason: reasonValue || null,
+        customerReview,
+        statusSubmittedAt: submittedAt,
+        statusPointsDelta: pointsDelta,
+        reviewPointsDelta,
+        // Any update beyond New Call removes this item from the employee queue.
+        assignedToId: status !== "New Call" ? null : undefined,
+        closedByName:
+          status === "Completed"
+            ? (employee?.name || request?.assignedTo?.name || "Unknown")
+            : null,
+        closedAt: status === "Completed" ? submittedAt : null,
+      },
+    });
+
+    await transaction.user.update({
+      where: { id: session.userId },
+      data: {
+        performancePoints: {
+          increment: totalPointsDelta,
+        },
+      },
+    });
   });
 
   revalidatePath("/dashboard");

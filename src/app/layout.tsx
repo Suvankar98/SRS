@@ -1,7 +1,5 @@
 ﻿import type { Metadata } from "next";
 import { Nunito_Sans } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -27,8 +25,6 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.16),_transparent_34%),linear-gradient(180deg,_#eef6ff_0%,_#ffffff_100%)] text-[#003d73]"
       >
         {children}
-        <Analytics />
-        <SpeedInsights />
       </body>
     </html>
   );
