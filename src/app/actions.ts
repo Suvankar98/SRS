@@ -108,8 +108,13 @@ export async function login(formData: FormData) {
   let user;
 
   try {
-    user = await prisma.user.findUnique({
-      where: { username },
+    user = await prisma.user.findFirst({
+      where: {
+        username: {
+          equals: username,
+          mode: "insensitive",
+        },
+      },
       select: { id: true, password: true, role: true },
     });
   } catch (error) {
