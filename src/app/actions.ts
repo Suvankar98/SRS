@@ -20,8 +20,6 @@ function getRequiredField(formData: FormData, key: string) {
 }
 
 const STATUS_SCORING_TIME_ZONE = "Asia/Kolkata";
-const CUSTOMER_REVIEW_VALUES = ["Excellent", "Good", "Poor", "Complain", "No Review"] as const;
-type CustomerReview = (typeof CUSTOMER_REVIEW_VALUES)[number];
 
 function getLocalDateTimeParts(value: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -68,26 +66,6 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
 
   const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
   return submittedMinutes <= 21 * 60 ? 2 : -2;
-}
-
-function getCustomerReviewPoints(review: CustomerReview) {
-  if (review === "Excellent") {
-    return 3;
-  }
-
-  if (review === "Good") {
-    return 1;
-  }
-
-  if (review === "Poor") {
-    return -2;
-  }
-
-  if (review === "Complain") {
-    return -5;
-  }
-
-  return 0;
 }
 
 const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
@@ -620,7 +598,6 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   const requestId = getRequiredField(formData, "requestId");
   const status = getRequiredField(formData, "status");
-  const customerReview = getRequiredField(formData, "customerReview");
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
 
@@ -628,10 +605,6 @@ export async function updateServiceCallStatus(formData: FormData) {
   const validStatuses = ["New Call", "In Process", "Completed", "Cancel"];
   if (!validStatuses.includes(status)) {
     throw new Error("Invalid status");
-  }
-
-  if (!CUSTOMER_REVIEW_VALUES.includes(customerReview as CustomerReview)) {
-    throw new Error("Invalid customer review");
   }
 
   // Verify the request belongs to the employee
@@ -694,8 +667,6 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   const submittedAt = new Date();
   const pointsDelta = getStatusSubmissionPoints(request.assignedAt ?? request.createdAt, submittedAt);
-  const reviewPointsDelta = getCustomerReviewPoints(customerReview as CustomerReview);
-  const totalPointsDelta = pointsDelta + reviewPointsDelta;
 
   await prisma.$transaction(async (transaction) => {
     await transaction.serviceRequest.update({
@@ -703,10 +674,10 @@ export async function updateServiceCallStatus(formData: FormData) {
       data: {
         status,
         statusReason: reasonValue || null,
-        customerReview,
+        customerReview: null,
         statusSubmittedAt: submittedAt,
         statusPointsDelta: pointsDelta,
-        reviewPointsDelta,
+        reviewPointsDelta: null,
         // Any update beyond New Call removes this item from the employee queue.
         assignedToId: status !== "New Call" ? null : undefined,
         closedByName:
@@ -721,7 +692,7 @@ export async function updateServiceCallStatus(formData: FormData) {
       where: { id: session.userId },
       data: {
         performancePoints: {
-          increment: totalPointsDelta,
+          increment: pointsDelta,
         },
       },
     });
