@@ -4,6 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
+import {
+  ATTENDANCE_POINTS,
+  DOCUMENT_SUBMISSION_POINTS,
+  MATERIAL_HANDOVER_POINTS,
+  REVIEW_POINTS,
+  TEAMWORK_POINTS,
+  isAttendanceOption,
+  isDocumentSubmissionOption,
+  isMaterialHandoverOption,
+  isReviewOption,
+  isTeamworkOption,
+} from "@/lib/employee-performance-rules";
 import { normalizeStatus } from "./status-utils";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -698,6 +710,132 @@ export async function updateServiceCallStatus(formData: FormData) {
     });
   });
 
+  revalidatePath("/dashboard");
+}
+
+export async function addEmployeePerformanceAdjustment(formData: FormData) {
+  const session = await requireSession();
+
+  if (!roleCanAssign(session.role)) {
+    redirect("/dashboard");
+  }
+
+  const employeeId = getRequiredField(formData, "employeeId");
+  const attendanceRaw = getRequiredField(formData, "attendanceOption");
+  const reviewRaw = getRequiredField(formData, "reviewOption");
+  const documentSubmissionRaw = getRequiredField(formData, "documentSubmissionOption");
+  const materialHandoverRaw = getRequiredField(formData, "materialHandoverOption");
+  const teamworkRaw = getRequiredField(formData, "teamworkOption");
+
+  if (!isAttendanceOption(attendanceRaw)) {
+    throw new Error("Invalid attendance option");
+  }
+
+  if (!isReviewOption(reviewRaw)) {
+    throw new Error("Invalid review option");
+  }
+
+  if (!isDocumentSubmissionOption(documentSubmissionRaw)) {
+    throw new Error("Invalid document submission option");
+  }
+
+  if (!isMaterialHandoverOption(materialHandoverRaw)) {
+    throw new Error("Invalid material handover option");
+  }
+
+  if (!isTeamworkOption(teamworkRaw)) {
+    throw new Error("Invalid teamwork option");
+  }
+
+  const attendance = ATTENDANCE_POINTS[attendanceRaw];
+  const review = REVIEW_POINTS[reviewRaw];
+  const documentSubmission = DOCUMENT_SUBMISSION_POINTS[documentSubmissionRaw];
+  const materialHandover = MATERIAL_HANDOVER_POINTS[materialHandoverRaw];
+  const teamwork = TEAMWORK_POINTS[teamworkRaw];
+  const totalDelta =
+    attendance.points + review.points + documentSubmission.points + materialHandover.points + teamwork.points;
+
+  await prisma.$transaction(async (transaction) => {
+    const employee = await transaction.user.findUnique({
+      where: { id: employeeId },
+      select: { id: true, role: true },
+    });
+
+    if (!employee || employee.role !== APP_ROLES.EMPLOYEE) {
+      throw new Error("Employee not found");
+    }
+
+    const pointAdjustmentDelegate = (transaction as unknown as {
+      employeePointAdjustment?: {
+        create: (args: {
+          data: {
+            employeeId: string;
+            updatedById: string;
+            attendanceOption: string;
+            attendancePoints: number;
+            reviewOption: string;
+            reviewPoints: number;
+            documentSubmissionOption: string;
+            documentSubmissionPoints: number;
+            materialHandoverOption: string;
+            materialHandoverPoints: number;
+            teamworkOption: string;
+            teamworkPoints: number;
+            totalDelta: number;
+          };
+        }) => Promise<unknown>;
+      };
+    }).employeePointAdjustment;
+
+    if (pointAdjustmentDelegate?.create) {
+      try {
+        await pointAdjustmentDelegate.create({
+          data: {
+            employeeId,
+            updatedById: session.userId,
+            attendanceOption: attendance.label,
+            attendancePoints: attendance.points,
+            reviewOption: review.label,
+            reviewPoints: review.points,
+            documentSubmissionOption: documentSubmission.label,
+            documentSubmissionPoints: documentSubmission.points,
+            materialHandoverOption: materialHandover.label,
+            materialHandoverPoints: materialHandover.points,
+            teamworkOption: teamwork.label,
+            teamworkPoints: teamwork.points,
+            totalDelta,
+          },
+        });
+      } catch (error) {
+        const code = (error as { code?: string } | null)?.code;
+        const message = error instanceof Error ? error.message : "";
+        const isMissingPointAdjustmentTable =
+          code === "P2021" ||
+          message.toLowerCase().includes("employeepointadjustment") ||
+          message.toLowerCase().includes("does not exist");
+
+        if (!isMissingPointAdjustmentTable) {
+          throw error;
+        }
+
+        console.warn("Skipping EmployeePointAdjustment log write because the table/delegate is not ready yet.", {
+          employeeId,
+          reason: message || code || "unknown",
+        });
+      }
+    }
+
+    await transaction.user.update({
+      where: { id: employeeId },
+      data: {
+        performancePoints: {
+          increment: totalDelta,
+        },
+      },
+    });
+  });
+
+  revalidatePath("/report");
   revalidatePath("/dashboard");
 }
 

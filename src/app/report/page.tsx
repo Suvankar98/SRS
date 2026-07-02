@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 
 import { logout } from "../actions";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
+import { EmployeePointsPopup } from "./employee-points-popup";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -41,7 +41,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const [employees, callTypeOptions, areaOptions] = await Promise.all([
     prisma.user.findMany({
       where: { role: APP_ROLES.EMPLOYEE },
-      select: { id: true, name: true },
+      select: { id: true, name: true, performancePoints: true },
       orderBy: { name: "asc" },
     }),
     prisma.serviceRequest.findMany({
@@ -75,6 +75,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
       name: true,
       company: true,
       status: true,
+      statusPointsDelta: true,
       assignedToId: true,
       createdAt: true,
       closedByName: true,
@@ -130,32 +131,30 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
   const employeeRows = employees
     .map((employee) => {
-      const activeAssigned = requests.filter(
-        (request) =>
-          request.assignedToId === employee.id &&
-          ["New Call", "In Process"].includes(normalizeStatus(request.status)),
-      ).length;
-
-      const completedByEmployee = requests.filter(
+      const completedRequests = requests.filter(
         (request) =>
           normalizeStatus(request.status) === "Completed" &&
           equalsIgnoreCase(request.closedByName, employee.name),
-      ).length;
+      );
 
-      const totalHandled = activeAssigned + completedByEmployee;
-      const completionRate = totalHandled === 0 ? 0 : Math.round((completedByEmployee / totalHandled) * 100);
+      const completedByEmployee = completedRequests.length;
 
       return {
         id: employee.id,
         name: employee.name,
-        activeAssigned,
+        totalPoints: employee.performancePoints,
         completedByEmployee,
-        completionRate,
       };
     })
-    .sort((a, b) => b.completedByEmployee - a.completedByEmployee || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) =>
+        b.totalPoints - a.totalPoints ||
+        b.completedByEmployee - a.completedByEmployee ||
+        a.name.localeCompare(b.name),
+    );
+  const leaderboardTopThree = employeeRows.slice(0, 3);
 
-  const recentCalls = requests.slice(0, 50);
+  const recentCalls = requests;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -167,24 +166,24 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
             <p className="mt-2 text-sm text-blue-700">Accessible only to Admin and Manager roles.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link
+            <a
               href="/dashboard"
               className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
             >
               Dashboard
-            </Link>
-            <Link
+            </a>
+            <a
               href="/form"
               className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
             >
               New Call
-            </Link>
-            <Link
+            </a>
+            <a
               href="/gallery"
               className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
             >
               Gallery
-            </Link>
+            </a>
             <form action={logout}>
               <button
                 type="submit"
@@ -197,7 +196,71 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         </div>
       </header>
 
-      <section className="mb-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+      <section className="mt-5 grid gap-4 lg:grid-cols-3">
+        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] lg:col-span-2">
+          <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
+          {employeeRows.length === 0 ? (
+            <p className="mt-3 text-sm text-blue-700">No employees found.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
+                <thead className="bg-blue-50 text-blue-700">
+                  <tr>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Employee</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Tag</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Points Earned</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-blue-100 bg-white">
+                  {employeeRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-2.5 py-2.5 text-blue-950">{row.name}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900">
+                        <EmployeePointsPopup
+                          employeeId={row.id}
+                          employeeName={row.name}
+                          currentPoints={row.totalPoints}
+                        />
+                      </td>
+                      <td className="px-2.5 py-2.5 text-blue-900">{row.totalPoints}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </article>
+
+        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-blue-950">Leaderboard</h2>
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+              Top 3
+            </span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {[0, 1, 2].map((index) => {
+              const employee = leaderboardTopThree[index];
+              const rank = index + 1;
+
+              return (
+                <div
+                  key={rank}
+                  className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Rank {rank}</p>
+                    <p className="truncate text-sm font-medium text-blue-950">{employee?.name ?? "-"}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.totalPoints} pts` : "-"}</p>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      </section>
+
+      <section className="mt-5 mb-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-blue-950">Filters</h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -216,12 +279,12 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
             >
               Download PDF
             </a>
-            <Link
+            <a
               href="/report"
               className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
             >
               Reset
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -332,71 +395,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         </form>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricCard title="Filtered Calls" value={String(totalCalls)} subtitle="Matches current filters" />
-        <MetricCard title="Active" value={String(activeCalls)} subtitle="New + In Process" />
-        <MetricCard title="Completed" value={String(completedCalls)} subtitle="Successfully closed" />
-        <MetricCard title="Cancelled" value={String(cancelCalls)} subtitle="Cancelled calls" />
-        <MetricCard title="Unassigned" value={String(unassignedCalls)} subtitle="No current owner" />
-        <MetricCard title="Created Today" value={String(todayCalls)} subtitle="Today in IST" />
-      </section>
-
-      <section className="mt-5 grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-          <h2 className="text-lg font-semibold text-blue-950">Status Breakdown</h2>
-          <div className="mt-4 space-y-3">
-            {STATUS_ORDER.map((status) => (
-              <div key={status} className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
-                      status,
-                    )}`}
-                  >
-                    {getStatusLabel(status)}
-                  </span>
-                  <span className="text-lg font-semibold text-blue-950">{statusCounts[status]}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-          <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
-          {employeeRows.length === 0 ? (
-            <p className="mt-3 text-sm text-blue-700">No employees found.</p>
-          ) : (
-            <div className="mt-3 overflow-x-auto">
-              <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
-                <thead className="bg-blue-50 text-blue-700">
-                  <tr>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Employee</th>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Active Assigned</th>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Completed</th>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Completion Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-blue-100 bg-white">
-                  {employeeRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-2.5 py-2.5 text-blue-950">{row.name}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{row.activeAssigned}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{row.completedByEmployee}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{row.completionRate}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </article>
-      </section>
-
       <section className="mt-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-semibold text-blue-950">Recent Calls (Filtered)</h2>
+        <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
         {recentCalls.length === 0 ? (
-          <p className="mt-3 text-sm text-blue-700">No calls found for selected filters.</p>
+          <p className="mt-3 text-sm text-blue-700">No call history found for selected filters.</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
