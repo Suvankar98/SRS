@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { logout } from "../actions";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
 import { EmployeePointsPopup } from "./employee-points-popup";
+import { ReportCallDetailsModal } from "./call-details-modal";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -74,13 +75,22 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
       docketNumber: true,
       name: true,
       company: true,
+      phoneNumber1: true,
+      phoneNumber2: true,
+      fullAddress: true,
+      complaintDetails: true,
+      product: true,
       status: true,
+      statusReason: true,
       statusPointsDelta: true,
       assignedToId: true,
       createdAt: true,
       closedByName: true,
       callType: true,
       area: true,
+      serviceBillingType: true,
+      chargeableAmount: true,
+      customerReview: true,
       assignedTo: {
         select: {
           name: true,
@@ -430,7 +440,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                       <td className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
                       <td className="px-2.5 py-2.5 text-blue-900">
                         <div>
-                          <p className="font-medium">{request.name}</p>
+                          <ReportCallDetailsModal request={request} />
                           <p className="text-[11px] text-blue-600">{request.company}</p>
                         </div>
                       </td>
