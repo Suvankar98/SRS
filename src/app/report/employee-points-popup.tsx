@@ -137,7 +137,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Employee Performance Tag</p>
                 <h3 className="mt-1 text-xl font-semibold text-blue-950">{employeeName}</h3>
-                <p className="mt-1 text-sm text-blue-700">Current points: {currentPoints}</p>
+                <p className="mt-1 text-sm text-blue-700">Current monthly points: {currentPoints}</p>
               </div>
               <button
                 type="button"
@@ -186,7 +186,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
             <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
               <p className="text-sm font-medium text-blue-800">Adjustment Total: {totalDelta >= 0 ? `+${totalDelta}` : totalDelta}</p>
               <p className="text-xs text-blue-700">
-                {allChosen ? `Projected points after save: ${projectedPoints}` : "Choose all dropdown values to calculate final points."}
+                {allChosen ? `Projected monthly points after save: ${projectedPoints}` : "Choose all dropdown values to calculate final points."}
               </p>
             </div>
 

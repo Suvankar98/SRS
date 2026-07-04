@@ -144,6 +144,61 @@ function getHighestDocketSequence(docketNumbers: Array<{ docketNumber: string }>
   return highest;
 }
 
+function isMonthReset(lastResetDate: Date | null): boolean {
+  const now = new Date();
+  if (!lastResetDate) {
+    return true;
+  }
+
+  return lastResetDate.getMonth() !== now.getMonth() || lastResetDate.getFullYear() !== now.getFullYear();
+}
+
+async function handleMonthlyPointsReset(
+  transaction: any,
+  employeeId: string,
+  currentMonthlyPoints: number,
+  lastResetDate: Date | null,
+) {
+  if (!isMonthReset(lastResetDate)) {
+    return; // No reset needed
+  }
+
+  const now = new Date();
+  const lastMonth = new Date(now);
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+  if (lastResetDate) {
+    // Store the previous month's points in history
+    await (transaction as any).monthlyPerformanceHistory.upsert({
+      where: {
+        employeeId_year_month: {
+          employeeId,
+          year: lastMonth.getFullYear(),
+          month: lastMonth.getMonth() + 1,
+        },
+      },
+      update: {
+        totalPoints: currentMonthlyPoints,
+      },
+      create: {
+        employeeId,
+        year: lastMonth.getFullYear(),
+        month: lastMonth.getMonth() + 1,
+        totalPoints: currentMonthlyPoints,
+      },
+    });
+  }
+
+  // Reset monthly points and update reset date
+  await transaction.user.update({
+    where: { id: employeeId },
+    data: {
+      monthlyPerformancePoints: 0,
+      lastMonthlyResetDate: now,
+    },
+  });
+}
+
 async function requireSession() {
   const session = await getSession();
   if (!session) {
@@ -759,12 +814,20 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
     await prisma.$transaction(async (transaction) => {
       const employee = await transaction.user.findUnique({
         where: { id: employeeId },
-        select: { id: true, role: true },
+        select: { id: true, role: true, monthlyPerformancePoints: true, lastMonthlyResetDate: true },
       });
 
       if (!employee || employee.role !== APP_ROLES.EMPLOYEE) {
         throw new Error("Employee not found");
       }
+
+      // Handle monthly reset if needed
+      await handleMonthlyPointsReset(
+        transaction,
+        employeeId,
+        employee.monthlyPerformancePoints,
+        employee.lastMonthlyResetDate,
+      );
 
       try {
         await (transaction as any).employeePointAdjustment.create({
@@ -806,6 +869,9 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
         where: { id: employeeId },
         data: {
           performancePoints: {
+            increment: totalDelta,
+          },
+          monthlyPerformancePoints: {
             increment: totalDelta,
           },
         },

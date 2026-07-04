@@ -8,17 +8,20 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(uuid()) @db.Uuid
-  name           String
-  username       String   @unique
-  password       String
-  role           UserRole
-  createdAt      DateTime @default(now())
-  whatsappNumber String?
-  performancePoints Int   @default(0)
-  assignedCalls  ServiceRequest[]
-  pointAdjustments EmployeePointAdjustment[] @relation("EmployeePointAdjustments")
-  performanceUpdates EmployeePointAdjustment[] @relation("PointUpdatedBy")
+  id                        String   @id @default(uuid()) @db.Uuid
+  name                      String
+  username                  String   @unique
+  password                  String
+  role                      UserRole
+  createdAt                 DateTime @default(now())
+  whatsappNumber            String?
+  performancePoints         Int      @default(0)
+  monthlyPerformancePoints  Int      @default(0)
+  lastMonthlyResetDate      DateTime?
+  assignedCalls             ServiceRequest[]
+  pointAdjustments          EmployeePointAdjustment[] @relation("EmployeePointAdjustments")
+  performanceUpdates        EmployeePointAdjustment[] @relation("PointUpdatedBy")
+  monthlyHistory            MonthlyPerformanceHistory[] @relation("MonthlyHistoryEmployee")
 }
 
 model Product {
@@ -80,6 +83,19 @@ model EmployeePointAdjustment {
 
   employee                   User     @relation("EmployeePointAdjustments", fields: [employeeId], references: [id])
   updatedBy                  User?    @relation("PointUpdatedBy", fields: [updatedById], references: [id])
+}
+
+model MonthlyPerformanceHistory {
+  id                 String   @id @default(uuid()) @db.Uuid
+  employeeId         String   @db.Uuid
+  year               Int
+  month              Int
+  totalPoints        Int      @default(0)
+  createdAt          DateTime @default(now())
+  
+  employee           User     @relation("MonthlyHistoryEmployee", fields: [employeeId], references: [id])
+  
+  @@unique([employeeId, year, month])
 }
 
 enum UserRole {

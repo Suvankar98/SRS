@@ -41,7 +41,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const [employees, callTypeOptions, areaOptions] = await Promise.all([
     prisma.user.findMany({
       where: { role: APP_ROLES.EMPLOYEE },
-      select: { id: true, name: true, performancePoints: true },
+      select: { id: true, name: true, performancePoints: true, monthlyPerformancePoints: true },
       orderBy: { name: "asc" },
     }),
     prisma.serviceRequest.findMany({
@@ -143,12 +143,13 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         id: employee.id,
         name: employee.name,
         totalPoints: employee.performancePoints,
+        monthlyPoints: employee.monthlyPerformancePoints,
         completedByEmployee,
       };
     })
     .sort(
       (a, b) =>
-        b.totalPoints - a.totalPoints ||
+        b.monthlyPoints - a.monthlyPoints ||
         b.completedByEmployee - a.completedByEmployee ||
         a.name.localeCompare(b.name),
     );
@@ -198,7 +199,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
       <section className="mt-5 grid gap-4 lg:grid-cols-3">
         <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] lg:col-span-2">
-          <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
+            <p className="mt-1 text-xs text-blue-600">Monthly & All-Time Points</p>
+          </div>
           {employeeRows.length === 0 ? (
             <p className="mt-3 text-sm text-blue-700">No employees found.</p>
           ) : (
@@ -208,7 +212,8 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                   <tr>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Employee</th>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Tag</th>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Points Earned</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Monthly Points</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">All-Time Points</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-100 bg-white">
@@ -219,10 +224,11 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                         <EmployeePointsPopup
                           employeeId={row.id}
                           employeeName={row.name}
-                          currentPoints={row.totalPoints}
+                          currentPoints={row.monthlyPoints}
                         />
                       </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{row.totalPoints}</td>
+                      <td className="px-2.5 py-2.5 text-blue-900 font-semibold">{row.monthlyPoints}</td>
+                      <td className="px-2.5 py-2.5 text-blue-600">{row.totalPoints}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -252,7 +258,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Rank {rank}</p>
                     <p className="truncate text-sm font-medium text-blue-950">{employee?.name ?? "-"}</p>
                   </div>
-                  <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.totalPoints} pts` : "-"}</p>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.monthlyPoints} pts` : "-"}</p>
+                    <p className="text-xs text-blue-600">{employee ? `${employee.totalPoints} all-time` : ""}</p>
+                  </div>
                 </div>
               );
             })}
