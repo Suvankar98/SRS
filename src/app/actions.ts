@@ -755,41 +755,19 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
   const totalDelta =
     attendance.points + review.points + documentSubmission.points + materialHandover.points + teamwork.points;
 
-  await prisma.$transaction(async (transaction) => {
-    const employee = await transaction.user.findUnique({
-      where: { id: employeeId },
-      select: { id: true, role: true },
-    });
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const employee = await transaction.user.findUnique({
+        where: { id: employeeId },
+        select: { id: true, role: true },
+      });
 
-    if (!employee || employee.role !== APP_ROLES.EMPLOYEE) {
-      throw new Error("Employee not found");
-    }
+      if (!employee || employee.role !== APP_ROLES.EMPLOYEE) {
+        throw new Error("Employee not found");
+      }
 
-    const pointAdjustmentDelegate = (transaction as unknown as {
-      employeePointAdjustment?: {
-        create: (args: {
-          data: {
-            employeeId: string;
-            updatedById: string;
-            attendanceOption: string;
-            attendancePoints: number;
-            reviewOption: string;
-            reviewPoints: number;
-            documentSubmissionOption: string;
-            documentSubmissionPoints: number;
-            materialHandoverOption: string;
-            materialHandoverPoints: number;
-            teamworkOption: string;
-            teamworkPoints: number;
-            totalDelta: number;
-          };
-        }) => Promise<unknown>;
-      };
-    }).employeePointAdjustment;
-
-    if (pointAdjustmentDelegate?.create) {
       try {
-        await pointAdjustmentDelegate.create({
+        await (transaction as any).employeePointAdjustment.create({
           data: {
             employeeId,
             updatedById: session.userId,
@@ -823,17 +801,20 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
           reason: message || code || "unknown",
         });
       }
-    }
 
-    await transaction.user.update({
-      where: { id: employeeId },
-      data: {
-        performancePoints: {
-          increment: totalDelta,
+      await transaction.user.update({
+        where: { id: employeeId },
+        data: {
+          performancePoints: {
+            increment: totalDelta,
+          },
         },
-      },
+      });
     });
-  });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to update points";
+    throw new Error(message);
+  }
 
   revalidatePath("/report");
   revalidatePath("/dashboard");
