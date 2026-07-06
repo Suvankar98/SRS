@@ -231,13 +231,150 @@ export function DocketDetailsModal({
   };
 
   const modal = isOpen ? (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-black/50 p-4" onClick={() => setIsOpen(false)}>
-      <div className="my-4 w-full max-w-3xl rounded-lg border bg-white p-6 shadow"> 
-        <h3 className="text-lg font-semibold">Docket Details (simplified)</h3>
-        <p className="mt-4 text-sm text-gray-700">Modal simplified for debugging. Close to continue.</p>
-        <div className="mt-4 text-right">
-          <button onClick={() => setIsOpen(false)} className="rounded bg-blue-600 px-4 py-2 text-white">Close</button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
+      onClick={() => setIsOpen(false)}
+    >
+      <div
+        className="my-4 w-full max-w-5xl rounded-lg border bg-white shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: "90vh" }}
+      >
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <div>
+            <h3 className="text-lg font-semibold">Docket Details — {request.docketNumber}</h3>
+            <p className="text-xs text-gray-500">{formatRequestDateTime(request.createdAt)}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {request.status ? (
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{request.status}</span>
+            ) : null}
+            <button onClick={() => setIsOpen(false)} className="ml-2 rounded-full bg-red-100 px-3 py-1 text-sm text-red-700">Close</button>
+          </div>
         </div>
+
+        <form onSubmit={handleSubmit} className="flex h-full flex-col">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="space-y-4">
+                <GridField label="Customer name">
+                  {canEdit ? (
+                    <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2" />
+                  ) : (
+                    <InfoField label="Name" value={`${name} ${company ? `\n${company}` : ""}`.trim()} />
+                  )}
+                </GridField>
+
+                <GridField label="Phone numbers">
+                  <div className="flex gap-2">
+                    <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-1/2 rounded border px-3 py-2" />
+                    <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-1/2 rounded border px-3 py-2" />
+                  </div>
+                </GridField>
+
+                <GridField label="Address">
+                  <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2" rows={4} />
+                </GridField>
+
+                <GridField label="Complaint details">
+                  <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className="w-full rounded border px-3 py-2" rows={4} />
+                </GridField>
+              </div>
+
+              <div className="space-y-4">
+                <GridField label="Product">
+                  {canEdit ? (
+                    <select value={product} onChange={(e) => setProduct(e.target.value)} className="w-full rounded border px-3 py-2">
+                      {products.map((p) => (
+                        <option key={p.id} value={p.name ?? p.id}>{p.name ?? p.id}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <InfoField label="Product" value={product} />
+                  )}
+                </GridField>
+
+                <GridField label="Call type">
+                  <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className="w-full rounded border px-3 py-2">
+                    {callTypeOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </GridField>
+
+                {isServiceCall && (
+                  <GridField label="Service billing type">
+                    <div className="flex gap-2">
+                      {BILLING_TYPE_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => toggleServiceBillingType(opt.id)}
+                          className={`rounded px-3 py-1 ${serviceBillingType === opt.id ? "bg-blue-600 text-white" : "border text-gray-700"}`}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {isChargeable && (
+                      <div className="mt-2">
+                        <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2" placeholder="Amount" />
+                      </div>
+                    )}
+                  </GridField>
+                )}
+
+                <GridField label="Area">
+                  <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full rounded border px-3 py-2">
+                    {AREAS.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </GridField>
+
+                <div className="space-y-2">
+                  {canAssign && employees ? (
+                    <div>
+                      <label className="block text-sm font-medium text-blue-700">Assign to</label>
+                      <div className="mt-2 flex items-center gap-2">
+                        <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="w-2/3 rounded border px-3 py-2">
+                          <option value="">Select employee</option>
+                          {employees.map((emp) => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                          ))}
+                        </select>
+                        <button type="button" onClick={handleAssignmentSave} disabled={isAssigning} className="rounded bg-blue-600 px-3 py-2 text-white">
+                          {isAssigning ? "Saving..." : "Save allocation"}
+                        </button>
+                      </div>
+                      {assignmentMessage ? <p className="mt-2 text-sm text-green-600">{assignmentMessage}</p> : null}
+                    </div>
+                  ) : null}
+
+                  {canAssign ? (
+                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                      {request.createdBy ? <p>Created by: {request.createdBy.name}</p> : null}
+                      {request.assignedTo ? <p>Assigned to: {request.assignedTo.name}</p> : null}
+                      {request.assignedAt ? <p>Assigned at: {formatRequestDateTime(request.assignedAt)}</p> : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
+            <button type="button" onClick={handleOpenMap} className="rounded border px-3 py-2 text-sm">Open in maps</button>
+            {canEdit ? (
+              <>
+                <button type="button" onClick={handleDelete} disabled={isDeleting} className="rounded border px-3 py-2 text-sm text-red-600">{isDeleting ? "Deleting..." : "Delete"}</button>
+                <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">Save changes</button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setIsOpen(false)} className="rounded bg-blue-600 px-4 py-2 text-white">Close</button>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   ) : null;
