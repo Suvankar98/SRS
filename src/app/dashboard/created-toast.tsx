@@ -1,0 +1,28 @@
+"use client";
+
+import React from "react";
+
+export default function CreatedToast({ docket }: { docket?: string | null }) {
+  React.useEffect(() => {
+    if (!docket) return;
+    const el = document.createElement("div");
+    el.className = "fixed top-6 right-6 z-50 rounded-md bg-emerald-600 px-4 py-2 text-white shadow-lg";
+    el.textContent = `New service created: ${docket}`;
+    document.body.appendChild(el);
+    const t = setTimeout(() => {
+      el.remove();
+      const params = new URLSearchParams(window.location.search);
+      params.delete("created");
+      const base = window.location.pathname;
+      const qs = params.toString();
+      window.history.replaceState({}, "", qs ? `${base}?${qs}` : base);
+    }, 2500);
+
+    return () => {
+      clearTimeout(t);
+      el.remove();
+    };
+  }, [docket]);
+
+  return null;
+}

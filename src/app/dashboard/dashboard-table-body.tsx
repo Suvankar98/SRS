@@ -35,6 +35,8 @@ type DashboardTableBodyProps = {
     company: string;
     fullAddress: string;
     complaintDetails: string | null;
+    assignedTo?: { name: string } | null;
+    createdBy?: { name: string } | null;
   }>;
   products: SimpleOption[];
   employees: SimpleOption[];
@@ -113,6 +115,8 @@ function DashboardTableRow({
         <DocketDetailsModal
           request={request}
           canEdit={canEditDocket}
+          canAssign={canAssign}
+          employees={employees}
           products={products}
           onReady={(open) => {
             openModalRef.current = open;
@@ -167,37 +171,50 @@ function DashboardTableRow({
       {canAssign ? (
         <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
           <div className="space-y-2">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2">
+              <p className="text-xs font-semibold text-blue-900">
+                <span className="text-[10px] uppercase tracking-[0.08em] text-blue-600">Assigned to:</span>{" "}
+                {request.assignedTo?.name ?? "Unassigned"}
+              </p>
+              {request.assignedAt ? (
+                <p className="mt-1 text-[10px] text-blue-700">Assigned {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(request.assignedAt))}</p>
+              ) : null}
+              {isClosedStatus(request.status) && request.assignedTo?.name ? (
+                <p className="mt-1 text-[11px] text-blue-700">Reassigned to {request.assignedTo.name}</p>
+              ) : null}
+            </div>
             {isClosedStatus(request.status) ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                <p className="text-xs font-semibold text-emerald-900">
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
-                  {getClosedByName(request)}
-                </p>
-              </div>
+              <>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
+                  <p className="text-xs font-semibold text-emerald-900">
+                    <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span>{" "}
+                    {getClosedByName(request)}
+                  </p>
+                </div>
+                <p className="text-[11px] text-blue-700">Completed requests can only be reassigned by Admin or Manager.</p>
+              </>
             ) : null}
-            {!isClosedStatus(request.status) ? (
-              <form action={assignServiceCall} className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
-                <input type="hidden" name="requestId" value={request.id} />
-                <select
-                  name="assignedToId"
-                  defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                  className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                >
-                  <option value="">Select employee</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
-                >
-                  Save
-                </button>
-              </form>
-            ) : null}
+            <form action={assignServiceCall} className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+              <input type="hidden" name="requestId" value={request.id} />
+              <select
+                name="assignedToId"
+                defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
+                className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+              >
+                <option value="">Select employee</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
+              >
+                Save
+              </button>
+            </form>
           </div>
         </td>
       ) : null}

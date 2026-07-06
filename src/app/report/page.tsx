@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 
 import { logout } from "../actions";
+import ReportFilters from "./report-filters";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
 import { EmployeePointsPopup } from "./employee-points-popup";
 import { ReportCallDetailsModal } from "./call-details-modal";
@@ -310,111 +311,19 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
           </div>
         </div>
 
-        <form className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Search</span>
-            <input
-              name="q"
-              defaultValue={searchQuery}
-              placeholder="Docket, customer, company..."
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Status</span>
-            <select
-              name="status"
-              defaultValue={selectedStatus}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            >
-              <option value="">All</option>
-              {STATUS_ORDER.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Assigned To</span>
-            <select
-              name="employeeId"
-              defaultValue={selectedEmployee}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            >
-              <option value="">All</option>
-              <option value="unassigned">Unassigned</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Call Type</span>
-            <select
-              name="callType"
-              defaultValue={selectedCallType}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            >
-              <option value="">All</option>
-              {callTypeOptions.map((row) => (
-                <option key={row.callType} value={row.callType}>
-                  {row.callType}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Area</span>
-            <select
-              name="area"
-              defaultValue={selectedArea}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            >
-              <option value="">All</option>
-              {areaOptions.map((row) => (
-                <option key={row.area} value={row.area}>
-                  {row.area}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">From Date</span>
-            <input
-              type="date"
-              name="from"
-              defaultValue={fromDate}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">To Date</span>
-            <input
-              type="date"
-              name="to"
-              defaultValue={toDate}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            />
-          </label>
-
-          <div className="flex items-end gap-2 xl:justify-end">
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-            >
-              Apply Filters
-            </button>
-          </div>
-        </form>
+        {/* client-side filter component so we can show billing options when Call Type=Service */}
+        <ReportFilters
+          searchQuery={searchQuery}
+          selectedStatus={selectedStatus}
+          selectedEmployee={selectedEmployee}
+          selectedCallType={selectedCallType}
+          selectedArea={selectedArea}
+          fromDate={fromDate}
+          toDate={toDate}
+          employees={employees}
+          callTypeOptions={callTypeOptions}
+          areaOptions={areaOptions}
+        />
       </section>
 
       <section className="mt-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">

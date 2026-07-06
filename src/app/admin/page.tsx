@@ -13,6 +13,7 @@ import {
 import { BrandLogo } from "../brand-logo";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { FixedCallTypesSection } from "./fixed-call-types-section";
+import { OptionalPasswordField } from "./optional-password-field";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -172,76 +173,81 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </span>
               </div>
 
-              <div className="mt-5 max-h-[24rem] space-y-3 overflow-y-auto pr-1">
+              <div className="mt-5 space-y-3">
                 {staffMembers.map((member) => (
                   <div
                     key={member.id}
-                    className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3 shadow-sm"
+                    className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 shadow-sm"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                    <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                      <div className="min-w-0 space-y-3">
                         {hasEditingStaff && editingStaffId === member.id ? (
-                          <form action={updateStaff} className="space-y-2">
+                          <form action={updateStaff} className="grid gap-3">
                             <input type="hidden" name="id" value={member.id} />
                             <input
                               name="name"
                               defaultValue={member.name}
                               placeholder="Full name"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-400"
+                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
                               required
                             />
                             <input
                               name="username"
                               defaultValue={member.username}
                               placeholder="Username"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-400"
+                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
                               required
                             />
+                            <OptionalPasswordField />
                             <input
                               name="whatsappNumber"
                               defaultValue={member.whatsappNumber ?? ""}
                               placeholder="WhatsApp number"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-400"
+                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
                             />
                             <select
                               name="role"
                               defaultValue={member.role}
-                              className="w-full rounded-xl border border-blue-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-400"
+                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
                               required
                             >
                               <option value={APP_ROLES.EMPLOYEE}>Employee</option>
                               <option value={APP_ROLES.MANAGER}>Manager</option>
                             </select>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 type="submit"
-                                className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-800"
+                                className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
                               >
                                 Save
                               </button>
                               <Link
                                 href="/admin?tab=staff"
-                                className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+                                className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
                               >
                                 Cancel
                               </Link>
                             </div>
                           </form>
                         ) : (
-                          <>
-                            <p className="font-semibold text-blue-950">{member.name}</p>
-                            <p className="mt-1 text-xs text-blue-600">@{member.username}</p>
-                            <p className="mt-2 text-xs font-medium text-blue-800">Points: {member.performancePoints}</p>
-                            <p className="mt-2 text-xs text-blue-700">
-                              WhatsApp: {member.whatsappNumber ? member.whatsappNumber : "Not provided"}
-                            </p>
-                            <span className="mt-3 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-                              {member.role.toLowerCase()}
-                            </span>
-                          </>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-blue-950">{member.name}</p>
+                                <p className="text-xs text-blue-600">@{member.username}</p>
+                              </div>
+                              <span className="inline-flex rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                                {member.role.toLowerCase()}
+                              </span>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <p className="text-xs text-blue-700">Points: {member.performancePoints}</p>
+                              <p className="text-xs text-blue-700">WhatsApp: {member.whatsappNumber ?? "Not provided"}</p>
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-start gap-2 justify-end">
                         <form action={deleteStaff}>
                           <input type="hidden" name="id" value={member.id} />
                           <ConfirmSubmitButton

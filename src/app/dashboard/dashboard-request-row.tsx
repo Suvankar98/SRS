@@ -4,8 +4,6 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
-import { CopyPhoneButton } from "./copy-phone-button";
-import { assignServiceCall } from "../actions";
 import {
   formatServiceBillingType,
   formatINRCurrency,
@@ -30,10 +28,13 @@ type DashboardRequestRowProps = {
     serviceBillingType: string | null;
     chargeableAmount: number | null;
     assignedToId: string | null;
+    assignedAt?: Date | string | null;
     status: string | null;
     statusReason: string | null;
     closedAt: Date | string | null;
     closedByName: string | null;
+    assignedTo?: { name: string } | null;
+    createdBy?: { name: string } | null;
   };
   products: Array<{ id: string; name: string }>;
   employees: Array<{ id: string; name: string }>;
@@ -65,7 +66,19 @@ export function DashboardRequestRow({
   onMoveDown,
   canMoveUp,
   canMoveDown,
-}: DashboardRequestRowProps) {
+  // drag handlers
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: DashboardRequestRowProps & {
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
+  onDragOver?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
+  onDrop?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
+}) {
   const openModalRef = React.useRef<() => void>(() => {});
 
   const getComplaintAgeLabel = (request: { createdAt: Date | string; status: string | null; closedAt?: Date | string | null }) => {
@@ -114,6 +127,100 @@ export function DashboardRequestRow({
     return null;
   };
 
+  const getAssignedAt = (request: { assignedAt?: Date | string | null }) => {
+    const value = (request as any).assignedAt;
+    if (value instanceof Date) return value;
+    if (typeof value === "string") {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return null;
+  };
+
+  const getDurationLabel = (milliseconds: number) => {
+    const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  const getAssignmentCountdown = (assignedAt: Date) => {
+    const now = new Date();
+    const assignedDay = new Date(assignedAt);
+    const dayStart = new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate());
+    const deadline9 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 21, 0, 0);
+    const deadline24 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 24, 0, 0);
+
+    if (now < deadline9) {
+      return `Due in ${getDurationLabel(deadline9.getTime() - now.getTime())}`;
+    }
+
+    if (now < deadline24) {
+      return `Due in ${getDurationLabel(deadline24.getTime() - now.getTime())}`;
+    }
+
+    return `Overdue by ${getDurationLabel(now.getTime() - deadline24.getTime())}`;
+  };
+
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const assignedAt = getAssignedAt(request);
+    if (!assignedAt || isClosedStatus(request.status)) {
+      return;
+    }
+
+    const interval = window.setInterval(() => setTick((current) => current + 1), 30000);
+    return () => window.clearInterval(interval);
+  }, [request.assignedAt, request.status]);
+
+  const renderAssignmentBadge = (request: any) => {
+    const assignedAt = getAssignedAt(request);
+    if (!assignedAt) return null;
+
+    const now = new Date();
+    const assignedDay = new Date(assignedAt);
+    const dayStart = new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate());
+    const deadline9 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 21, 0, 0);
+    const deadline24 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 24, 0, 0);
+
+    let colorClass = "bg-emerald-50 text-emerald-900 ring-emerald-300";
+    if (now >= deadline9 && now < deadline24) {
+      colorClass = "bg-amber-50 text-amber-900 ring-amber-300";
+    }
+    if (now >= deadline24) {
+      colorClass = "bg-rose-50 text-rose-900 ring-rose-300";
+    }
+
+    // If completed, evaluate thumbs
+    const closedAt = getClosedAt(request as any);
+    if (request.status === "Completed" && closedAt) {
+      if (closedAt <= deadline9 || (closedAt <= deadline24 && closedAt > deadline9)) {
+        return (
+          <div className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
+            <span>Congratulations</span>
+            <span aria-hidden>👍</span>
+          </div>
+        );
+      }
+      return (
+        <div className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
+          <span>Too late</span>
+          <span aria-hidden>👎</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`inline-flex flex-col gap-1 rounded-md px-2 py-2 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
+        <span>{new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(assignedAt)}</span>
+        <span className="text-[10px] font-normal text-blue-700">{getAssignmentCountdown(assignedAt)}</span>
+      </div>
+    );
+  };
+
   const getDayNumberInTimeZone = (value: Date, timeZone: string) => {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone,
@@ -131,6 +238,11 @@ export function DashboardRequestRow({
 
   return (
     <tr
+      draggable={draggable}
+      onDragStart={(e) => onDragStart?.(e, request.id)}
+      onDragOver={(e) => onDragOver?.(e, request.id)}
+      onDrop={(e) => onDrop?.(e, request.id)}
+      onDragEnd={(e) => onDragEnd?.(e, request.id)}
       onClick={() => {
         if (canEditDocket) {
           openModalRef.current();
@@ -140,60 +252,55 @@ export function DashboardRequestRow({
       className={`align-top text-blue-900 ${!isEmployee && isClosedStatus(request.status) ? "bg-emerald-50/80" : ""} ${canEditDocket ? "cursor-pointer" : ""}`}
     >
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
-        <DocketDetailsModal
-          request={request}
-          canEdit={canEditDocket}
-          products={products}
-          onReady={(open) => {
-            openModalRef.current = open;
-          }}
-          renderTrigger={(open) => (
-            <span
-              onClick={(event) => {
-                event.stopPropagation();
-                open();
+        <div className="flex items-start gap-3">
+          {!isEmployee ? (
+            <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm" onClick={(e)=>e.stopPropagation()} title="Drag to reorder">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M10 6h6M10 12h6M10 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          ) : null}
+
+          <div className="min-w-0">
+            <DocketDetailsModal
+              request={request}
+              canEdit={canEditDocket}
+              canAssign={canAssign}
+              employees={employees}
+              products={products}
+              onReady={(open) => {
+                openModalRef.current = open;
               }}
-              className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-600"
-            >
-              {request.docketNumber}
-            </span>
-          )}
-        />
-        {!isEmployee ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onMoveUp?.();
-              }}
-              disabled={!canMoveUp}
-              className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onMoveDown?.();
-              }}
-              disabled={!canMoveDown}
-              className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              ↓
-            </button>
+              renderTrigger={(open) => (
+                <span
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    open();
+                  }}
+                  className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-600"
+                >
+                  {request.docketNumber}
+                </span>
+              )}
+            />
+
+            {!isEmployee ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {/* previously up/down buttons removed - drag handle used instead */}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
-        <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">
-          {getComplaintAgeLabel(request)}
-        </span>
+        <div className="flex flex-col gap-2">
+          <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">{getComplaintAgeLabel(request)}</span>
+          {request.assignedToId ? renderAssignmentBadge(request) : null}
+        </div>
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
         <p className="font-semibold text-blue-950">{request.name}</p>
-        <p className="mt-0.5 text-xs font-normal text-blue-700">{request.company}</p>
+        <p className="mt-0.5 text-xs font-semibold text-blue-900">{request.company}</p>
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>
@@ -236,11 +343,40 @@ export function DashboardRequestRow({
               </div>
             ) : null}
             {!isClosedStatus(request.status) ? (
-              <form action={assignServiceCall} className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center gap-2">
                 <input type="hidden" name="requestId" value={request.id} />
                 <select
                   name="assignedToId"
                   defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
+                  onChange={async (e) => {
+                    const assignedToId = e.currentTarget.value;
+                    try {
+                      // show quick toast then reload to reflect change
+                      const res = await fetch("/api/assign", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ requestId: request.id, assignedToId }),
+                      });
+
+                      const json = await res.json();
+                      if (json.success) {
+                        // show small toast
+                        const el = document.createElement("div");
+                        el.className = "fixed bottom-4 right-4 z-50 rounded-md bg-emerald-600 px-4 py-2 text-white";
+                        el.textContent = "Allocation saved";
+                        document.body.appendChild(el);
+                        setTimeout(() => {
+                          el.remove();
+                          window.location.reload();
+                        }, 800);
+                      } else {
+                        alert(json.message || "Allocation failed");
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      alert("Allocation failed");
+                    }
+                  }}
                   className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
                 >
                   <option value="">Select employee</option>
@@ -250,13 +386,7 @@ export function DashboardRequestRow({
                     </option>
                   ))}
                 </select>
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
-                >
-                  Save
-                </button>
-              </form>
+              </div>
             ) : null}
           </div>
         </td>

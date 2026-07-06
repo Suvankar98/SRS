@@ -7,6 +7,7 @@ import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ServiceCallBillingFields } from "../service-call-billing-fields";
+import { AreaAutocomplete } from "./area-autocomplete";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,8 @@ export default async function FormPage() {
   const products = await prisma.product.findMany({ orderBy: { name: "asc" } });
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-[#004b8d]/90 px-4 py-5 text-white shadow-2xl shadow-blue-900/30 backdrop-blur sm:px-6 md:flex-row md:items-end md:justify-between">
+    <main className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-[#004b8d]/90 px-4 py-4 text-white shadow-2xl shadow-blue-900/30 backdrop-blur sm:px-6 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
           <div className="inline-flex rounded-xl border border-white/20 bg-[#003d73] p-2">
             <BrandLogo width={175} className="h-auto w-auto" />
@@ -77,48 +78,14 @@ export default async function FormPage() {
             <Field label="Company" name="company" placeholder="Company or organization" />
             <Field label="Phone Number 1" name="phoneNumber1" placeholder="Primary contact number" type="tel" />
             <Field label="Phone Number 2" name="phoneNumber2" placeholder="Secondary contact number" type="tel" />
-            <label>
-              <span className="mb-2 block text-sm font-medium text-blue-700">Area</span>
-              <select
-                name="area"
-                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
-                defaultValue=""
-                required
-              >
-                <option value="" disabled>
-                  Select Kolkata area
-                </option>
-                <option value="Alipore">Alipore</option>
-                <option value="Ballygunge">Ballygunge</option>
-                <option value="Baghajatin">Baghajatin</option>
-                <option value="Behala">Behala</option>
-                <option value="Bhowanipore">Bhowanipore</option>
-                <option value="Dum Dum">Dum Dum</option>
-                <option value="EM Bypass">EM Bypass</option>
-                <option value="Esplanade">Esplanade</option>
-                <option value="Garia">Garia</option>
-                <option value="Jadavpur">Jadavpur</option>
-                <option value="Kalighat">Kalighat</option>
-                <option value="Kasba">Kasba</option>
-                <option value="Kidderpore">Kidderpore</option>
-                <option value="Lake Town">Lake Town</option>
-                <option value="New Alipore">New Alipore</option>
-                <option value="Park Circus">Park Circus</option>
-                <option value="Park Street">Park Street</option>
-                <option value="Rajarhat">Rajarhat</option>
-                <option value="Salt Lake">Salt Lake</option>
-                <option value="Sealdah">Sealdah</option>
-                <option value="Shyambazar">Shyambazar</option>
-                <option value="Tollygunge">Tollygunge</option>
-              </select>
-            </label>
+            <AreaAutocomplete />
             <label>
               <span className="mb-2 block text-sm font-medium text-blue-700">Full Address</span>
               <textarea
                 name="fullAddress"
-                rows={4}
+                rows={2}
                 placeholder="Street, building, landmark, city, postal code"
-                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
+                className="w-full min-h-[3.5rem] max-h-56 resize-y rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                 required
               />
             </label>

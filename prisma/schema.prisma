@@ -18,7 +18,8 @@ model User {
   performancePoints         Int      @default(0)
   monthlyPerformancePoints  Int      @default(0)
   lastMonthlyResetDate      DateTime?
-  assignedCalls             ServiceRequest[]
+  assignedCalls             ServiceRequest[] @relation("AssignedToRequests")
+  createdRequests           ServiceRequest[] @relation("CreatedByRequests")
   pointAdjustments          EmployeePointAdjustment[] @relation("EmployeePointAdjustments")
   performanceUpdates        EmployeePointAdjustment[] @relation("PointUpdatedBy")
   monthlyHistory            MonthlyPerformanceHistory[] @relation("MonthlyHistoryEmployee")
@@ -50,7 +51,10 @@ model ServiceRequest {
   callType     String
   serviceBillingType String?
   chargeableAmount Float?
+  createdById  String?  @db.Uuid
+  createdBy    User?    @relation("CreatedByRequests", fields: [createdById], references: [id])
   assignedToId String?  @db.Uuid
+  assignedTo   User?    @relation("AssignedToRequests", fields: [assignedToId], references: [id])
   assignedAt   DateTime?
   createdAt    DateTime @default(now())
   status       String?  @default("New Call")
@@ -61,7 +65,6 @@ model ServiceRequest {
   reviewPointsDelta Int?
   closedByName String?
   closedAt     DateTime?
-  assignedTo   User?    @relation(fields: [assignedToId], references: [id])
 }
 
 model EmployeePointAdjustment {

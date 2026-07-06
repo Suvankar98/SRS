@@ -269,7 +269,7 @@ export async function logout() {
 }
 
 export async function createServiceRequest(formData: FormData) {
-  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
 
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
@@ -306,6 +306,7 @@ export async function createServiceRequest(formData: FormData) {
         callType,
         serviceBillingType,
         chargeableAmount,
+        createdById: session.userId,
       },
     });
 
@@ -458,14 +459,22 @@ export async function updateStaff(formData: FormData) {
     redirect("/admin?tab=staff");
   }
 
+  const updateData: Record<string, unknown> = {
+    name,
+    username,
+    role,
+    whatsappNumber,
+  };
+
+  const passwordRaw = formData.get("password");
+  const password = typeof passwordRaw === "string" && passwordRaw.trim() !== "" ? passwordRaw.trim() : null;
+  if (password) {
+    updateData.password = password;
+  }
+
   await prisma.user.update({
     where: { id },
-    data: {
-      name,
-      username,
-      role,
-      whatsappNumber,
-    },
+    data: updateData,
   });
 
   revalidatePath("/admin");
@@ -586,7 +595,8 @@ export async function assignServiceCall(formData: FormData) {
     redirect("/dashboard");
   }
 
-  if (normalizeStatus(previousRequest.status) === "Completed") {
+  const isCompletedRequest = normalizeStatus(previousRequest.status) === "Completed";
+  if (isCompletedRequest && !roleCanAssign(session.role)) {
     redirect("/dashboard");
   }
 
@@ -715,12 +725,32 @@ export async function updateServiceCallStatus(formData: FormData) {
   if (status === "Completed") {
     const path = await import("path");
     const fs = await import("fs");
-    const uploadsBase = path.join(process.cwd(), "public", "uploads");
-    const requestDir = path.join(uploadsBase, session.userId, requestId);
-    const hasMedia = await fs.promises
-      .readdir(requestDir)
-      .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
-      .catch(() => false);
+    const os = await import("os");
+
+    const publicUploads = path.join(process.cwd(), "public", "uploads");
+    const tmpUploads = path.join(os.tmpdir(), "srs-uploads");
+
+    const requestDirsToCheck = [];
+    if (process.env.USE_TMP_UPLOADS === "1") {
+      requestDirsToCheck.push(path.join(tmpUploads, session.userId, requestId));
+    }
+    requestDirsToCheck.push(path.join(publicUploads, session.userId, requestId));
+
+    let hasMedia = false;
+    for (const dir of requestDirsToCheck) {
+      // check directory for any file except .DS_Store
+      // ignore errors and continue to next location
+      // eslint-disable-next-line no-await-in-loop
+      const exists = await fs.promises
+        .readdir(dir)
+        .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
+        .catch(() => false);
+
+      if (exists) {
+        hasMedia = true;
+        break;
+      }
+    }
 
     if (!hasMedia) {
       throw new Error("Please upload at least one image or video before marking this call as Completed.");
@@ -956,8 +986,23 @@ export async function uploadEmployeeImage(formData: FormData) {
 
   const path = await import("path");
   const fs = await import("fs");
+  const os = await import("os");
 
-  const uploadsBase = path.join(process.cwd(), "public", "uploads");
+  // On platforms like Vercel the server filesystem is effectively read-only
+  // across invocations. For production deployments use an object store
+  // (S3/Cloudinary). For quick ephemeral testing you can set
+  // USE_TMP_UPLOADS=1 to write to the runtime's temp directory.
+  if (process.env.VERCEL === "1" && process.env.USE_TMP_UPLOADS !== "1") {
+    throw new Error(
+      "Cannot write uploaded files to disk on serverless platforms (e.g. Vercel). Configure external object storage (S3/Cloudinary) or set USE_TMP_UPLOADS=1 for ephemeral testing.",
+    );
+  }
+
+  const uploadsBase =
+    process.env.USE_TMP_UPLOADS === "1"
+      ? path.join(os.tmpdir(), "srs-uploads")
+      : path.join(process.cwd(), "public", "uploads");
+
   const requestDir = path.join(uploadsBase, session.userId, requestId);
 
   await fs.promises.mkdir(requestDir, { recursive: true });

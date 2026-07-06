@@ -6,7 +6,6 @@ import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
 import { CopyPhoneButton } from "./copy-phone-button";
 import { DashboardRequestRow } from "./dashboard-request-row";
-import { assignServiceCall } from "../actions";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 
 export type DashboardListRequest = {
@@ -25,10 +24,13 @@ export type DashboardListRequest = {
   serviceBillingType: string | null;
   chargeableAmount: number | null;
   assignedToId: string | null;
+  assignedAt?: Date | string | null;
   status: string | null;
   statusReason: string | null;
   closedAt: Date | string | null;
   closedByName: string | null;
+  assignedTo?: { name: string } | null;
+  createdBy?: { name: string } | null;
 };
 
 type DashboardRequestListProps = {
@@ -50,18 +52,40 @@ export function DashboardRequestList({
 }: DashboardRequestListProps) {
   const [items, setItems] = React.useState(requests);
 
-  const moveItem = (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= items.length) {
-      return;
-    }
+  // drag & drop state
+  const dragItem = React.useRef<number | null>(null);
+  const dragOverItem = React.useRef<number | null>(null);
 
-    setItems((currentItems) => {
-      const next = [...currentItems];
-      const [moved] = next.splice(index, 1);
-      next.splice(targetIndex, 0, moved);
-      return next;
+  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    const idx = items.findIndex((it) => it.id === id);
+    dragItem.current = idx >= 0 ? idx : null;
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    e.preventDefault();
+    const idx = items.findIndex((it) => it.id === id);
+    dragOverItem.current = idx >= 0 ? idx : null;
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    e.preventDefault();
+    const from = dragItem.current;
+    const to = dragOverItem.current;
+    if (from === null || to === null || from === to) return;
+    setItems((current) => {
+      const copy = [...current];
+      const [moved] = copy.splice(from, 1);
+      copy.splice(to, 0, moved);
+      return copy;
     });
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
+  const handleDragEnd = () => {
+    dragItem.current = null;
+    dragOverItem.current = null;
   };
 
   return (
@@ -79,10 +103,16 @@ export function DashboardRequestList({
             <div className="mb-2 flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1 pr-2">
                 <div className="text-xs uppercase tracking-[0.12em] text-blue-600">
-                  <DocketDetailsModal request={request} canEdit={canEditDocket} products={products} />
+                  <DocketDetailsModal
+                    request={request}
+                    canEdit={canEditDocket}
+                    canAssign={canAssign}
+                    employees={employees}
+                    products={products}
+                  />
                 </div>
                 <p className="break-words font-semibold text-blue-950">{request.name}</p>
-                <p className="break-words text-xs font-normal text-blue-700">{request.company}</p>
+                <p className="break-words text-xs font-semibold text-blue-900">{request.company}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">
                 <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">
@@ -145,33 +175,61 @@ export function DashboardRequestList({
               <div className="flex-1" />
               {canAssign ? (
                 <div className="space-y-2">
-                  {isClosedStatus(request.status) ? (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                      <p className="text-xs font-semibold text-emerald-900">
-                        <span className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Closed By:</span> {request.closedByName ?? "Unknown"}
-                      </p>
-                    </div>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                    <p className="text-xs font-semibold text-blue-900">
+                      <span className="text-[10px] uppercase tracking-[0.08em] text-blue-600">Assigned to:</span> {request.assignedTo?.name ?? "Unassigned"}
+                    </p>
+                    {request.assignedAt ? (
+                      <p className="mt-1 text-[10px] text-blue-700">Assigned {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(request.assignedAt))}</p>
+                    ) : null}
+                    {request.status === "Completed" && request.assignedTo?.name ? (
+                      <p className="mt-1 text-[11px] text-blue-700">Reassigned to {request.assignedTo.name}</p>
+                    ) : null}
+                  </div>
+                  {request.status === "Completed" ? (
+                    <p className="text-[11px] text-blue-700">Completed requests can only be reassigned by Admin or Manager.</p>
                   ) : null}
-                  {!isClosedStatus(request.status) ? (
-                    <form action={assignServiceCall} className="flex flex-col gap-2 sm:flex-row sm:items-center" onClick={(event) => event.stopPropagation()}>
-                      <input type="hidden" name="requestId" value={request.id} />
-                      <select
-                        name="assignedToId"
-                        defaultValue={request.assignedToId ?? ""}
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 sm:w-auto"
-                      >
-                        <option value="">Select employee</option>
-                        {employees.map((employee) => (
-                          <option key={employee.id} value={employee.id}>
-                            {employee.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="submit" className="rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800">
-                        Save
-                      </button>
-                    </form>
-                  ) : null}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input type="hidden" name="requestId" value={request.id} />
+                    <select
+                      name="assignedToId"
+                      defaultValue={request.assignedToId ?? ""}
+                      onChange={async (e) => {
+                        const assignedToId = e.currentTarget.value;
+                        try {
+                          const res = await fetch("/api/assign", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ requestId: request.id, assignedToId }),
+                          });
+                          const json = await res.json();
+                          if (json.success) {
+                            const el = document.createElement("div");
+                            el.className = "fixed bottom-4 right-4 z-50 rounded-md bg-emerald-600 px-4 py-2 text-white";
+                            el.textContent = "Allocation saved";
+                            document.body.appendChild(el);
+                            setTimeout(() => {
+                              el.remove();
+                              window.location.reload();
+                            }, 800);
+                          } else {
+                            alert(json.message || "Allocation failed");
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert("Allocation failed");
+                        }
+                      }}
+                      className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 sm:w-auto"
+                    >
+                      <option value="">Select employee</option>
+                      {employees.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {employee.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -180,7 +238,7 @@ export function DashboardRequestList({
       </div>
 
       <div className="hidden md:block overflow-x-auto">
-        <table className="min-w-[900px] w-full table-auto divide-y divide-blue-100 text-left text-xs">
+        <table className="min-w-[900px] w-full table-auto divide-y divide-blue-300 text-left text-xs">
           <thead className="bg-blue-50 text-blue-700">
             <tr>
               <Th>Docket</Th>
@@ -204,10 +262,11 @@ export function DashboardRequestList({
                 canEditDocket={canEditDocket}
                 canAssign={canAssign}
                 isEmployee={isEmployee}
-                onMoveUp={() => moveItem(index, -1)}
-                onMoveDown={() => moveItem(index, 1)}
-                canMoveUp={index !== 0}
-                canMoveDown={index !== items.length - 1}
+                draggable={true}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
               />
             ))}
           </tbody>
@@ -291,7 +350,11 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="break-words px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-600">{children}</th>;
+  return (
+    <th className="break-words px-2.5 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-blue-900 border-b-2 border-blue-200">
+      {children}
+    </th>
+  );
 }
 
 function formatServiceBillingType(value: string) {

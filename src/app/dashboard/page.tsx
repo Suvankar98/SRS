@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { logout } from "../actions";
+import CreatedToast from "./created-toast";
 import { BrandLogo } from "../brand-logo";
 import { DashboardFilters } from "./dashboard-filters";
 import { DashboardRequestList } from "./dashboard-request-list";
@@ -29,6 +30,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
   const selectedStatuses = getSelectedStatuses(resolvedSearchParams.status);
+  const createdDocket = typeof resolvedSearchParams.created === 'string' ? resolvedSearchParams.created : null;
 
   const isEmployee = session.role === APP_ROLES.EMPLOYEE;
   const canEditDocket = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
@@ -45,6 +47,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     prisma.serviceRequest.findMany({
       where: visibleWhere,
       orderBy: { createdAt: "desc" },
+      include: {
+        assignedTo: {
+          select: { name: true },
+        },
+        createdBy: {
+          select: { name: true },
+        },
+      },
     }),
     canAssign
       ? prisma.user.findMany({
@@ -71,7 +81,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const unassignedRequests = totalRequests - assignedRequests;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
+    <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8"> 
+      {/* show created toast client-side when a new service is created */}
+      <CreatedToast docket={createdDocket} />
       <header className="fixed left-0 right-0 top-0 z-40 border-b border-blue-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[95rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <div className="rounded-md bg-[#003d73] px-2 py-1 shadow-sm">

@@ -43,7 +43,7 @@ export function ServiceCallBillingFields() {
   };
 
   return (
-    <div className="md:col-span-2">
+    <div className="md:col-span-1">
       <label className="block">
         <span className="mb-2 block text-sm font-medium text-blue-700">Call Type</span>
         <select
@@ -66,21 +66,23 @@ export function ServiceCallBillingFields() {
 
       {isServiceCall ? (
         <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
-          <span className="mb-3 block text-sm font-medium text-blue-700">Service Type</span>
-          <div className="flex flex-wrap gap-4">
-            {BILLING_TYPE_OPTIONS.map((option) => (
-              <label key={option.id} className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-blue-900">
-                <input
-                  type="checkbox"
-                  checked={serviceBillingType === option.id}
-                  onChange={() => handleBillingTypeToggle(option.id)}
-                  className="h-4 w-4 rounded border-blue-300 text-blue-700 focus:ring-blue-500"
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-          <input type="hidden" name="serviceBillingType" value={serviceBillingType} />
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-blue-700">Service Type</span>
+            <select
+              name="serviceBillingType"
+              value={serviceBillingType}
+              onChange={(event) => setServiceBillingType(event.target.value as BillingType)}
+              className="w-full rounded-2xl border border-blue-200 bg-white px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400"
+              required
+            >
+              <option value="">Select service type</option>
+              {BILLING_TYPE_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {isChargeable ? (
             <label className="mt-4 block">

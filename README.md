@@ -13,11 +13,13 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_WHATSAPP_FROM=+14155238886
 PROJECT_LINK=https://your-deployed-app-url.example.com
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 ```
 
 Notes:
 - `TWILIO_WHATSAPP_FROM` must be your Twilio WhatsApp-enabled sender number.
 - Employee WhatsApp numbers should be saved in international format, for example `+919876543210`.
+- `GOOGLE_MAPS_API_KEY` must have Maps Places API enabled for the area autocomplete feature.
 - On deployment (Vercel/Render/etc.), add these same variables in the project environment settings.
 - Set `PROJECT_LINK` to your deployed app URL if you want it included in allocation messages.
 
