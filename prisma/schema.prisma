@@ -19,6 +19,7 @@ model User {
   monthlyPerformancePoints  Int      @default(0)
   lastMonthlyResetDate      DateTime?
   assignedCalls             ServiceRequest[] @relation("AssignedToRequests")
+  serviceAssignments        ServiceAssignment[] @relation("ServiceAssignmentEmployee")
   createdRequests           ServiceRequest[] @relation("CreatedByRequests")
   pointAdjustments          EmployeePointAdjustment[] @relation("EmployeePointAdjustments")
   performanceUpdates        EmployeePointAdjustment[] @relation("PointUpdatedBy")
@@ -56,6 +57,7 @@ model ServiceRequest {
   assignedToId String?  @db.Uuid
   assignedTo   User?    @relation("AssignedToRequests", fields: [assignedToId], references: [id])
   assignedAt   DateTime?
+  assignments  ServiceAssignment[] @relation("ServiceRequestAssignments")
   createdAt    DateTime @default(now())
   status       String?  @default("New Call")
   statusReason String?
@@ -65,6 +67,25 @@ model ServiceRequest {
   reviewPointsDelta Int?
   closedByName String?
   closedAt     DateTime?
+}
+
+model ServiceAssignment {
+  id                  String   @id @default(uuid()) @db.Uuid
+  requestId           String   @db.Uuid
+  employeeId          String   @db.Uuid
+  assignedAt          DateTime @default(now())
+  status              String?  @default("New Call")
+  statusReason        String?
+  statusSubmittedAt   DateTime?
+  statusPointsDelta   Int?
+  closedByName        String?
+  closedAt            DateTime?
+
+  request             ServiceRequest @relation("ServiceRequestAssignments", fields: [requestId], references: [id], onDelete: Cascade)
+  employee            User           @relation("ServiceAssignmentEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, employeeId])
+  @@index([employeeId])
 }
 
 model EmployeePointAdjustment {

@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { deleteServiceRequest, updateServiceRequestDetails } from "./actions";
 import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
+import { AssignmentPicker, type AssignmentPickerAssignment } from "./dashboard/assignment-picker";
 
 type SimpleOption = {
   id: string;
@@ -29,6 +30,7 @@ type RequestDetails = {
   assignedAt?: Date | string | null;
   status?: string | null;
   assignedTo?: { name: string } | null;
+  assignments?: AssignmentPickerAssignment[];
   createdBy?: { name: string } | null;
 };
 
@@ -83,9 +85,6 @@ export function DocketDetailsModal({
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-  const [assignedToId, setAssignedToId] = React.useState(request.assignedToId ?? "");
-  const [isAssigning, setIsAssigning] = React.useState(false);
-  const [assignmentMessage, setAssignmentMessage] = React.useState<string | null>(null);
   const openModal = () => setIsOpen(true);
 
   React.useEffect(() => {
@@ -94,7 +93,7 @@ export function DocketDetailsModal({
     }
   }, [onReady]);
   const [name, setName] = React.useState(request.name);
-  const [company, setCompany] = React.useState(request.company);
+  const [company] = React.useState(request.company);
   const [phoneNumber1, setPhoneNumber1] = React.useState(request.phoneNumber1);
   const [phoneNumber2, setPhoneNumber2] = React.useState(request.phoneNumber2 || "");
   const [fullAddress, setFullAddress] = React.useState(request.fullAddress);
@@ -136,36 +135,6 @@ export function DocketDetailsModal({
 
       return nextValue;
     });
-  };
-
-  const handleAssignmentSave = async () => {
-    if (!canAssign || !employees) {
-      return;
-    }
-
-    setIsAssigning(true);
-    setAssignmentMessage(null);
-
-    try {
-      const response = await fetch("/api/assign", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ requestId: request.id, assignedToId: assignedToId }),
-      });
-
-      const json = await response.json();
-      if (json.success) {
-        setAssignmentMessage("Allocation updated successfully.");
-        router.refresh();
-      } else {
-        setAssignmentMessage(json.message || "Allocation failed.");
-      }
-    } catch (error) {
-      console.error(error);
-      setAssignmentMessage("Allocation failed.");
-    } finally {
-      setIsAssigning(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -229,62 +198,77 @@ export function DocketDetailsModal({
     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     window.open(mapsUrl, "_blank", "noopener,noreferrer");
   };
+  const assignmentDates =
+    request.assignments
+      ?.map((assignment) => parseDateValue(assignment.assignedAt))
+      .filter((value): value is Date => value !== null) ?? [];
+  const firstAssignedAt =
+    assignmentDates.length > 0
+      ? new Date(Math.min(...assignmentDates.map((value) => value.getTime())))
+      : parseDateValue(request.assignedAt);
+  const assignedAtLabel = firstAssignedAt ? formatRequestDateTime(firstAssignedAt) : null;
 
   const modal = isOpen ? (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-2 sm:p-4"
       onClick={() => setIsOpen(false)}
     >
       <div
-        className="my-4 w-full max-w-5xl rounded-lg border bg-white shadow-lg"
+        className="my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-white shadow-lg sm:my-4 sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxHeight: "90vh" }}
       >
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div>
-            <h3 className="text-lg font-semibold">Docket Details — {request.docketNumber}</h3>
+        <div className="flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="min-w-0">
+            <h3 className="break-words text-base font-semibold text-blue-950 sm:text-lg">
+              Docket Details - {request.docketNumber}
+              {assignedAtLabel ? (
+                <span className="mt-1 block text-xs font-medium text-blue-600 sm:ml-2 sm:mt-0 sm:inline">
+                  Assigned: {assignedAtLabel}
+                </span>
+              ) : null}
+            </h3>
             <p className="text-xs text-gray-500">{formatRequestDateTime(request.createdAt)}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {request.status ? (
               <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{request.status}</span>
             ) : null}
-            <button onClick={() => setIsOpen(false)} className="ml-2 rounded-full bg-red-100 px-3 py-1 text-sm text-red-700">Close</button>
+            <button type="button" onClick={() => setIsOpen(false)} className="rounded-full bg-red-100 px-3 py-1 text-sm text-red-700">Close</button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex h-full flex-col">
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
               <div className="space-y-4">
                 <GridField label="Customer name">
                   {canEdit ? (
-                    <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2" />
+                    <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
                   ) : (
                     <InfoField label="Name" value={`${name} ${company ? `\n${company}` : ""}`.trim()} />
                   )}
                 </GridField>
 
                 <GridField label="Phone numbers">
-                  <div className="flex gap-2">
-                    <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-1/2 rounded border px-3 py-2" />
-                    <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-1/2 rounded border px-3 py-2" />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
+                    <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
                   </div>
                 </GridField>
 
                 <GridField label="Address">
-                  <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2" rows={4} />
+                  <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
                 </GridField>
 
                 <GridField label="Complaint details">
-                  <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className="w-full rounded border px-3 py-2" rows={4} />
+                  <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
                 </GridField>
               </div>
 
               <div className="space-y-4">
                 <GridField label="Product">
                   {canEdit ? (
-                    <select value={product} onChange={(e) => setProduct(e.target.value)} className="w-full rounded border px-3 py-2">
+                    <select value={product} onChange={(e) => setProduct(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
                       {products.map((p) => (
                         <option key={p.id} value={p.name ?? p.id}>{p.name ?? p.id}</option>
                       ))}
@@ -295,7 +279,7 @@ export function DocketDetailsModal({
                 </GridField>
 
                 <GridField label="Call type">
-                  <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className="w-full rounded border px-3 py-2">
+                  <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
                     {callTypeOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
@@ -304,7 +288,7 @@ export function DocketDetailsModal({
 
                 {isServiceCall && (
                   <GridField label="Service billing type">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {BILLING_TYPE_OPTIONS.map((opt) => (
                         <button
                           key={opt.id}
@@ -318,14 +302,14 @@ export function DocketDetailsModal({
 
                     {isChargeable && (
                       <div className="mt-2">
-                        <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2" placeholder="Amount" />
+                        <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Amount" />
                       </div>
                     )}
                   </GridField>
                 )}
 
                 <GridField label="Area">
-                  <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full rounded border px-3 py-2">
+                  <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
                     {AREAS.map((a) => (
                       <option key={a} value={a}>{a}</option>
                     ))}
@@ -336,26 +320,34 @@ export function DocketDetailsModal({
                   {canAssign && employees ? (
                     <div>
                       <label className="block text-sm font-medium text-blue-700">Assign to</label>
-                      <div className="mt-2 flex items-center gap-2">
-                        <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="w-2/3 rounded border px-3 py-2">
-                          <option value="">Select employee</option>
-                          {employees.map((emp) => (
-                            <option key={emp.id} value={emp.id}>{emp.name}</option>
-                          ))}
-                        </select>
-                        <button type="button" onClick={handleAssignmentSave} disabled={isAssigning} className="rounded bg-blue-600 px-3 py-2 text-white">
-                          {isAssigning ? "Saving..." : "Save allocation"}
-                        </button>
+                      <div className="mt-2">
+                        <AssignmentPicker
+                          key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
+                          requestId={request.id}
+                          employees={employees}
+                          assignments={request.assignments}
+                          defaultEmployeeId={request.assignedToId}
+                        />
                       </div>
-                      {assignmentMessage ? <p className="mt-2 text-sm text-green-600">{assignmentMessage}</p> : null}
                     </div>
                   ) : null}
 
                   {canAssign ? (
                     <div className="mt-2 space-y-1 text-sm text-gray-600">
                       {request.createdBy ? <p>Created by: {request.createdBy.name}</p> : null}
-                      {request.assignedTo ? <p>Assigned to: {request.assignedTo.name}</p> : null}
-                      {request.assignedAt ? <p>Assigned at: {formatRequestDateTime(request.assignedAt)}</p> : null}
+                      {request.assignments && request.assignments.length > 0 ? (
+                        request.assignments.map((assignment) => (
+                          <p key={assignment.employeeId}>
+                            Assigned to: {assignment.employee?.name ?? "Employee"}
+                            {assignment.assignedAt ? ` at ${formatRequestDateTime(assignment.assignedAt)}` : ""}
+                          </p>
+                        ))
+                      ) : (
+                        <>
+                          {request.assignedTo ? <p>Assigned to: {request.assignedTo.name}</p> : null}
+                          {request.assignedAt ? <p>Assigned at: {formatRequestDateTime(request.assignedAt)}</p> : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -363,15 +355,15 @@ export function DocketDetailsModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
-            <button type="button" onClick={handleOpenMap} className="rounded border px-3 py-2 text-sm">Open in maps</button>
+          <div className="grid gap-2 border-t px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
+            <button type="button" onClick={handleOpenMap} className="w-full rounded border px-3 py-2 text-sm sm:w-auto">Open in maps</button>
             {canEdit ? (
               <>
-                <button type="button" onClick={handleDelete} disabled={isDeleting} className="rounded border px-3 py-2 text-sm text-red-600">{isDeleting ? "Deleting..." : "Delete"}</button>
-                <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">Save changes</button>
+                <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded border px-3 py-2 text-sm text-red-600 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
+                <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Save changes</button>
               </>
             ) : (
-              <button type="button" onClick={() => setIsOpen(false)} className="rounded bg-blue-600 px-4 py-2 text-white">Close</button>
+              <button type="button" onClick={() => setIsOpen(false)} className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Close</button>
             )}
           </div>
         </form>
@@ -439,11 +431,11 @@ function formatRequestDateTime(value: Date | string) {
   }).format(date);
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
+function parseDateValue(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
 
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}

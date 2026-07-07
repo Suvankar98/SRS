@@ -29,7 +29,7 @@ export function ConfirmSubmitButton({
 
   function handleConfirm() {
     if (formElement) {
-      formElement.submit();
+      formElement.requestSubmit();
       return;
     }
 

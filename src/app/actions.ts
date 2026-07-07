@@ -80,6 +80,28 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
   return submittedMinutes <= 21 * 60 ? 2 : -2;
 }
 
+function getAggregateAssignmentStatus(statuses: Array<string | null>) {
+  const normalizedStatuses = statuses.map((status) => normalizeStatus(status));
+
+  if (normalizedStatuses.length === 0) {
+    return "New Call";
+  }
+
+  if (normalizedStatuses.every((status) => status === "Completed")) {
+    return "Completed";
+  }
+
+  if (normalizedStatuses.every((status) => status === "Cancel")) {
+    return "Cancel";
+  }
+
+  if (normalizedStatuses.some((status) => status !== "New Call")) {
+    return "In Process";
+  }
+
+  return "New Call";
+}
+
 const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
 type ServiceBillingType = (typeof SERVICE_BILLING_TYPES)[number];
 
@@ -486,6 +508,19 @@ export async function addProduct(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
   const name = getRequiredField(formData, "name");
+  const existingProduct = await prisma.product.findFirst({
+    where: {
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingProduct) {
+    redirect("/admin?tab=products&duplicate=1");
+  }
 
   await prisma.product.create({ data: { name } });
 
@@ -499,6 +534,20 @@ export async function updateProduct(formData: FormData) {
 
   const id = getRequiredField(formData, "id");
   const name = getRequiredField(formData, "name");
+  const duplicateProduct = await prisma.product.findFirst({
+    where: {
+      id: { not: id },
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+    select: { id: true },
+  });
+
+  if (duplicateProduct) {
+    redirect("/admin?tab=products&duplicate=1");
+  }
 
   await prisma.product.update({
     where: { id },
@@ -526,6 +575,19 @@ export async function addCallType(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
   const name = getRequiredField(formData, "name");
+  const existingCallType = await prisma.callType.findFirst({
+    where: {
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingCallType) {
+    redirect("/admin?tab=call-types&duplicate=1");
+  }
 
   await prisma.callType.create({ data: { name } });
 
@@ -539,6 +601,20 @@ export async function updateCallType(formData: FormData) {
 
   const id = getRequiredField(formData, "id");
   const name = getRequiredField(formData, "name");
+  const duplicateCallType = await prisma.callType.findFirst({
+    where: {
+      id: { not: id },
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+    select: { id: true },
+  });
+
+  if (duplicateCallType) {
+    redirect("/admin?tab=call-types&duplicate=1");
+  }
 
   await prisma.callType.update({
     where: { id },
@@ -684,35 +760,88 @@ export async function updateServiceCallStatus(formData: FormData) {
     throw new Error("Invalid status");
   }
 
-  // Verify the request belongs to the employee
-  const request = await prisma.serviceRequest.findUnique({
-    where: { id: requestId },
-    select: {
-      createdAt: true,
-      status: true,
-      assignedAt: true,
-      statusSubmittedAt: true,
-      assignedToId: true,
-      assignedTo: {
+  let assignment = await prisma.serviceAssignment.findUnique({
+    where: {
+      requestId_employeeId: {
+        requestId,
+        employeeId: session.userId,
+      },
+    },
+    include: {
+      request: {
         select: {
-          name: true,
+          createdAt: true,
+          assignedAt: true,
+          assignedToId: true,
+          status: true,
+          statusReason: true,
+          statusSubmittedAt: true,
+          statusPointsDelta: true,
+          closedByName: true,
+          closedAt: true,
         },
       },
     },
   });
 
-  if (request?.assignedToId !== session.userId) {
-    redirect("/dashboard");
+  if (!assignment) {
+    const legacyRequest = await prisma.serviceRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        createdAt: true,
+        assignedAt: true,
+        assignedToId: true,
+        status: true,
+        statusReason: true,
+        statusSubmittedAt: true,
+        statusPointsDelta: true,
+        closedByName: true,
+        closedAt: true,
+      },
+    });
+
+    if (legacyRequest?.assignedToId !== session.userId) {
+      redirect("/dashboard");
+    }
+
+    assignment = await prisma.serviceAssignment.create({
+      data: {
+        requestId,
+        employeeId: session.userId,
+        assignedAt: legacyRequest.assignedAt ?? legacyRequest.createdAt,
+        status: legacyRequest.status ?? "New Call",
+        statusReason: legacyRequest.statusReason,
+        statusSubmittedAt: legacyRequest.statusSubmittedAt,
+        statusPointsDelta: legacyRequest.statusPointsDelta,
+        closedByName: legacyRequest.closedByName,
+        closedAt: legacyRequest.closedAt,
+      },
+      include: {
+        request: {
+          select: {
+            createdAt: true,
+            assignedAt: true,
+            assignedToId: true,
+            status: true,
+            statusReason: true,
+            statusSubmittedAt: true,
+            statusPointsDelta: true,
+            closedByName: true,
+            closedAt: true,
+          },
+        },
+      },
+    });
   }
 
-  const currentStatus = normalizeStatus(request?.status);
+  const currentStatus = normalizeStatus(assignment.status);
   if (currentStatus === "Completed") {
     throw new Error("Completed calls are locked and cannot be updated.");
   }
 
-  const allocationStartedAt = request.assignedAt ?? request.createdAt;
+  const allocationStartedAt = assignment.assignedAt ?? assignment.request.createdAt;
   const alreadyUpdatedForCurrentAllocation =
-    !!request.statusSubmittedAt && request.statusSubmittedAt.getTime() >= allocationStartedAt.getTime();
+    !!assignment.statusSubmittedAt && assignment.statusSubmittedAt.getTime() >= allocationStartedAt.getTime();
 
   if (alreadyUpdatedForCurrentAllocation) {
     throw new Error("Status can only be updated once per allotment.");
@@ -763,25 +892,55 @@ export async function updateServiceCallStatus(formData: FormData) {
   });
 
   const submittedAt = new Date();
-  const pointsDelta = getStatusSubmissionPoints(request.assignedAt ?? request.createdAt, submittedAt);
+  const pointsDelta = getStatusSubmissionPoints(assignment.assignedAt ?? assignment.request.createdAt, submittedAt);
 
   await prisma.$transaction(async (transaction) => {
-    await transaction.serviceRequest.update({
-      where: { id: requestId },
+    await transaction.serviceAssignment.update({
+      where: { id: assignment.id },
       data: {
         status,
         statusReason: reasonValue || null,
-        customerReview: null,
         statusSubmittedAt: submittedAt,
         statusPointsDelta: pointsDelta,
-        reviewPointsDelta: null,
-        // Any update beyond New Call removes this item from the employee queue.
-        assignedToId: status !== "New Call" ? null : undefined,
-        closedByName:
-          status === "Completed"
-            ? (employee?.name || request?.assignedTo?.name || "Unknown")
-            : null,
+        closedByName: status === "Completed" ? (employee?.name || "Unknown") : null,
         closedAt: status === "Completed" ? submittedAt : null,
+      },
+    });
+
+    const updatedAssignments = await transaction.serviceAssignment.findMany({
+      where: { requestId },
+      select: {
+        status: true,
+        statusReason: true,
+        statusSubmittedAt: true,
+        closedByName: true,
+        closedAt: true,
+      },
+    });
+    const aggregateStatus = getAggregateAssignmentStatus(updatedAssignments.map((item) => item.status));
+    const latestSubmitted = updatedAssignments
+      .filter((item) => item.statusSubmittedAt)
+      .sort((a, b) => (b.statusSubmittedAt?.getTime() ?? 0) - (a.statusSubmittedAt?.getTime() ?? 0))[0];
+    const closedAssignments = updatedAssignments.filter((item) => item.closedAt);
+    const latestClosedAt = closedAssignments
+      .map((item) => item.closedAt)
+      .filter((value): value is Date => value instanceof Date)
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+    await transaction.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        status: aggregateStatus,
+        statusReason: latestSubmitted?.statusReason || null,
+        customerReview: null,
+        statusSubmittedAt: latestSubmitted?.statusSubmittedAt || submittedAt,
+        statusPointsDelta: pointsDelta,
+        reviewPointsDelta: null,
+        closedByName:
+          aggregateStatus === "Completed"
+            ? closedAssignments.map((item) => item.closedByName).filter(Boolean).join(", ") || null
+            : null,
+        closedAt: aggregateStatus === "Completed" ? latestClosedAt : null,
       },
     });
 

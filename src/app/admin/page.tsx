@@ -35,6 +35,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const editStaffParam = resolvedSearchParams.editStaff;
   const editingStaffId = Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam;
   const hasEditingStaff = typeof editingStaffId === "string" && editingStaffId.trim() !== "";
+  const duplicateParam = resolvedSearchParams.duplicate;
+  const showDuplicateWarning = (Array.isArray(duplicateParam) ? duplicateParam[0] : duplicateParam) === "1";
+  const tabParam = resolvedSearchParams.tab;
+  const activeTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
+  const duplicateItemLabel = activeTab === "call-types" ? "call type" : "product";
 
   const [staffMembers, products, callTypes] = await Promise.all([
     prisma.user.findMany({
@@ -107,6 +112,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           </div>
         </header>
+
+        {showDuplicateWarning ? (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            This {duplicateItemLabel} already exists. Please use a different name.
+          </div>
+        ) : null}
 
         <section className="space-y-6">
           <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">

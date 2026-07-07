@@ -37,25 +37,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
 
-  const visibleWhere = isEmployee
-    ? {
-        assignedToId: session.userId,
-      }
-    : undefined;
-
-  const [allRequests, employees, products, currentUser] = await Promise.all([
-    prisma.serviceRequest.findMany({
-      where: visibleWhere,
-      orderBy: { createdAt: "desc" },
-      include: {
-        assignedTo: {
-          select: { name: true },
-        },
-        createdBy: {
-          select: { name: true },
-        },
-      },
-    }),
+  const [employees, products, currentUser] = await Promise.all([
     canAssign
       ? prisma.user.findMany({
           where: { role: APP_ROLES.EMPLOYEE },
@@ -67,6 +49,78 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, performancePoints: true } }),
   ]);
 
+  const allRequests = isEmployee
+    ? [
+        ...(await prisma.serviceAssignment.findMany({
+          where: { employeeId: session.userId },
+          orderBy: { assignedAt: "desc" },
+          include: {
+            employee: { select: { name: true } },
+            request: {
+              include: {
+                assignedTo: {
+                  select: { name: true },
+                },
+                createdBy: {
+                  select: { name: true },
+                },
+                assignments: {
+                  orderBy: { assignedAt: "asc" },
+                  include: { employee: { select: { name: true } } },
+                },
+              },
+            },
+          },
+        })).map((assignment) => ({
+          ...assignment.request,
+          assignedToId: assignment.employeeId,
+          assignedTo: assignment.employee,
+          assignedAt: assignment.assignedAt,
+          status: assignment.status ?? "New Call",
+          statusReason: assignment.statusReason,
+          statusSubmittedAt: assignment.statusSubmittedAt,
+          statusPointsDelta: assignment.statusPointsDelta,
+          closedByName: assignment.closedByName,
+          closedAt: assignment.closedAt,
+        })),
+        ...(await prisma.serviceRequest.findMany({
+          where: {
+            assignedToId: session.userId,
+            assignments: {
+              none: { employeeId: session.userId },
+            },
+          },
+          orderBy: { assignedAt: "desc" },
+          include: {
+            assignedTo: {
+              select: { name: true },
+            },
+            createdBy: {
+              select: { name: true },
+            },
+            assignments: {
+              orderBy: { assignedAt: "asc" },
+              include: { employee: { select: { name: true } } },
+            },
+          },
+        })),
+      ]
+    : await prisma.serviceRequest.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          assignedTo: {
+            select: { name: true },
+          },
+          createdBy: {
+            select: { name: true },
+          },
+          assignments: {
+            orderBy: { assignedAt: "asc" },
+            include: { employee: { select: { name: true } } },
+          },
+        },
+      });
+
   const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
   const visibleRequests = isEmployee
     ? filteredRequests.filter((request) => normalizeStatus(request.status) !== "Completed")
@@ -76,7 +130,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     : sortByDocketSequenceAscending(visibleRequests);
   const requests = isEmployee ? sortedFilteredRequests : sortedFilteredRequests.slice(-10);
   const totalRequests = sortedFilteredRequests.length;
-  const assignedRequests = sortedFilteredRequests.filter((request) => Boolean(request.assignedToId)).length;
+  const assignedRequests = sortedFilteredRequests.filter(
+    (request) => Boolean(request.assignedToId) || (request.assignments?.length ?? 0) > 0,
+  ).length;
 
   const unassignedRequests = totalRequests - assignedRequests;
 
@@ -252,7 +308,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </section>
               ) : (
                 <DashboardRequestList
-                  key={requests.map((request) => `${request.id}:${request.status ?? ""}:${request.assignedToId ?? ""}`).join("|")}
+                  key={requests.map((request) => `${request.id}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
                   requests={requests}
                   products={products}
                   employees={employees}

@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { updateServiceCallStatus } from "./actions";
-import { getStatusLabel, normalizeStatus } from "./status-utils";
+import { getStatusLabel } from "./status-utils";
 import { EmployeeMediaUpload } from "./dashboard/employee-media-upload";
 
 type StatusRequest = {
@@ -14,36 +14,29 @@ type StatusRequest = {
 };
 
 type EditableStatus = "In Process" | "Completed" | "Cancel";
-
-function getInitialEditableStatus(rawStatus: string | null): EditableStatus {
-  const normalizedStatus = normalizeStatus(rawStatus);
-  return normalizedStatus === "New Call" ? "In Process" : normalizedStatus;
-}
+type StatusChoice = "" | EditableStatus;
 
 export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-  const [status, setStatus] = React.useState(getInitialEditableStatus(request.status));
+  const [status, setStatus] = React.useState<StatusChoice>("");
   const [reason, setReason] = React.useState(request.statusReason || "");
-  const [showReasonInput, setShowReasonInput] = React.useState(
-    getInitialEditableStatus(request.status) === "Cancel"
-  );
   const [submitError, setSubmitError] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const currentStatusLabel = getStatusLabel(request.status);
+  const showWorkDoneInput = status === "In Process";
+  const showCancelReasonInput = status === "Cancel";
 
   const openModal = () => {
-    const editableStatus = getInitialEditableStatus(request.status);
-    setStatus(editableStatus);
-    setReason(request.statusReason || "");
-    setShowReasonInput(editableStatus === "Cancel");
+    setStatus("");
+    setReason("");
     setSubmitError("");
     setIsOpen(true);
   };
 
-  const handleStatusChange = (newStatus: EditableStatus) => {
+  const handleStatusChange = (newStatus: StatusChoice) => {
     setStatus(newStatus);
-    setShowReasonInput(newStatus === "Cancel");
-    if (newStatus !== "Cancel") {
+    if (newStatus !== "Cancel" && newStatus !== "In Process") {
       setReason("");
     }
   };
@@ -51,7 +44,17 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const handleSubmit = async () => {
     setSubmitError("");
 
-    if (showReasonInput && reason.trim() === "") {
+    if (!status) {
+      setSubmitError("Please choose a status.");
+      return;
+    }
+
+    if (showWorkDoneInput && reason.trim() === "") {
+      setSubmitError("Please enter how much work is done.");
+      return;
+    }
+
+    if (showCancelReasonInput && reason.trim() === "") {
       setSubmitError("Reason is required when status is Cancel.");
       return;
     }
@@ -95,7 +98,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 Update Call Status
               </h3>
               <p className="mt-1 text-sm text-blue-600">
-                Docket: {request.docketNumber}
+                Docket: {request.docketNumber} <span className="mx-2 text-blue-300">|</span> Current status: {currentStatusLabel}
               </p>
             </div>
 
@@ -106,9 +109,10 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 </label>
                 <select
                   value={status}
-                  onChange={(e) => handleStatusChange(e.target.value as EditableStatus)}
+                  onChange={(e) => handleStatusChange(e.target.value as StatusChoice)}
                   className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
                 >
+                  <option value="">Choose</option>
                   <option value="In Process">In Process</option>
                   <option value="Completed">Completed</option>
                   <option value="Cancel">Cancel</option>
@@ -116,7 +120,22 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 <p className="mt-2 text-xs text-blue-600">This can be changed only once for this allotted call.</p>
               </div>
 
-              {showReasonInput && (
+              {showWorkDoneInput && (
+                <div>
+                  <label className="block text-sm font-medium text-blue-700">
+                    Work done <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Describe how much work is done..."
+                    className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                    rows={4}
+                  />
+                </div>
+              )}
+
+              {showCancelReasonInput && (
                 <div>
                   <label className="block text-sm font-medium text-blue-700">
                     Reason <span className="text-red-500">*</span>

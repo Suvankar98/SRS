@@ -4,6 +4,7 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
+import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import {
   formatServiceBillingType,
   formatINRCurrency,
@@ -11,31 +12,34 @@ import {
   getStatusPillClass,
 } from "../status-utils";
 
+type DashboardRequestRowRequest = {
+  id: string;
+  docketNumber: string;
+  createdAt: Date | string;
+  name: string;
+  company: string;
+  phoneNumber1: string;
+  phoneNumber2: string | null;
+  fullAddress: string;
+  complaintDetails: string | null;
+  area: string;
+  product: string;
+  callType: string;
+  serviceBillingType: string | null;
+  chargeableAmount: number | null;
+  assignedToId: string | null;
+  assignedAt?: Date | string | null;
+  status: string | null;
+  statusReason: string | null;
+  closedAt: Date | string | null;
+  closedByName: string | null;
+  assignedTo?: { name: string } | null;
+  assignments?: AssignmentPickerAssignment[];
+  createdBy?: { name: string } | null;
+};
+
 type DashboardRequestRowProps = {
-  request: {
-    id: string;
-    docketNumber: string;
-    createdAt: Date | string;
-    name: string;
-    company: string;
-    phoneNumber1: string;
-    phoneNumber2: string | null;
-    fullAddress: string;
-    complaintDetails: string | null;
-    area: string;
-    product: string;
-    callType: string;
-    serviceBillingType: string | null;
-    chargeableAmount: number | null;
-    assignedToId: string | null;
-    assignedAt?: Date | string | null;
-    status: string | null;
-    statusReason: string | null;
-    closedAt: Date | string | null;
-    closedByName: string | null;
-    assignedTo?: { name: string } | null;
-    createdBy?: { name: string } | null;
-  };
+  request: DashboardRequestRowRequest;
   products: Array<{ id: string; name: string }>;
   employees: Array<{ id: string; name: string }>;
   canEditDocket: boolean;
@@ -62,10 +66,6 @@ export function DashboardRequestRow({
   canEditDocket,
   canAssign,
   isEmployee,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
   // drag handlers
   draggable,
   onDragStart,
@@ -128,7 +128,7 @@ export function DashboardRequestRow({
   };
 
   const getAssignedAt = (request: { assignedAt?: Date | string | null }) => {
-    const value = (request as any).assignedAt;
+    const value = request.assignedAt;
     if (value instanceof Date) return value;
     if (typeof value === "string") {
       const parsed = new Date(value);
@@ -141,14 +141,15 @@ export function DashboardRequestRow({
     const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
+
     if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+      return minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
     }
-    return `${minutes}m`;
+
+    return `${minutes} min`;
   };
 
-  const getAssignmentCountdown = (assignedAt: Date) => {
-    const now = new Date();
+  const getAssignmentCountdown = (assignedAt: Date, now: Date) => {
     const assignedDay = new Date(assignedAt);
     const dayStart = new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate());
     const deadline9 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 21, 0, 0);
@@ -165,26 +166,58 @@ export function DashboardRequestRow({
     return `Overdue by ${getDurationLabel(now.getTime() - deadline24.getTime())}`;
   };
 
-  const [tick, setTick] = React.useState(0);
+  const [now, setNow] = React.useState<Date | null>(null);
+  const assignedAtValue = request.assignedAt;
+  const requestStatus = request.status;
+
   React.useEffect(() => {
-    const assignedAt = getAssignedAt(request);
-    if (!assignedAt || isClosedStatus(request.status)) {
+    const assignedAt = getAssignedAt({ assignedAt: assignedAtValue });
+    if (!assignedAt || isClosedStatus(requestStatus)) {
       return;
     }
 
-    const interval = window.setInterval(() => setTick((current) => current + 1), 30000);
-    return () => window.clearInterval(interval);
-  }, [request.assignedAt, request.status]);
+    const initialTick = window.setTimeout(() => setNow(new Date()), 0);
+    const interval = window.setInterval(() => setNow(new Date()), 30000);
+    return () => {
+      window.clearTimeout(initialTick);
+      window.clearInterval(interval);
+    };
+  }, [assignedAtValue, requestStatus]);
 
-  const renderAssignmentBadge = (request: any) => {
+  const renderAssignmentBadge = (request: DashboardRequestRowRequest) => {
     const assignedAt = getAssignedAt(request);
     if (!assignedAt) return null;
 
-    const now = new Date();
     const assignedDay = new Date(assignedAt);
     const dayStart = new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate());
     const deadline9 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 21, 0, 0);
     const deadline24 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 24, 0, 0);
+
+    const completedAt = getClosedAt(request);
+    if (request.status === "Completed" && completedAt) {
+      const completedOnTime = completedAt <= deadline24;
+
+      return (
+        <div
+          className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${
+            completedOnTime
+              ? "bg-emerald-50 text-emerald-900 ring-emerald-300"
+              : "bg-rose-50 text-rose-900 ring-rose-300"
+          }`}
+        >
+          {completedOnTime ? "Completed on time" : "Completed late"}
+        </div>
+      );
+    }
+
+    // Avoid hydration mismatches: render a stable label until the client clock is available.
+    if (!now) {
+      return (
+        <div className="inline-flex rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900 ring-1 ring-inset ring-blue-300">
+          Assigned
+        </div>
+      );
+    }
 
     let colorClass = "bg-emerald-50 text-emerald-900 ring-emerald-300";
     if (now >= deadline9 && now < deadline24) {
@@ -195,7 +228,7 @@ export function DashboardRequestRow({
     }
 
     // If completed, evaluate thumbs
-    const closedAt = getClosedAt(request as any);
+    const closedAt = getClosedAt(request);
     if (request.status === "Completed" && closedAt) {
       if (closedAt <= deadline9 || (closedAt <= deadline24 && closedAt > deadline9)) {
         return (
@@ -214,9 +247,8 @@ export function DashboardRequestRow({
     }
 
     return (
-      <div className={`inline-flex flex-col gap-1 rounded-md px-2 py-2 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
-        <span>{new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(assignedAt)}</span>
-        <span className="text-[10px] font-normal text-blue-700">{getAssignmentCountdown(assignedAt)}</span>
+      <div className={`inline-flex rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
+        {getAssignmentCountdown(assignedAt, now)}
       </div>
     );
   };
@@ -343,50 +375,13 @@ export function DashboardRequestRow({
               </div>
             ) : null}
             {!isClosedStatus(request.status) ? (
-              <div className="flex items-center gap-2">
-                <input type="hidden" name="requestId" value={request.id} />
-                <select
-                  name="assignedToId"
-                  defaultValue={request.assignedToId ? String(request.assignedToId) : ""}
-                  onChange={async (e) => {
-                    const assignedToId = e.currentTarget.value;
-                    try {
-                      // show quick toast then reload to reflect change
-                      const res = await fetch("/api/assign", {
-                        method: "POST",
-                        headers: { "content-type": "application/json" },
-                        body: JSON.stringify({ requestId: request.id, assignedToId }),
-                      });
-
-                      const json = await res.json();
-                      if (json.success) {
-                        // show small toast
-                        const el = document.createElement("div");
-                        el.className = "fixed bottom-4 right-4 z-50 rounded-md bg-emerald-600 px-4 py-2 text-white";
-                        el.textContent = "Allocation saved";
-                        document.body.appendChild(el);
-                        setTimeout(() => {
-                          el.remove();
-                          window.location.reload();
-                        }, 800);
-                      } else {
-                        alert(json.message || "Allocation failed");
-                      }
-                    } catch (err) {
-                      console.error(err);
-                      alert("Allocation failed");
-                    }
-                  }}
-                  className="min-w-[9.5rem] flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                >
-                  <option value="">Select employee</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <AssignmentPicker
+                key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
+                requestId={request.id}
+                employees={employees}
+                assignments={request.assignments}
+                defaultEmployeeId={request.assignedToId}
+              />
             ) : null}
           </div>
         </td>

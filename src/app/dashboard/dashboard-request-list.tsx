@@ -5,6 +5,7 @@ import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
 import { CopyPhoneButton } from "./copy-phone-button";
+import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { DashboardRequestRow } from "./dashboard-request-row";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 
@@ -30,6 +31,7 @@ export type DashboardListRequest = {
   closedAt: Date | string | null;
   closedByName: string | null;
   assignedTo?: { name: string } | null;
+  assignments?: AssignmentPickerAssignment[];
   createdBy?: { name: string } | null;
 };
 
@@ -189,47 +191,14 @@ export function DashboardRequestList({
                   {request.status === "Completed" ? (
                     <p className="text-[11px] text-blue-700">Completed requests can only be reassigned by Admin or Manager.</p>
                   ) : null}
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input type="hidden" name="requestId" value={request.id} />
-                    <select
-                      name="assignedToId"
-                      defaultValue={request.assignedToId ?? ""}
-                      onChange={async (e) => {
-                        const assignedToId = e.currentTarget.value;
-                        try {
-                          const res = await fetch("/api/assign", {
-                            method: "POST",
-                            headers: { "content-type": "application/json" },
-                            body: JSON.stringify({ requestId: request.id, assignedToId }),
-                          });
-                          const json = await res.json();
-                          if (json.success) {
-                            const el = document.createElement("div");
-                            el.className = "fixed bottom-4 right-4 z-50 rounded-md bg-emerald-600 px-4 py-2 text-white";
-                            el.textContent = "Allocation saved";
-                            document.body.appendChild(el);
-                            setTimeout(() => {
-                              el.remove();
-                              window.location.reload();
-                            }, 800);
-                          } else {
-                            alert(json.message || "Allocation failed");
-                          }
-                        } catch (err) {
-                          console.error(err);
-                          alert("Allocation failed");
-                        }
-                      }}
-                      className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 sm:w-auto"
-                    >
-                      <option value="">Select employee</option>
-                      {employees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <AssignmentPicker
+                    key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
+                    requestId={request.id}
+                    employees={employees}
+                    assignments={request.assignments}
+                    defaultEmployeeId={request.assignedToId}
+                    compact
+                  />
                 </div>
               ) : null}
             </div>
