@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { deleteServiceRequest, updateServiceRequestDetails } from "./actions";
 import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./dashboard/assignment-picker";
+import { ProductAutocomplete } from "./product-autocomplete";
 
 type SimpleOption = {
   id: string;
@@ -110,6 +111,13 @@ export function DocketDetailsModal({
     request.chargeableAmount !== null && request.chargeableAmount !== undefined ? String(request.chargeableAmount) : "",
   );
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const productOptions = React.useMemo(() => {
+    if (products.some((option) => option.name.toLowerCase() === product.toLowerCase())) {
+      return products;
+    }
+
+    return [{ id: `current-${product}`, name: product }, ...products];
+  }, [product, products]);
   const callTypeOptions = request.callType && !CALL_TYPE_OPTIONS.includes(request.callType as (typeof CALL_TYPE_OPTIONS)[number])
     ? [request.callType, ...CALL_TYPE_OPTIONS]
     : [...CALL_TYPE_OPTIONS];
@@ -268,11 +276,15 @@ export function DocketDetailsModal({
               <div className="space-y-4">
                 <GridField label="Product">
                   {canEdit ? (
-                    <select value={product} onChange={(e) => setProduct(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
-                      {products.map((p) => (
-                        <option key={p.id} value={p.name ?? p.id}>{p.name ?? p.id}</option>
-                      ))}
-                    </select>
+                    <ProductAutocomplete
+                      products={productOptions}
+                      label=""
+                      value={product}
+                      onChange={setProduct}
+                      placeholder="Type product name"
+                      inputClassName="w-full rounded border px-3 py-2 text-sm text-blue-950 outline-none focus:border-blue-400 sm:text-base"
+                      required
+                    />
                   ) : (
                     <InfoField label="Product" value={product} />
                   )}

@@ -27,6 +27,7 @@ type DashboardRequestRowRequest = {
   callType: string;
   serviceBillingType: string | null;
   chargeableAmount: number | null;
+  dashboardOrder: number | null;
   assignedToId: string | null;
   assignedAt?: Date | string | null;
   status: string | null;

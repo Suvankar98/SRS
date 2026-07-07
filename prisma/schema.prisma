@@ -58,6 +58,7 @@ model ServiceRequest {
   assignedTo   User?    @relation("AssignedToRequests", fields: [assignedToId], references: [id])
   assignedAt   DateTime?
   assignments  ServiceAssignment[] @relation("ServiceRequestAssignments")
+  dashboardOrder Int?
   createdAt    DateTime @default(now())
   status       String?  @default("New Call")
   statusReason String?

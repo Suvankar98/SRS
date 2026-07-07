@@ -27,6 +27,7 @@ export async function GET(request: Request) {
   const selectedStatus = getCanonicalStatus(url.searchParams.get("status") || "");
   const selectedEmployee = (url.searchParams.get("employeeId") || "").trim();
   const selectedCallType = (url.searchParams.get("callType") || "").trim();
+  const selectedServiceBillingType = getServiceBillingType(url.searchParams.get("serviceBillingType") || "");
   const selectedArea = (url.searchParams.get("area") || "").trim();
   const fromDate = (url.searchParams.get("from") || "").trim();
   const toDate = (url.searchParams.get("to") || "").trim();
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
     selectedStatus,
     selectedEmployee,
     selectedCallType,
+    selectedServiceBillingType,
     selectedArea,
     fromDate,
     toDate,
@@ -252,6 +254,7 @@ function buildReportWhere({
   selectedStatus,
   selectedEmployee,
   selectedCallType,
+  selectedServiceBillingType,
   selectedArea,
   fromDate,
   toDate,
@@ -261,6 +264,7 @@ function buildReportWhere({
   selectedStatus: CanonicalStatus | "";
   selectedEmployee: string;
   selectedCallType: string;
+  selectedServiceBillingType: string;
   selectedArea: string;
   fromDate: string;
   toDate: string;
@@ -292,6 +296,10 @@ function buildReportWhere({
 
   if (selectedCallType !== "") {
     andClauses.push({ callType: selectedCallType });
+  }
+
+  if (selectedServiceBillingType !== "") {
+    andClauses.push({ serviceBillingType: selectedServiceBillingType });
   }
 
   if (selectedArea !== "") {
@@ -374,6 +382,15 @@ function parseDateInput(value: string, endOfDay: boolean): Date | null {
 function getCanonicalStatus(value: string): CanonicalStatus | "" {
   if (STATUS_ORDER.includes(value as CanonicalStatus)) {
     return value as CanonicalStatus;
+  }
+
+  return "";
+}
+
+function getServiceBillingType(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "warranty" || normalized === "amc" || normalized === "chargeable") {
+    return normalized;
   }
 
   return "";

@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
+type GooglePlacesAutocompleteResponse = {
+  suggestions?: Array<{
+    placePrediction?: {
+      text?: {
+        text?: string;
+      };
+    };
+    queryPrediction?: {
+      text?: {
+        text?: string;
+      };
+    };
+  }>;
+  error?: {
+    message?: string;
+    status?: string;
+  };
+};
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get("query")?.trim() || "";
@@ -14,23 +33,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ suggestions: [] });
   }
 
-  const googleUrl = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
-  googleUrl.searchParams.set("input", query);
-  googleUrl.searchParams.set("types", "(regions)");
-  googleUrl.searchParams.set("components", "country:in");
-  googleUrl.searchParams.set("key", GOOGLE_MAPS_API_KEY);
-
-  let data: any;
+  let data: GooglePlacesAutocompleteResponse;
   try {
-    const response = await fetch(googleUrl.toString());
+    const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": "suggestions.placePrediction.text.text,suggestions.queryPrediction.text.text",
+      },
+      body: JSON.stringify({
+        input: query,
+        includedPrimaryTypes: ["(regions)"],
+        includedRegionCodes: ["in"],
+        languageCode: "en",
+      }),
+    });
     data = await response.json();
 
     if (!response.ok) {
       return NextResponse.json(
         {
           suggestions: [],
-          error: data?.error_message || "Google API request failed",
-          googleStatus: data?.status,
+          error: data.error?.message || "Google API request failed",
+          googleStatus: data.error?.status,
         },
         { status: response.status }
       );
@@ -45,20 +71,12 @@ export async function GET(request: Request) {
     );
   }
 
-  if (data.status && data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    return NextResponse.json(
-      {
-        suggestions: [],
-        error: data.error_message || data.status,
-        googleStatus: data.status,
-      },
-      { status: 500 }
-    );
-  }
+  const suggestions = (data.suggestions ?? [])
+    .map((suggestion) => suggestion.placePrediction?.text?.text ?? suggestion.queryPrediction?.text?.text ?? "")
+    .filter((suggestion) => suggestion !== "")
+    .slice(0, 10);
 
-  const suggestions = Array.isArray(data.predictions)
-    ? data.predictions.map((prediction: any) => prediction.description).slice(0, 10)
-    : [];
+  const uniqueSuggestions = Array.from(new Set(suggestions));
 
-  return NextResponse.json({ suggestions });
+  return NextResponse.json({ suggestions: uniqueSuggestions });
 }

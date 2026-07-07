@@ -11,6 +11,7 @@ import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getProductOptions } from "@/lib/product-options";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
 
-  const [employees, products, currentUser] = await Promise.all([
+  const [employees, databaseProducts, currentUser] = await Promise.all([
     canAssign
       ? prisma.user.findMany({
           where: { role: APP_ROLES.EMPLOYEE },
@@ -48,6 +49,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, performancePoints: true } }),
   ]);
+  const products = getProductOptions(databaseProducts);
 
   const allRequests = isEmployee
     ? [
@@ -127,7 +129,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     : filteredRequests;
   const sortedFilteredRequests = isEmployee
     ? sortByEmployeeQueueOrder(visibleRequests)
-    : sortByDocketSequenceAscending(visibleRequests);
+    : sortByDashboardOrder(visibleRequests);
   const requests = isEmployee ? sortedFilteredRequests : sortedFilteredRequests.slice(-10);
   const totalRequests = sortedFilteredRequests.length;
   const assignedRequests = sortedFilteredRequests.filter(
@@ -308,7 +310,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </section>
               ) : (
                 <DashboardRequestList
-                  key={requests.map((request) => `${request.id}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
+                  key={requests.map((request) => `${request.id}:${request.dashboardOrder ?? ""}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
                   requests={requests}
                   products={products}
                   employees={employees}
@@ -517,8 +519,27 @@ function getDocketSequence(docketNumber: string) {
   return Number.isNaN(value) ? Number.MAX_SAFE_INTEGER : value;
 }
 
-function sortByDocketSequenceAscending<T extends { docketNumber: string }>(requests: T[]) {
+function sortByDashboardOrder<T extends { docketNumber: string; dashboardOrder: number | null }>(requests: T[]) {
   return [...requests].sort((a, b) => {
+    const aHasOrder = typeof a.dashboardOrder === "number";
+    const bHasOrder = typeof b.dashboardOrder === "number";
+
+    if (aHasOrder || bHasOrder) {
+      if (!aHasOrder) {
+        return 1;
+      }
+
+      if (!bHasOrder) {
+        return -1;
+      }
+
+      const aOrder = a.dashboardOrder ?? 0;
+      const bOrder = b.dashboardOrder ?? 0;
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+    }
+
     const aSequence = getDocketSequence(a.docketNumber);
     const bSequence = getDocketSequence(b.docketNumber);
 

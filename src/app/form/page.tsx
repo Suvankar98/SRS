@@ -6,8 +6,10 @@ import { BrandLogo } from "../brand-logo";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getProductOptions } from "@/lib/product-options";
 import { ServiceCallBillingFields } from "../service-call-billing-fields";
 import { AreaAutocomplete } from "./area-autocomplete";
+import { ProductAutocomplete } from "../product-autocomplete";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,8 @@ export default async function FormPage() {
     redirect("/dashboard");
   }
 
-  const products = await prisma.product.findMany({ orderBy: { name: "asc" } });
+  const databaseProducts = await prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const products = getProductOptions(databaseProducts);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
@@ -89,24 +92,7 @@ export default async function FormPage() {
                 required
               />
             </label>
-            <label>
-              <span className="mb-2 block text-sm font-medium text-blue-700">Product</span>
-              <select
-                name="product"
-                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
-                defaultValue=""
-                required
-              >
-                <option value="" disabled>
-                  Select a product
-                </option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.name}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ProductAutocomplete products={products} name="product" placeholder="Type product name" required />
 
             <ServiceCallBillingFields />
 

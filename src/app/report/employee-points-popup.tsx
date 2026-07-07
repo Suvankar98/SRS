@@ -38,12 +38,14 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState("");
+  const todayInputValue = useMemo(() => getTodayInputValue(), []);
 
   const [attendanceOption, setAttendanceOption] = useState<AttendanceOption | "">("");
   const [reviewOption, setReviewOption] = useState<ReviewOption | "">("");
   const [documentSubmissionOption, setDocumentSubmissionOption] = useState<DocumentSubmissionOption | "">("");
   const [materialHandoverOption, setMaterialHandoverOption] = useState<MaterialHandoverOption | "">("");
   const [teamworkOption, setTeamworkOption] = useState<TeamworkOption | "">("");
+  const [adjustmentDate, setAdjustmentDate] = useState(todayInputValue);
 
   const allChosen =
     attendanceOption !== "" &&
@@ -81,6 +83,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
         formData.append("documentSubmissionOption", documentSubmissionOption);
         formData.append("materialHandoverOption", materialHandoverOption);
         formData.append("teamworkOption", teamworkOption);
+        formData.append("adjustmentDate", adjustmentDate);
 
         await addEmployeePerformanceAdjustment(formData);
 
@@ -111,6 +114,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
     setDocumentSubmissionOption("");
     setMaterialHandoverOption("");
     setTeamworkOption("");
+    setAdjustmentDate(todayInputValue);
     setErrorMessage("");
   };
 
@@ -134,8 +138,20 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Employee Performance Tag</p>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Employee Performance Tag</p>
+                  <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-blue-700">
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      value={adjustmentDate}
+                      max={todayInputValue}
+                      onChange={(event) => setAdjustmentDate(event.target.value)}
+                      className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium normal-case tracking-normal text-blue-900 outline-none focus:border-blue-400"
+                    />
+                  </label>
+                </div>
                 <h3 className="mt-1 text-xl font-semibold text-blue-950">{employeeName}</h3>
                 <p className="mt-1 text-sm text-blue-700">Current monthly points: {currentPoints}</p>
               </div>
@@ -223,6 +239,15 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints }:
       ) : null}
     </>
   );
+}
+
+function getTodayInputValue() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function SelectField<T extends string>({

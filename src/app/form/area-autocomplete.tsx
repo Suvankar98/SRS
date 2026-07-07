@@ -4,23 +4,35 @@ import React from "react";
 
 export function AreaAutocomplete() {
   const [query, setQuery] = React.useState("");
-  const [selectedArea, setSelectedArea] = React.useState("");
   const [suggestions, setSuggestions] = React.useState<string[]>([]);
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [noResults, setNoResults] = React.useState(false);
   const timeoutRef = React.useRef<number | null>(null);
+  const latestQueryRef = React.useRef("");
 
   React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleSearch = (nextQuery: string) => {
+    latestQueryRef.current = nextQuery;
+
     if (timeoutRef.current) {
       window.clearTimeout(timeoutRef.current);
     }
 
-    if (!query || query.length < 2) {
+    if (nextQuery.length < 2) {
       setSuggestions([]);
+      setActiveIndex(-1);
       setError(null);
       setNoResults(false);
+      setLoading(false);
       return;
     }
 
@@ -30,37 +42,38 @@ export function AreaAutocomplete() {
 
     timeoutRef.current = window.setTimeout(async () => {
       try {
-        const response = await fetch(`/api/places/autocomplete?query=${encodeURIComponent(query)}`);
+        const response = await fetch(`/api/places/autocomplete?query=${encodeURIComponent(nextQuery)}`);
         const data = await response.json();
 
         if (!response.ok) {
           const message = data?.error || "Unable to fetch area suggestions";
-          throw new Error(
-            message + (data?.googleStatus ? ` (Google status: ${data.googleStatus})` : "")
-          );
+          throw new Error(message + (data?.googleStatus ? ` (Google status: ${data.googleStatus})` : ""));
+        }
+
+        if (latestQueryRef.current !== nextQuery) {
+          return;
         }
 
         const nextSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
         setSuggestions(nextSuggestions);
         setNoResults(nextSuggestions.length === 0);
       } catch (err) {
-        console.error(err);
+        if (latestQueryRef.current !== nextQuery) {
+          return;
+        }
+
         setError(err instanceof Error ? err.message : "Unable to load area suggestions");
         setSuggestions([]);
       } finally {
-        setLoading(false);
+        if (latestQueryRef.current === nextQuery) {
+          setLoading(false);
+        }
       }
     }, 300);
-
-    return () => {
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [query]);
+  };
 
   const handleSelect = (value: string) => {
-    setSelectedArea(value);
+    latestQueryRef.current = value;
     setQuery(value);
     setSuggestions([]);
     setActiveIndex(-1);
@@ -93,8 +106,10 @@ export function AreaAutocomplete() {
           name="area"
           value={query}
           onChange={(event) => {
-            setQuery(event.target.value);
-            setSelectedArea("");
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
+            setActiveIndex(-1);
+            scheduleSearch(nextQuery);
           }}
           onKeyDown={handleKeyDown}
           placeholder="Type area name"

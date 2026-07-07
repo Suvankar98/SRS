@@ -24,6 +24,7 @@ export type DashboardListRequest = {
   callType: string;
   serviceBillingType: string | null;
   chargeableAmount: number | null;
+  dashboardOrder: number | null;
   assignedToId: string | null;
   assignedAt?: Date | string | null;
   status: string | null;
@@ -53,6 +54,7 @@ export function DashboardRequestList({
   isEmployee,
 }: DashboardRequestListProps) {
   const [items, setItems] = React.useState(requests);
+  const [orderMessage, setOrderMessage] = React.useState("");
 
   // drag & drop state
   const dragItem = React.useRef<number | null>(null);
@@ -79,6 +81,9 @@ export function DashboardRequestList({
       const copy = [...current];
       const [moved] = copy.splice(from, 1);
       copy.splice(to, 0, moved);
+      if (!isEmployee && canAssign) {
+        void saveDashboardOrder(copy.map((item) => item.id));
+      }
       return copy;
     });
     dragItem.current = null;
@@ -90,8 +95,37 @@ export function DashboardRequestList({
     dragOverItem.current = null;
   };
 
+  const saveDashboardOrder = async (requestIds: string[]) => {
+    setOrderMessage("Saving order...");
+
+    try {
+      const response = await fetch("/api/dashboard/reorder", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ requestIds }),
+      });
+      const json = await response.json();
+
+      if (!json.success) {
+        setOrderMessage(json.message || "Order was not saved");
+        return;
+      }
+
+      setOrderMessage("Order saved");
+      window.setTimeout(() => setOrderMessage(""), 1500);
+    } catch (error) {
+      console.error(error);
+      setOrderMessage("Order was not saved");
+    }
+  };
+
   return (
     <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white">
+      {orderMessage ? (
+        <div className="border-b border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+          {orderMessage}
+        </div>
+      ) : null}
       <div className="space-y-3 p-3 md:hidden">
         {items.map((request, index) => (
           <article

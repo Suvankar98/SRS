@@ -36,6 +36,9 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const selectedStatus = getCanonicalStatus(getSearchParamValue(resolvedSearchParams.status));
   const selectedEmployee = getSearchParamValue(resolvedSearchParams.employeeId).trim();
   const selectedCallType = getSearchParamValue(resolvedSearchParams.callType).trim();
+  const selectedServiceBillingType = getServiceBillingType(
+    getSearchParamValue(resolvedSearchParams.serviceBillingType),
+  );
   const selectedArea = getSearchParamValue(resolvedSearchParams.area).trim();
   const fromDate = getSearchParamValue(resolvedSearchParams.from).trim();
   const toDate = getSearchParamValue(resolvedSearchParams.to).trim();
@@ -63,6 +66,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     selectedStatus,
     selectedEmployee,
     selectedCallType,
+    selectedServiceBillingType,
     selectedArea,
     fromDate,
     toDate,
@@ -127,6 +131,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     selectedStatus,
     selectedEmployee,
     selectedCallType,
+    selectedServiceBillingType,
     selectedArea,
     fromDate,
     toDate,
@@ -136,6 +141,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   if (selectedStatus !== "") exportParams.set("status", selectedStatus);
   if (selectedEmployee !== "") exportParams.set("employeeId", selectedEmployee);
   if (selectedCallType !== "") exportParams.set("callType", selectedCallType);
+  if (selectedServiceBillingType !== "") exportParams.set("serviceBillingType", selectedServiceBillingType);
   if (selectedArea !== "") exportParams.set("area", selectedArea);
   if (fromDate !== "") exportParams.set("from", fromDate);
   if (toDate !== "") exportParams.set("to", toDate);
@@ -313,10 +319,12 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
         {/* client-side filter component so we can show billing options when Call Type=Service */}
         <ReportFilters
+          key={`${selectedCallType}:${selectedServiceBillingType}`}
           searchQuery={searchQuery}
           selectedStatus={selectedStatus}
           selectedEmployee={selectedEmployee}
           selectedCallType={selectedCallType}
+          selectedServiceBillingType={selectedServiceBillingType}
           selectedArea={selectedArea}
           fromDate={fromDate}
           toDate={toDate}
@@ -425,6 +433,7 @@ function buildReportWhere({
   selectedStatus,
   selectedEmployee,
   selectedCallType,
+  selectedServiceBillingType,
   selectedArea,
   fromDate,
   toDate,
@@ -434,6 +443,7 @@ function buildReportWhere({
   selectedStatus: CanonicalStatus | "";
   selectedEmployee: string;
   selectedCallType: string;
+  selectedServiceBillingType: string;
   selectedArea: string;
   fromDate: string;
   toDate: string;
@@ -465,6 +475,10 @@ function buildReportWhere({
 
   if (selectedCallType !== "") {
     andClauses.push({ callType: selectedCallType });
+  }
+
+  if (selectedServiceBillingType !== "") {
+    andClauses.push({ serviceBillingType: selectedServiceBillingType });
   }
 
   if (selectedArea !== "") {
@@ -552,6 +566,15 @@ function getCanonicalStatus(value: string): CanonicalStatus | "" {
   return "";
 }
 
+function getServiceBillingType(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "warranty" || normalized === "amc" || normalized === "chargeable") {
+    return normalized;
+  }
+
+  return "";
+}
+
 function getSearchParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
     return value[0] ?? "";
@@ -565,6 +588,7 @@ function getActiveFilterCount({
   selectedStatus,
   selectedEmployee,
   selectedCallType,
+  selectedServiceBillingType,
   selectedArea,
   fromDate,
   toDate,
@@ -573,13 +597,21 @@ function getActiveFilterCount({
   selectedStatus: CanonicalStatus | "";
   selectedEmployee: string;
   selectedCallType: string;
+  selectedServiceBillingType: string;
   selectedArea: string;
   fromDate: string;
   toDate: string;
 }) {
-  return [searchQuery, selectedStatus, selectedEmployee, selectedCallType, selectedArea, fromDate, toDate].filter(
-    (value) => value !== "",
-  ).length;
+  return [
+    searchQuery,
+    selectedStatus,
+    selectedEmployee,
+    selectedCallType,
+    selectedServiceBillingType,
+    selectedArea,
+    fromDate,
+    toDate,
+  ].filter((value) => value !== "").length;
 }
 
 function MetricCard({ title, value, subtitle }: { title: string; value: string; subtitle: string }) {

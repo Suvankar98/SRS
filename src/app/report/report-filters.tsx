@@ -1,33 +1,44 @@
 "use client";
 
 import React from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+type ReportFiltersProps = {
+  searchQuery: string;
+  selectedStatus: string;
+  selectedEmployee: string;
+  selectedCallType: string;
+  selectedServiceBillingType: string;
+  selectedArea: string;
+  fromDate: string;
+  toDate: string;
+  employees: Array<{ id: string; name: string }>;
+  callTypeOptions: Array<{ callType: string }>;
+  areaOptions: Array<{ area: string }>;
+};
 
 export default function ReportFilters({
   searchQuery,
   selectedStatus,
   selectedEmployee,
   selectedCallType,
+  selectedServiceBillingType,
   selectedArea,
   fromDate,
   toDate,
   employees,
   callTypeOptions,
   areaOptions,
-}: any) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+}: ReportFiltersProps) {
+  const [callType, setCallType] = React.useState(selectedCallType);
+  const [billingType, setBillingType] = React.useState(selectedServiceBillingType);
 
-  const [callType, setCallType] = React.useState(selectedCallType || "");
-  const [billingType, setBillingType] = React.useState((new URLSearchParams(searchParams.toString())).get("serviceBillingType") || "");
-
-  React.useEffect(() => {
-    // sync billingType when callType changes
-    if (callType !== "Service") {
+  const handleCallTypeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextCallType = event.target.value;
+    setCallType(nextCallType);
+    if (nextCallType !== "Service") {
       setBillingType("");
     }
-  }, [callType]);
+  };
 
   return (
     <form className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -52,7 +63,7 @@ export default function ReportFilters({
         <select name="employeeId" defaultValue={selectedEmployee} className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400">
           <option value="">All</option>
           <option value="unassigned">Unassigned</option>
-          {employees.map((employee: any) => (
+          {employees.map((employee) => (
             <option key={employee.id} value={employee.id}>{employee.name}</option>
           ))}
         </select>
@@ -61,9 +72,9 @@ export default function ReportFilters({
       <div className="">
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Call Type</span>
-          <select name="callType" defaultValue={selectedCallType} onChange={(e)=>setCallType(e.target.value)} className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400">
+          <select name="callType" value={callType} onChange={handleCallTypeChange} className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400">
             <option value="">All</option>
-            {callTypeOptions.map((row: any) => (
+            {callTypeOptions.map((row) => (
               <option key={row.callType} value={row.callType}>{row.callType}</option>
             ))}
           </select>
@@ -74,7 +85,7 @@ export default function ReportFilters({
         <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Area</span>
         <select name="area" defaultValue={selectedArea} className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400">
           <option value="">All</option>
-          {areaOptions.map((row: any) => (
+          {areaOptions.map((row) => (
             <option key={row.area} value={row.area}>{row.area}</option>
           ))}
         </select>
@@ -97,7 +108,7 @@ export default function ReportFilters({
             <div className="mb-2">
               <label className="block">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Service Billing Type</span>
-                <select name="serviceBillingType" defaultValue={billingType} className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400">
+                <select name="serviceBillingType" value={billingType} onChange={(event) => setBillingType(event.target.value)} className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400">
                   <option value="">All</option>
                   <option value="warranty">Warranty</option>
                   <option value="amc">AMC</option>

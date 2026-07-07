@@ -1,5 +1,6 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
@@ -32,6 +33,7 @@ function getRequiredField(formData: FormData, key: string) {
 }
 
 const STATUS_SCORING_TIME_ZONE = "Asia/Kolkata";
+const PERFORMANCE_TIME_ZONE = "Asia/Kolkata";
 
 function getLocalDateTimeParts(value: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -78,6 +80,37 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
 
   const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
   return submittedMinutes <= 21 * 60 ? 2 : -2;
+}
+
+function parsePerformanceAdjustmentDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error("Invalid adjustment date");
+  }
+
+  const adjustmentDate = new Date(`${value}T12:00:00.000+05:30`);
+  if (Number.isNaN(adjustmentDate.getTime())) {
+    throw new Error("Invalid adjustment date");
+  }
+
+  const todayInputValue = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PERFORMANCE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  if (value > todayInputValue) {
+    throw new Error("Adjustment date cannot be in the future");
+  }
+
+  return adjustmentDate;
+}
+
+function isCurrentPerformanceMonth(value: Date) {
+  const target = getLocalDateTimeParts(value, PERFORMANCE_TIME_ZONE);
+  const current = getLocalDateTimeParts(new Date(), PERFORMANCE_TIME_ZONE);
+
+  return target.year === current.year && target.month === current.month;
 }
 
 function getAggregateAssignmentStatus(statuses: Array<string | null>) {
@@ -176,7 +209,7 @@ function isMonthReset(lastResetDate: Date | null): boolean {
 }
 
 async function handleMonthlyPointsReset(
-  transaction: any,
+  transaction: Prisma.TransactionClient,
   employeeId: string,
   currentMonthlyPoints: number,
   lastResetDate: Date | null,
@@ -191,7 +224,7 @@ async function handleMonthlyPointsReset(
 
   if (lastResetDate) {
     // Store the previous month's points in history
-    await (transaction as any).monthlyPerformanceHistory.upsert({
+    await transaction.monthlyPerformanceHistory.upsert({
       where: {
         employeeId_year_month: {
           employeeId,
@@ -869,7 +902,6 @@ export async function updateServiceCallStatus(formData: FormData) {
     for (const dir of requestDirsToCheck) {
       // check directory for any file except .DS_Store
       // ignore errors and continue to next location
-      // eslint-disable-next-line no-await-in-loop
       const exists = await fs.promises
         .readdir(dir)
         .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
@@ -970,6 +1002,7 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
   const documentSubmissionRaw = getRequiredField(formData, "documentSubmissionOption");
   const materialHandoverRaw = getRequiredField(formData, "materialHandoverOption");
   const teamworkRaw = getRequiredField(formData, "teamworkOption");
+  const adjustmentDate = parsePerformanceAdjustmentDate(getRequiredField(formData, "adjustmentDate"));
 
   if (!isAttendanceOption(attendanceRaw)) {
     throw new Error("Invalid attendance option");
@@ -1019,7 +1052,7 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
       );
 
       try {
-        await (transaction as any).employeePointAdjustment.create({
+        await transaction.employeePointAdjustment.create({
           data: {
             employeeId,
             updatedById: session.userId,
@@ -1034,6 +1067,7 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
             teamworkOption: teamwork.label,
             teamworkPoints: teamwork.points,
             totalDelta,
+            createdAt: adjustmentDate,
           },
         });
       } catch (error) {
@@ -1060,11 +1094,39 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
           performancePoints: {
             increment: totalDelta,
           },
-          monthlyPerformancePoints: {
-            increment: totalDelta,
-          },
+          ...(isCurrentPerformanceMonth(adjustmentDate)
+            ? {
+                monthlyPerformancePoints: {
+                  increment: totalDelta,
+                },
+              }
+            : {}),
         },
       });
+
+      if (!isCurrentPerformanceMonth(adjustmentDate)) {
+        const adjustmentParts = getLocalDateTimeParts(adjustmentDate, PERFORMANCE_TIME_ZONE);
+        await transaction.monthlyPerformanceHistory.upsert({
+          where: {
+            employeeId_year_month: {
+              employeeId,
+              year: adjustmentParts.year,
+              month: adjustmentParts.month,
+            },
+          },
+          update: {
+            totalPoints: {
+              increment: totalDelta,
+            },
+          },
+          create: {
+            employeeId,
+            year: adjustmentParts.year,
+            month: adjustmentParts.month,
+            totalPoints: totalDelta,
+          },
+        });
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to update points";
