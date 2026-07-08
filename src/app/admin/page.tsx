@@ -42,15 +42,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
   const duplicateItemLabel = activeTab === "call-types" ? "call type" : "product";
 
-  const existingProductsForSeed = await prisma.product.findMany({
-    select: { name: true },
-  });
-  const existingProductNames = new Set(existingProductsForSeed.map((product) => product.name.trim().toLowerCase()));
-  const missingSrtecProductNames = SRTEC_PRODUCT_NAMES.filter((name) => !existingProductNames.has(name.toLowerCase()));
-
-  if (missingSrtecProductNames.length > 0) {
+  if ((await prisma.product.count()) === 0) {
     await prisma.product.createMany({
-      data: missingSrtecProductNames.map((name) => ({ name })),
+      data: SRTEC_PRODUCT_NAMES.map((name) => ({ name })),
       skipDuplicates: true,
     });
   }
