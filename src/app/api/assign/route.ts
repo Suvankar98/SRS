@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     const serviceRequest = await prisma.serviceRequest.findUnique({
       where: { id: String(requestId) },
-      select: { status: true },
+      select: { status: true, statusReason: true, closedByName: true, closedAt: true },
     });
 
     if (!serviceRequest) {
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       : [];
     const validEmployeeIds = validEmployees.map((employee) => employee.id);
     const assignedAt = new Date();
+    const assignmentStatus = normalizeStatus(serviceRequest.status);
 
     await prisma.$transaction(async (transaction) => {
       if (validEmployeeIds.length === 0) {
@@ -80,7 +81,10 @@ export async function POST(request: Request) {
               requestId: String(requestId),
               employeeId,
               assignedAt,
-              status: "New Call",
+              status: assignmentStatus,
+              statusReason: serviceRequest.statusReason,
+              closedByName: assignmentStatus === "Completed" ? serviceRequest.closedByName : null,
+              closedAt: assignmentStatus === "Completed" ? serviceRequest.closedAt : null,
             })),
             skipDuplicates: true,
           });
