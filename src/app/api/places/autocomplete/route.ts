@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+function getGoogleMapsApiKey() {
+  return process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+}
 
 type GooglePlacesAutocompleteResponse = {
   suggestions?: Array<{
@@ -24,9 +26,10 @@ type GooglePlacesAutocompleteResponse = {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get("query")?.trim() || "";
+  const googleMapsApiKey = getGoogleMapsApiKey();
 
-  if (!GOOGLE_MAPS_API_KEY) {
-    return NextResponse.json({ suggestions: [], error: "Missing API key" }, { status: 500 });
+  if (!googleMapsApiKey) {
+    return NextResponse.json({ suggestions: [], autocompleteDisabled: true });
   }
 
   if (query.length < 1) {
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-Api-Key": googleMapsApiKey,
         "X-Goog-FieldMask": "suggestions.placePrediction.text.text,suggestions.queryPrediction.text.text",
       },
       body: JSON.stringify({

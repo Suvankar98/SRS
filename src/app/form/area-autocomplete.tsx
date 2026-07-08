@@ -56,7 +56,7 @@ export function AreaAutocomplete() {
 
         const nextSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
         setSuggestions(nextSuggestions);
-        setNoResults(nextSuggestions.length === 0);
+        setNoResults(nextSuggestions.length === 0 && data?.autocompleteDisabled !== true);
       } catch (err) {
         if (latestQueryRef.current !== nextQuery) {
           return;
