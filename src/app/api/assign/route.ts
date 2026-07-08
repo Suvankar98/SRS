@@ -4,6 +4,8 @@ import { getSession, roleCanAssign } from "@/lib/auth";
 import { normalizeStatus } from "@/app/status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 
+const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
+
 function getAssignedEmployeeIds(body: { assignedToId?: unknown; assignedToIds?: unknown }) {
   const rawIds = Array.isArray(body.assignedToIds) ? body.assignedToIds : [body.assignedToId];
 
@@ -15,6 +17,22 @@ function getAssignedEmployeeIds(body: { assignedToId?: unknown; assignedToIds?: 
         .filter(Boolean),
     ),
   );
+}
+
+function getCompletedAt(serviceRequest: {
+  closedAt: Date | null;
+  statusSubmittedAt: Date | null;
+  lastAttemptAt: Date | null;
+}) {
+  return serviceRequest.closedAt ?? serviceRequest.statusSubmittedAt ?? serviceRequest.lastAttemptAt;
+}
+
+function isCompletedReassignWindowOpen(completedAt: Date | null) {
+  if (!completedAt) {
+    return false;
+  }
+
+  return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
 }
 
 export async function POST(request: Request) {
@@ -30,7 +48,14 @@ export async function POST(request: Request) {
 
     const serviceRequest = await prisma.serviceRequest.findUnique({
       where: { id: String(requestId) },
-      select: { status: true, statusReason: true, closedByName: true, closedAt: true },
+      select: {
+        status: true,
+        statusReason: true,
+        closedByName: true,
+        closedAt: true,
+        statusSubmittedAt: true,
+        lastAttemptAt: true,
+      },
     });
 
     if (!serviceRequest) {
@@ -38,8 +63,11 @@ export async function POST(request: Request) {
     }
 
     const isCompletedRequest = normalizeStatus(serviceRequest.status) === "Completed";
-    if (isCompletedRequest && !roleCanAssign(session.role)) {
-      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 403 });
+    if (isCompletedRequest && !isCompletedReassignWindowOpen(getCompletedAt(serviceRequest))) {
+      return NextResponse.json(
+        { success: false, message: "Reassign window closed after 72 hours." },
+        { status: 400 },
+      );
     }
 
     const validEmployees = assignedEmployeeIds.length
@@ -53,7 +81,8 @@ export async function POST(request: Request) {
       : [];
     const validEmployeeIds = validEmployees.map((employee) => employee.id);
     const assignedAt = new Date();
-    const assignmentStatus = normalizeStatus(serviceRequest.status);
+    const isReopeningCompletedRequest = isCompletedRequest && validEmployeeIds.length > 0;
+    const assignmentStatus = isReopeningCompletedRequest ? "New Call" : normalizeStatus(serviceRequest.status);
 
     await prisma.$transaction(async (transaction) => {
       if (validEmployeeIds.length === 0) {
@@ -96,6 +125,18 @@ export async function POST(request: Request) {
         data: {
           assignedToId: validEmployeeIds[0] ?? null,
           assignedAt: validEmployeeIds.length > 0 ? assignedAt : null,
+          ...(isReopeningCompletedRequest
+            ? {
+                status: "New Call",
+                statusReason: null,
+                customerReview: null,
+                statusSubmittedAt: null,
+                statusPointsDelta: null,
+                reviewPointsDelta: null,
+                closedByName: null,
+                closedAt: null,
+              }
+            : {}),
         },
       });
     });

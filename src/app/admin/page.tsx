@@ -21,6 +21,12 @@ import { SRTEC_PRODUCT_NAMES } from "@/lib/product-options";
 
 export const dynamic = "force-dynamic";
 
+const STAFF_DEPARTMENT_OPTIONS = [
+  { value: "sales", label: "Sales" },
+  { value: "service", label: "Service" },
+  { value: "backoffice", label: "Backoffice" },
+] as const;
+
 type AdminPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -157,11 +163,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 required
               />
               <input
-                name="whatsappNumber"
+                name="phoneNumber1"
                 type="tel"
-                placeholder="WhatsApp number"
+                placeholder="Phone number 1"
                 className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
               />
+              <input
+                name="phoneNumber2"
+                type="tel"
+                placeholder="Phone number 2"
+                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+              />
+              <select
+                name="department"
+                defaultValue="service"
+                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+                required
+              >
+                {STAFF_DEPARTMENT_OPTIONS.map((department) => (
+                  <option key={department.value} value={department.value}>
+                    {department.label}
+                  </option>
+                ))}
+              </select>
               <select
                 name="role"
                 defaultValue={APP_ROLES.EMPLOYEE}
@@ -219,11 +243,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             />
                             <OptionalPasswordField />
                             <input
-                              name="whatsappNumber"
-                              defaultValue={member.whatsappNumber ?? ""}
-                              placeholder="WhatsApp number"
+                              name="phoneNumber1"
+                              defaultValue={member.phoneNumber1 ?? member.whatsappNumber ?? ""}
+                              placeholder="Phone number 1"
                               className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
                             />
+                            <input
+                              name="phoneNumber2"
+                              defaultValue={member.phoneNumber2 ?? ""}
+                              placeholder="Phone number 2"
+                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                            />
+                            <select
+                              name="department"
+                              defaultValue={member.department ?? "service"}
+                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                              required
+                            >
+                              {STAFF_DEPARTMENT_OPTIONS.map((department) => (
+                                <option key={department.value} value={department.value}>
+                                  {department.label}
+                                </option>
+                              ))}
+                            </select>
                             <select
                               name="role"
                               defaultValue={member.role}
@@ -261,7 +303,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             </div>
                             <div className="grid gap-2 sm:grid-cols-2">
                               <p className="text-xs text-blue-700">Points: {member.performancePoints}</p>
-                              <p className="text-xs text-blue-700">WhatsApp: {member.whatsappNumber ?? "Not provided"}</p>
+                              <p className="text-xs text-blue-700">Phone 1: {member.phoneNumber1 ?? member.whatsappNumber ?? "Not provided"}</p>
+                              <p className="text-xs text-blue-700">Phone 2: {member.phoneNumber2 ?? "Not provided"}</p>
+                              <p className="text-xs text-blue-700">Department: {formatStaffDepartment(member.department)}</p>
                             </div>
                           </div>
                         )}
@@ -389,6 +433,10 @@ function EditIcon() {
       />
     </svg>
   );
+}
+
+function formatStaffDepartment(department: string | null) {
+  return STAFF_DEPARTMENT_OPTIONS.find((option) => option.value === department)?.label ?? "Not selected";
 }
 
 

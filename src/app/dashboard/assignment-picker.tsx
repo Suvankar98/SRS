@@ -7,6 +7,7 @@ export type AssignmentPickerAssignment = {
   id?: string;
   employeeId: string;
   assignedAt?: Date | string | null;
+  statusSubmittedAt?: Date | string | null;
   employee?: { name: string } | null;
 };
 
@@ -16,6 +17,8 @@ type AssignmentPickerProps = {
   assignments?: AssignmentPickerAssignment[];
   defaultEmployeeId?: string | null;
   compact?: boolean;
+  disabled?: boolean;
+  disabledMessage?: string;
 };
 
 function getInitialRows(assignments: AssignmentPickerAssignment[] | undefined, defaultEmployeeId?: string | null) {
@@ -42,6 +45,8 @@ export function AssignmentPicker({
   assignments,
   defaultEmployeeId,
   compact = false,
+  disabled = false,
+  disabledMessage,
 }: AssignmentPickerProps) {
   const router = useRouter();
   const [rows, setRows] = React.useState(() => getInitialRows(assignments, defaultEmployeeId));
@@ -103,6 +108,11 @@ export function AssignmentPicker({
 
   return (
     <div className="space-y-1.5">
+      {disabled && disabledMessage ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-medium text-slate-600">
+          {disabledMessage}
+        </p>
+      ) : null}
       {rows.map((employeeId, index) => {
         const selectedInOtherRows = new Set(rows.filter((_, rowIndex) => rowIndex !== index));
         const isLastRow = index === rows.length - 1;
@@ -112,10 +122,10 @@ export function AssignmentPicker({
             <select
               value={employeeId}
               onChange={(event) => updateRow(index, event.currentTarget.value)}
-              disabled={isSaving}
+              disabled={disabled || isSaving}
               className={`min-w-0 flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400 ${
                 compact ? "" : "sm:min-w-[9.5rem]"
-              }`}
+              } disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500`}
             >
               <option value="">Select employee</option>
               {employees.map((employee) => (
@@ -129,7 +139,7 @@ export function AssignmentPicker({
               <button
                 type="button"
                 onClick={addRow}
-                disabled={isSaving}
+                disabled={disabled || isSaving}
                 aria-label="Add employee allocation"
                 title="Add employee"
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -140,7 +150,7 @@ export function AssignmentPicker({
               <button
                 type="button"
                 onClick={() => removeRow(index)}
-                disabled={isSaving}
+                disabled={disabled || isSaving}
                 aria-label="Remove employee allocation"
                 title="Remove employee"
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"

@@ -9,6 +9,8 @@ import { CopyPhoneButton } from "./dashboard/copy-phone-button";
 import { ProductAutocomplete } from "./product-autocomplete";
 import { formatIndianPhoneNumber, getIndianPhoneCopyValue } from "@/lib/phone";
 
+const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
+
 type SimpleOption = {
   id: string;
   name: string;
@@ -32,6 +34,11 @@ type RequestDetails = {
   assignedToId: string | null;
   assignedAt?: Date | string | null;
   status?: string | null;
+  statusSubmittedAt?: Date | string | null;
+  closedAt?: Date | string | null;
+  closedByName?: string | null;
+  lastAttemptByName?: string | null;
+  lastAttemptAt?: Date | string | null;
   assignedTo?: { name: string } | null;
   assignments?: AssignmentPickerAssignment[];
   createdBy?: { name: string } | null;
@@ -217,6 +224,8 @@ export function DocketDetailsModal({
       ? new Date(Math.min(...assignmentDates.map((value) => value.getTime())))
       : parseDateValue(request.assignedAt);
   const assignedAtLabel = firstAssignedAt ? formatRequestDateTime(firstAssignedAt) : null;
+  const isCompletedRequest = request.status === "Completed";
+  const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
 
   const modal = isOpen ? (
     <div
@@ -243,7 +252,15 @@ export function DocketDetailsModal({
             {request.status ? (
               <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{request.status}</span>
             ) : null}
-            <button type="button" onClick={() => setIsOpen(false)} className="rounded-full bg-red-100 px-3 py-1 text-sm text-red-700">Close</button>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+              aria-label="Close docket details"
+              title="Close"
+            >
+              <CloseIcon />
+            </button>
           </div>
         </div>
 
@@ -373,7 +390,14 @@ export function DocketDetailsModal({
                           employees={employees}
                           assignments={request.assignments}
                           defaultEmployeeId={request.assignedToId}
+                          disabled={isReassignLocked}
+                          disabledMessage={isReassignLocked ? "This completed service can no longer be reassigned." : undefined}
                         />
+                        {isCompletedRequest ? (
+                          <p className={`mt-2 text-xs font-medium ${isReassignLocked ? "text-slate-600" : "text-blue-700"}`}>
+                            {isReassignLocked ? "Reassign window closed after 72 hours." : "Reassign available within 72 hours of completion."}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}
@@ -412,7 +436,15 @@ export function DocketDetailsModal({
                 <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Save changes</button>
               </>
             ) : (
-              <button type="button" onClick={() => setIsOpen(false)} className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Close</button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="inline-flex h-10 w-full items-center justify-center rounded bg-blue-600 text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 sm:w-10"
+                aria-label="Close docket details"
+                title="Close"
+              >
+                <CloseIcon />
+              </button>
             )}
           </div>
         </form>
@@ -501,6 +533,20 @@ function MapIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M18 6 6 18M6 6l12 12"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function formatServiceBillingType(value: string) {
   if (value === "amc") {
     return "AMC";
@@ -533,4 +579,22 @@ function parseDateValue(value: Date | string | null | undefined) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getCompletedAt(request: RequestDetails) {
+  return (
+    parseDateValue(request.closedAt) ??
+    parseDateValue(request.statusSubmittedAt) ??
+    parseDateValue(request.lastAttemptAt)
+  );
+}
+
+function isCompletedReassignWindowOpen(request: RequestDetails) {
+  const completedAt = getCompletedAt(request);
+
+  if (!completedAt) {
+    return false;
+  }
+
+  return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
 }

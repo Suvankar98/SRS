@@ -8,6 +8,8 @@ import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardRequestRow } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
 
+const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
+
 export type DashboardListRequest = {
   id: string;
   docketNumber: string;
@@ -27,9 +29,12 @@ export type DashboardListRequest = {
   assignedToId: string | null;
   assignedAt?: Date | string | null;
   status: string | null;
+  statusSubmittedAt?: Date | string | null;
   statusReason: string | null;
   closedAt: Date | string | null;
   closedByName: string | null;
+  lastAttemptByName?: string | null;
+  lastAttemptAt?: Date | string | null;
   assignedTo?: { name: string } | null;
   assignments?: AssignmentPickerAssignment[];
   createdBy?: { name: string } | null;
@@ -125,71 +130,97 @@ export function DashboardRequestList({
           {orderMessage}
         </div>
       ) : null}
-      <div className="space-y-3 p-3 md:hidden">
-        {items.map((request, index) => (
+      <div className="space-y-3 p-1.5 md:hidden">
+        {items.map((request) => {
+          const isCompletedRequest = isClosedStatus(request.status);
+          const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
+
+          return (
           <article
             key={request.id}
-            className={`rounded-xl border p-3 text-sm text-blue-900 ${
+            className={`rounded-2xl border p-3 text-sm text-blue-900 shadow-sm ${
               !isEmployee && isClosedStatus(request.status)
                 ? "border-emerald-300 bg-emerald-50"
-                : "border-blue-200 bg-blue-50/40"
+                : "border-blue-200 bg-white"
             }`}
           >
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1 pr-2">
-                <div className="text-xs uppercase tracking-[0.12em] text-blue-600">
+            <div className="mb-3 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
                   <DocketDetailsModal
                     request={request}
                     canEdit={canEditDocket}
                     canAssign={canAssign}
                     employees={employees}
                     products={products}
+                    renderTrigger={(open) => (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          open();
+                        }}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-300 bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-800 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        aria-label={`Open docket details for ${request.docketNumber}`}
+                      >
+                        <span className="min-w-0">{request.docketNumber}</span>
+                        <OpenDocketIcon />
+                      </button>
+                    )}
                   />
                 </div>
-                <p className="break-words font-semibold text-blue-950">{request.name}</p>
-                <p className="break-words text-xs font-semibold text-blue-900">{request.company}</p>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">
+                    {getComplaintAgeLabel(request)}
+                  </span>
+                  {isEmployee && request.assignedToId ? <EmployeeCountdownBadge request={request} /> : null}
+                </div>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">
-                  {getComplaintAgeLabel(request)}
-                </span>
-                {!isEmployee && (
-                  <div className="flex flex-col items-end">
+
+              <div className="min-w-0">
+                <p className="break-words text-base font-bold leading-snug text-blue-950">{request.name}</p>
+                <p className="mt-0.5 break-words text-xs font-medium leading-snug text-slate-600">{request.company}</p>
+                {!isEmployee ? (
+                  <div className="mt-2 flex flex-col items-start">
                     <AdminManagerStatusSelect request={request} />
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-xs">
               <Detail label="Location" value={request.area} />
               <Detail label="Product" value={request.product} />
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Call Type</p>
-                <p className="mt-0.5 break-words text-blue-900 font-semibold">{request.callType}</p>
+              <div className="rounded-lg border border-blue-100 bg-white px-2.5 py-2 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Call Type</p>
+                <p className="mt-1 break-words text-[13px] font-bold leading-snug text-blue-950">{request.callType}</p>
                 {request.callType === "Service" ? (
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-700">
                     {request.serviceBillingType ? formatServiceBillingType(request.serviceBillingType) : "Not specified"}
                   </p>
                 ) : null}
               </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Amount</p>
-                <p className="mt-0.5 break-words text-blue-950 font-semibold">
+              <div className="rounded-lg border border-blue-100 bg-white px-2.5 py-2 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Amount</p>
+                <p className="mt-1 break-words text-[13px] font-bold leading-snug text-blue-950">
                   {formatINRCurrency(request.serviceBillingType === "chargeable" ? request.chargeableAmount ?? 0 : 0)}
                 </p>
               </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Phone</p>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-blue-900">
-                  <span>{request.phoneNumber1}</span>
-                </div>
-              </div>
-              {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
+              {!isEmployee ? (
+                <>
+                  <div className="rounded-lg border border-blue-100 bg-white px-2.5 py-2 shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Phone</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] font-bold leading-snug text-blue-950">
+                      <span>{request.phoneNumber1}</span>
+                    </div>
+                  </div>
+                  {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}
+                </>
+              ) : null}
               {isEmployee ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Status</p>
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="col-span-2 flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50/70 px-2.5 py-2 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Status</p>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <StatusUpdateModal request={request} />
                   </div>
                 </div>
@@ -212,7 +243,9 @@ export function DashboardRequestList({
                     ) : null}
                   </div>
                   {request.status === "Completed" ? (
-                    <p className="text-[11px] text-blue-700">Completed requests can only be reassigned by Admin or Manager.</p>
+                    <p className={`text-[11px] font-medium ${isReassignLocked ? "text-slate-600" : "text-blue-700"}`}>
+                      {isReassignLocked ? "Reassign window closed after 72 hours." : "Reassign available within 72 hours of completion."}
+                    </p>
                   ) : null}
                   <AssignmentPicker
                     key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
@@ -221,12 +254,15 @@ export function DashboardRequestList({
                     assignments={request.assignments}
                     defaultEmployeeId={request.assignedToId}
                     compact
+                    disabled={isReassignLocked}
+                    disabledMessage={isReassignLocked ? "This completed service can no longer be reassigned." : undefined}
                   />
                 </div>
               ) : null}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
       <div className="hidden md:block overflow-x-auto">
@@ -270,8 +306,8 @@ export function DashboardRequestList({
 
 function getComplaintAgeLabel(request: DashboardListRequest) {
   const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
-  const closedAt = getClosedAt(request);
-  const endDate = request.status === "Completed" && closedAt ? closedAt : new Date();
+  const completedAt = getCompletedAt(request);
+  const endDate = isClosedStatus(request.status) && completedAt ? completedAt : new Date();
 
   const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
   const createdDay = getDayNumberInTimeZone(createdAt, "Asia/Kolkata");
@@ -288,11 +324,13 @@ function getComplaintAgeLabel(request: DashboardListRequest) {
   return `${days} days`;
 }
 
-function getClosedAt(request: DashboardListRequest) {
-  const value = request.closedAt;
+function getParsedDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
 
   if (value instanceof Date) {
-    return value;
+    return Number.isNaN(value.getTime()) ? null : value;
   }
 
   if (typeof value === "string") {
@@ -303,6 +341,69 @@ function getClosedAt(request: DashboardListRequest) {
   }
 
   return null;
+}
+
+function getCompletedAt(request: DashboardListRequest) {
+  return (
+    getParsedDate(request.closedAt) ??
+    getParsedDate(request.statusSubmittedAt) ??
+    getParsedDate(request.lastAttemptAt)
+  );
+}
+
+function isCompletedReassignWindowOpen(request: DashboardListRequest) {
+  const completedAt = getCompletedAt(request);
+
+  if (!completedAt) {
+    return false;
+  }
+
+  return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
+}
+
+function EmployeeCountdownBadge({ request }: { request: DashboardListRequest }) {
+  const assignedAt = getParsedDate(request.assignedAt);
+
+  if (!assignedAt || isClosedStatus(request.status)) {
+    return null;
+  }
+
+  const now = new Date();
+  const assignedDay = new Date(assignedAt);
+  const dayStart = new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate());
+  const deadline9 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 21, 0, 0);
+  const deadline24 = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 24, 0, 0);
+
+  let colorClass = "bg-emerald-50 text-emerald-900 ring-emerald-300";
+  let label = `Due in ${formatDuration(deadline9.getTime() - now.getTime())}`;
+
+  if (now >= deadline9 && now < deadline24) {
+    colorClass = "bg-amber-50 text-amber-900 ring-amber-300";
+    label = `Due in ${formatDuration(deadline24.getTime() - now.getTime())}`;
+  }
+
+  if (now >= deadline24) {
+    colorClass = "bg-rose-50 text-rose-900 ring-rose-300";
+    label = `Overdue by ${formatDuration(now.getTime() - deadline24.getTime())}`;
+  }
+
+  return (
+    <span className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${colorClass}`}>
+      {label}
+    </span>
+  );
+}
+
+function formatDuration(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
+  }
+
+  return `${minutes} min`;
 }
 
 function getDayNumberInTimeZone(value: Date, timeZone: string) {
@@ -326,10 +427,24 @@ function isClosedStatus(status: string | null) {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">{label}</p>
-      <p className="mt-0.5 break-words text-blue-900">{value}</p>
+    <div className="rounded-lg border border-blue-100 bg-white px-2.5 py-2 shadow-sm">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
+      <p className="mt-1 break-words text-[13px] font-bold leading-snug text-blue-950">{value}</p>
     </div>
+  );
+}
+
+function OpenDocketIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M8 5h11v11M19 5 6 18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

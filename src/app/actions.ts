@@ -141,6 +141,9 @@ function isCurrentPerformanceMonth(value: Date) {
 }
 
 const DASHBOARD_STATUSES = ["New Call", "In Process", "Completed", "Cancel"] as const;
+const STAFF_DEPARTMENTS = ["sales", "service", "backoffice"] as const;
+const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
+type StaffDepartment = (typeof STAFF_DEPARTMENTS)[number];
 
 function getDashboardStatus(value: string) {
   const status = normalizeStatus(value);
@@ -150,6 +153,32 @@ function getDashboardStatus(value: string) {
   }
 
   return status;
+}
+
+function getStaffDepartment(formData: FormData) {
+  const department = getRequiredField(formData, "department").toLowerCase();
+
+  if (!STAFF_DEPARTMENTS.includes(department as StaffDepartment)) {
+    throw new Error("Invalid department selected");
+  }
+
+  return department as StaffDepartment;
+}
+
+function getCompletedAtForReassign(request: {
+  closedAt?: Date | null;
+  statusSubmittedAt?: Date | null;
+  lastAttemptAt?: Date | null;
+}) {
+  return request.closedAt ?? request.statusSubmittedAt ?? request.lastAttemptAt ?? null;
+}
+
+function isCompletedReassignWindowOpen(completedAt: Date | null) {
+  if (!completedAt) {
+    return false;
+  }
+
+  return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
 }
 
 const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
@@ -459,8 +488,9 @@ export async function addStaff(formData: FormData) {
   const username = getRequiredField(formData, "username");
   const password = getRequiredField(formData, "password");
   const role = getRequiredField(formData, "role");
-  const whatsappRaw = formData.get("whatsappNumber");
-  const whatsappNumber = typeof whatsappRaw === "string" && whatsappRaw.trim() !== "" ? whatsappRaw.trim() : null;
+  const phoneNumber1 = getOptionalPhoneField(formData, "phoneNumber1", "Phone Number 1");
+  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  const department = getStaffDepartment(formData);
 
   if (role !== APP_ROLES.MANAGER && role !== APP_ROLES.EMPLOYEE) {
     throw new Error("Invalid role selected");
@@ -471,7 +501,10 @@ export async function addStaff(formData: FormData) {
       name,
       username,
       password,
-      whatsappNumber,
+      whatsappNumber: phoneNumber1,
+      phoneNumber1,
+      phoneNumber2,
+      department,
       role,
     },
   });
@@ -507,8 +540,9 @@ export async function updateStaff(formData: FormData) {
   const name = getRequiredField(formData, "name");
   const username = getRequiredField(formData, "username");
   const role = getRequiredField(formData, "role");
-  const whatsappRaw = formData.get("whatsappNumber");
-  const whatsappNumber = typeof whatsappRaw === "string" && whatsappRaw.trim() !== "" ? whatsappRaw.trim() : null;
+  const phoneNumber1 = getOptionalPhoneField(formData, "phoneNumber1", "Phone Number 1");
+  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  const department = getStaffDepartment(formData);
 
   if (role !== APP_ROLES.MANAGER && role !== APP_ROLES.EMPLOYEE) {
     throw new Error("Invalid role selected");
@@ -527,7 +561,10 @@ export async function updateStaff(formData: FormData) {
     name,
     username,
     role,
-    whatsappNumber,
+    whatsappNumber: phoneNumber1,
+    phoneNumber1,
+    phoneNumber2,
+    department,
   };
 
   const passwordRaw = formData.get("password");
@@ -706,6 +743,9 @@ export async function assignServiceCall(formData: FormData) {
       area: true,
       product: true,
       callType: true,
+      statusSubmittedAt: true,
+      lastAttemptAt: true,
+      closedAt: true,
     },
   });
 
@@ -714,8 +754,8 @@ export async function assignServiceCall(formData: FormData) {
   }
 
   const isCompletedRequest = normalizeStatus(previousRequest.status) === "Completed";
-  if (isCompletedRequest && !roleCanAssign(session.role)) {
-    redirect("/dashboard");
+  if (isCompletedRequest && !isCompletedReassignWindowOpen(getCompletedAtForReassign(previousRequest))) {
+    throw new Error("Reassign window closed after 72 hours.");
   }
 
   const shouldReopenForQueue =
@@ -735,6 +775,18 @@ export async function assignServiceCall(formData: FormData) {
           : shouldReopenForQueue || allocationChanged
             ? new Date()
             : undefined,
+      ...(isCompletedRequest && assignedToId
+        ? {
+            status: "New Call",
+            statusReason: null,
+            customerReview: null,
+            statusSubmittedAt: null,
+            statusPointsDelta: null,
+            reviewPointsDelta: null,
+            closedByName: null,
+            closedAt: null,
+          }
+        : {}),
     },
   });
 
@@ -953,6 +1005,8 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusSubmittedAt: submittedAt,
         statusPointsDelta,
         reviewPointsDelta: null,
+        lastAttemptByName: employee?.name || "Unknown",
+        lastAttemptAt: submittedAt,
         closedByName: status === "Completed" ? employee?.name || "Unknown" : null,
         closedAt: status === "Completed" ? submittedAt : null,
       },

@@ -141,7 +141,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const unassignedRequests = totalRequests - assignedRequests;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8"> 
+    <main className="mx-auto min-h-screen w-full max-w-[95rem] px-2 py-4 sm:px-6 sm:py-6 lg:px-8"> 
       {/* show created toast client-side when a new service is created */}
       <CreatedToast docket={createdDocket} />
       <header className="fixed left-0 right-0 top-0 z-40 border-b border-blue-200 bg-white/95 shadow-sm backdrop-blur">
@@ -278,7 +278,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       <section className="min-h-[calc(100vh-3rem)] pt-20">
 
-        <div className="rounded-[2rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:p-6">
+        <div className="rounded-2xl border border-blue-200 bg-white p-2 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:rounded-[2rem] sm:p-6">
           <div>
               {!isEmployee ? (
                 <header className="mb-3 grid gap-2 xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -312,7 +312,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </section>
               ) : (
                 <DashboardRequestList
-                  key={requests.map((request) => `${request.id}:${request.dashboardOrder ?? ""}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
+                  key={requests.map((request) => `${request.id}:${request.dashboardOrder ?? ""}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.statusSubmittedAt ?? ""}:${request.lastAttemptByName ?? ""}:${request.lastAttemptAt ?? ""}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
                   requests={requests}
                   products={products}
                   employees={employees}
