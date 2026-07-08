@@ -140,28 +140,6 @@ function isCurrentPerformanceMonth(value: Date) {
   return target.year === current.year && target.month === current.month;
 }
 
-function getAggregateAssignmentStatus(statuses: Array<string | null>) {
-  const normalizedStatuses = statuses.map((status) => normalizeStatus(status));
-
-  if (normalizedStatuses.length === 0) {
-    return "New Call";
-  }
-
-  if (normalizedStatuses.every((status) => status === "Completed")) {
-    return "Completed";
-  }
-
-  if (normalizedStatuses.every((status) => status === "Cancel")) {
-    return "Cancel";
-  }
-
-  if (normalizedStatuses.some((status) => status !== "New Call")) {
-    return "In Process";
-  }
-
-  return "New Call";
-}
-
 const DASHBOARD_STATUSES = ["New Call", "In Process", "Completed", "Cancel"] as const;
 
 function getDashboardStatus(value: string) {
@@ -814,15 +792,9 @@ export async function updateServiceCallStatus(formData: FormData) {
   }
 
   const requestId = getRequiredField(formData, "requestId");
-  const status = getRequiredField(formData, "status");
+  const status = getDashboardStatus(getRequiredField(formData, "status"));
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
-
-  // Validate status values
-  const validStatuses = ["New Call", "In Process", "Completed", "Cancel"];
-  if (!validStatuses.includes(status)) {
-    throw new Error("Invalid status");
-  }
 
   let assignment = await prisma.serviceAssignment.findUnique({
     where: {
@@ -970,41 +942,24 @@ export async function updateServiceCallStatus(formData: FormData) {
       },
     });
 
-    const updatedAssignments = await transaction.serviceAssignment.findMany({
-      where: { requestId },
-      select: {
-        status: true,
-        statusReason: true,
-        statusSubmittedAt: true,
-        closedByName: true,
-        closedAt: true,
-      },
-    });
-    const aggregateStatus = getAggregateAssignmentStatus(updatedAssignments.map((item) => item.status));
-    const latestSubmitted = updatedAssignments
-      .filter((item) => item.statusSubmittedAt)
-      .sort((a, b) => (b.statusSubmittedAt?.getTime() ?? 0) - (a.statusSubmittedAt?.getTime() ?? 0))[0];
-    const closedAssignments = updatedAssignments.filter((item) => item.closedAt);
-    const latestClosedAt = closedAssignments
-      .map((item) => item.closedAt)
-      .filter((value): value is Date => value instanceof Date)
-      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-
     await transaction.serviceRequest.update({
       where: { id: requestId },
       data: {
-        status: aggregateStatus,
-        statusReason: latestSubmitted?.statusReason || null,
+        assignedToId: null,
+        assignedAt: null,
+        status,
+        statusReason: reasonValue || null,
         customerReview: null,
-        statusSubmittedAt: latestSubmitted?.statusSubmittedAt || submittedAt,
+        statusSubmittedAt: submittedAt,
         statusPointsDelta,
         reviewPointsDelta: null,
-        closedByName:
-          aggregateStatus === "Completed"
-            ? closedAssignments.map((item) => item.closedByName).filter(Boolean).join(", ") || null
-            : null,
-        closedAt: aggregateStatus === "Completed" ? latestClosedAt : null,
+        closedByName: status === "Completed" ? employee?.name || "Unknown" : null,
+        closedAt: status === "Completed" ? submittedAt : null,
       },
+    });
+
+    await transaction.serviceAssignment.deleteMany({
+      where: { requestId },
     });
 
     if (performancePointsIncrement !== 0) {
@@ -1046,6 +1001,8 @@ export async function updateManagerServiceStatus(formData: FormData) {
     await transaction.serviceRequest.update({
       where: { id: requestId },
       data: {
+        assignedToId: null,
+        assignedAt: null,
         status,
         statusReason: reasonValue || null,
         statusSubmittedAt: submittedAt,
@@ -1056,15 +1013,8 @@ export async function updateManagerServiceStatus(formData: FormData) {
       },
     });
 
-    await transaction.serviceAssignment.updateMany({
+    await transaction.serviceAssignment.deleteMany({
       where: { requestId },
-      data: {
-        status,
-        statusReason: reasonValue || null,
-        statusSubmittedAt: submittedAt,
-        closedByName,
-        closedAt,
-      },
     });
   });
 
