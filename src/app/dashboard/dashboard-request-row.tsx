@@ -2,14 +2,12 @@
 
 import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
-import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
+import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import {
   formatServiceBillingType,
   formatINRCurrency,
-  getStatusLabel,
-  getStatusPillClass,
 } from "../status-utils";
 
 type DashboardRequestRowRequest = {
@@ -51,14 +49,6 @@ type DashboardRequestRowProps = {
   canMoveUp?: boolean;
   canMoveDown?: boolean;
 };
-
-function StatusPill({ label, className }: { label: string; className: string }) {
-  return (
-    <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${className}`}>
-      {label}
-    </span>
-  );
-}
 
 export function DashboardRequestRow({
   request,
@@ -354,14 +344,7 @@ export function DashboardRequestRow({
             <StatusUpdateModal request={request} />
           </div>
         ) : (
-          <div className="space-y-1">
-            <StatusPill label={getStatusLabel(request.status)} className={getStatusPillClass(request.status)} />
-            {request.statusReason && (
-              <div className="mt-1">
-                <RemarkPopup remark={request.statusReason} />
-              </div>
-            )}
-          </div>
+          <AdminManagerStatusSelect request={request} />
         )}
       </td>
       {canAssign ? (

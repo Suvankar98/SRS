@@ -2,11 +2,11 @@
 
 import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
-import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
+import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardRequestRow } from "./dashboard-request-row";
-import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
+import { normalizeStatus } from "../status-utils";
 
 export type DashboardListRequest = {
   id: string;
@@ -155,12 +155,7 @@ export function DashboardRequestList({
                 </span>
                 {!isEmployee && (
                   <div className="flex flex-col items-end">
-                    <StatusPill label={getStatusLabel(request.status)} className={getStatusPillClass(request.status)} />
-                    {request.statusReason && (
-                      <div className="mt-2">
-                        <RemarkPopup remark={request.statusReason} />
-                      </div>
-                    )}
+                    <AdminManagerStatusSelect request={request} />
                   </div>
                 )}
               </div>
@@ -327,14 +322,6 @@ function getDayNumberInTimeZone(value: Date, timeZone: string) {
 
 function isClosedStatus(status: string | null) {
   return normalizeStatus(status) === "Completed";
-}
-
-function StatusPill({ label, className }: { label: string; className: string }) {
-  return (
-    <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${className}`}>
-      {label}
-    </span>
-  );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

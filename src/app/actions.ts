@@ -162,6 +162,18 @@ function getAggregateAssignmentStatus(statuses: Array<string | null>) {
   return "New Call";
 }
 
+const DASHBOARD_STATUSES = ["New Call", "In Process", "Completed", "Cancel"] as const;
+
+function getDashboardStatus(value: string) {
+  const status = normalizeStatus(value);
+
+  if (!DASHBOARD_STATUSES.includes(status)) {
+    throw new Error("Invalid status");
+  }
+
+  return status;
+}
+
 const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
 type ServiceBillingType = (typeof SERVICE_BILLING_TYPES)[number];
 
@@ -1005,6 +1017,55 @@ export async function updateServiceCallStatus(formData: FormData) {
         },
       });
     }
+  });
+
+  revalidatePath("/dashboard");
+}
+
+export async function updateManagerServiceStatus(formData: FormData) {
+  const session = await requireSession();
+
+  if (!roleCanAssign(session.role)) {
+    redirect("/dashboard");
+  }
+
+  const requestId = getRequiredField(formData, "requestId");
+  const status = getDashboardStatus(getRequiredField(formData, "status"));
+  const statusReason = formData.get("statusReason");
+  const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
+  const submittedAt = status === "New Call" ? null : new Date();
+  const closedAt = status === "Completed" ? submittedAt : null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true },
+  });
+  const closedByName = status === "Completed" ? user?.name || "Admin / Manager" : null;
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        status,
+        statusReason: reasonValue || null,
+        statusSubmittedAt: submittedAt,
+        customerReview: null,
+        reviewPointsDelta: null,
+        closedByName,
+        closedAt,
+      },
+    });
+
+    await transaction.serviceAssignment.updateMany({
+      where: { requestId },
+      data: {
+        status,
+        statusReason: reasonValue || null,
+        statusSubmittedAt: submittedAt,
+        closedByName,
+        closedAt,
+      },
+    });
   });
 
   revalidatePath("/dashboard");
