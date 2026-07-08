@@ -84,6 +84,7 @@ model ServiceAssignment {
   statusReason        String?
   statusSubmittedAt   DateTime?
   statusPointsDelta   Int?
+  mediaUploadedAt     DateTime?
   closedByName        String?
   closedAt            DateTime?
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { uploadEmployeeImage } from "../actions";
 
 type EmployeeMediaUploadProps = {
@@ -44,11 +44,17 @@ const allowedExtensions = [
 export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
   const [fileName, setFileName] = useState<string>("");
   const [fileError, setFileError] = useState<string>("");
+  const [uploadMessage, setUploadMessage] = useState<string>("");
+  const [uploadError, setUploadError] = useState<string>("");
+  const [isPending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File | null) => {
     if (!file) {
       setFileName("");
       setFileError("");
+      setUploadMessage("");
+      setUploadError("");
       return;
     }
 
@@ -57,6 +63,8 @@ export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
     const isAllowedExtension = allowedExtensions.includes(extension);
 
     setFileName(file.name);
+    setUploadMessage("");
+    setUploadError("");
 
     if (!isAllowedType && !isAllowedExtension) {
       setFileError("Unsupported file type. Please choose an image or supported video.");
@@ -71,15 +79,34 @@ export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (fileError || !fileName) {
-      event.preventDefault();
+      setUploadError(fileError || "Please choose an image or video first.");
       return;
     }
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setUploadError("");
+    setUploadMessage("");
+
+    startTransition(async () => {
+      try {
+        await uploadEmployeeImage(formData);
+        setUploadMessage("Uploaded. You can save status now.");
+        setFileName("");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "Upload failed. Please try again.");
+      }
+    });
   };
 
   return (
     <form
-      action={uploadEmployeeImage}
       className="flex flex-col gap-1 text-[11px] text-blue-950"
       onSubmit={handleSubmit}
     >
@@ -93,13 +120,14 @@ export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
             accept="image/*,video/*"
             className="hidden"
             onChange={handleFileChange}
+            ref={fileInputRef}
           />
         </label>
         <span className="truncate max-w-[9rem] text-blue-600">{fileName || "No file chosen"}</span>
         <button
           type="submit"
           aria-label="Upload file"
-          disabled={!fileName || !!fileError}
+          disabled={!fileName || !!fileError || isPending}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-950 text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -110,6 +138,9 @@ export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
         </button>
       </div>
       {fileError ? <p className="text-xs text-red-600">{fileError}</p> : null}
+      {uploadError ? <p className="text-xs font-medium text-red-600">{uploadError}</p> : null}
+      {uploadMessage ? <p className="text-xs font-medium text-emerald-700">{uploadMessage}</p> : null}
+      {isPending ? <p className="text-xs font-medium text-blue-700">Uploading...</p> : null}
       <p className="text-[10px] text-blue-600">Required before status update.</p>
     </form>
   );

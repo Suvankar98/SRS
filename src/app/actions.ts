@@ -181,6 +181,10 @@ function isCompletedReassignWindowOpen(completedAt: Date | null) {
   return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
 }
 
+function shouldUseTmpUploads() {
+  return process.env.USE_TMP_UPLOADS === "1" || process.env.VERCEL === "1";
+}
+
 const SERVICE_BILLING_TYPES = ["warranty", "amc", "chargeable"] as const;
 type ServiceBillingType = (typeof SERVICE_BILLING_TYPES)[number];
 
@@ -901,6 +905,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusReason: legacyRequest.statusReason,
         statusSubmittedAt: legacyRequest.statusSubmittedAt,
         statusPointsDelta: legacyRequest.statusPointsDelta,
+        mediaUploadedAt: null,
         closedByName: legacyRequest.closedByName,
         closedAt: legacyRequest.closedAt,
       },
@@ -944,12 +949,12 @@ export async function updateServiceCallStatus(formData: FormData) {
     const tmpUploads = path.join(os.tmpdir(), "srs-uploads");
 
     const requestDirsToCheck = [];
-    if (process.env.USE_TMP_UPLOADS === "1") {
+    if (shouldUseTmpUploads()) {
       requestDirsToCheck.push(path.join(tmpUploads, session.userId, requestId));
     }
     requestDirsToCheck.push(path.join(publicUploads, session.userId, requestId));
 
-    let hasMedia = false;
+    let hasMedia = !!assignment.mediaUploadedAt;
     for (const dir of requestDirsToCheck) {
       // check directory for any file except .DS_Store
       // ignore errors and continue to next location
@@ -1295,18 +1300,8 @@ export async function uploadEmployeeImage(formData: FormData) {
   const fs = await import("fs");
   const os = await import("os");
 
-  // On platforms like Vercel the server filesystem is effectively read-only
-  // across invocations. For production deployments use an object store
-  // (S3/Cloudinary). For quick ephemeral testing you can set
-  // USE_TMP_UPLOADS=1 to write to the runtime's temp directory.
-  if (process.env.VERCEL === "1" && process.env.USE_TMP_UPLOADS !== "1") {
-    throw new Error(
-      "Cannot write uploaded files to disk on serverless platforms (e.g. Vercel). Configure external object storage (S3/Cloudinary) or set USE_TMP_UPLOADS=1 for ephemeral testing.",
-    );
-  }
-
   const uploadsBase =
-    process.env.USE_TMP_UPLOADS === "1"
+    shouldUseTmpUploads()
       ? path.join(os.tmpdir(), "srs-uploads")
       : path.join(process.cwd(), "public", "uploads");
 
@@ -1320,7 +1315,29 @@ export async function uploadEmployeeImage(formData: FormData) {
 
   await fs.promises.writeFile(filePath, buffer);
 
+  try {
+    await prisma.serviceAssignment.update({
+      where: {
+        requestId_employeeId: {
+          requestId,
+          employeeId: session.userId,
+        },
+      },
+      data: {
+        mediaUploadedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    if (code === "P2025") {
+      throw new Error("This call is no longer assigned to you.");
+    }
+
+    throw error;
+  }
+
   revalidatePath("/dashboard");
+  return { success: true, fileName: safeName };
 }
 
 function sanitizeFileName(name: string) {
