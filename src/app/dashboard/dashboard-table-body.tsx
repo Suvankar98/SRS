@@ -4,7 +4,6 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
-import { CopyPhoneButton } from "./copy-phone-button";
 import { assignServiceCall } from "../actions";
 import { formatServiceBillingType, formatINRCurrency } from "../status-utils";
 import { ServiceRequest } from "@prisma/client";

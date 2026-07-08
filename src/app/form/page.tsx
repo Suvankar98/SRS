@@ -79,8 +79,8 @@ export default async function FormPage() {
           <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
             <Field label="Name" name="name" placeholder="Enter customer name" />
             <Field label="Company" name="company" placeholder="Company or organization" />
-            <Field label="Phone Number 1" name="phoneNumber1" placeholder="Primary contact number" type="tel" />
-            <Field label="Phone Number 2" name="phoneNumber2" placeholder="Secondary contact number" type="tel" />
+            <Field label="Phone Number 1" name="phoneNumber1" placeholder="+91 9876543210" type="tel" />
+            <Field label="Phone Number 2" name="phoneNumber2" placeholder="+91 9876543210" type="tel" />
             <AreaAutocomplete />
             <label>
               <span className="mb-2 block text-sm font-medium text-blue-700">Full Address</span>
@@ -137,6 +137,7 @@ function Field({ label, name, placeholder, type = "text" }: FieldProps) {
         name={name}
         type={type}
         placeholder={placeholder}
+        inputMode={type === "tel" ? "tel" : undefined}
         className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
         required={name !== "phoneNumber2"}
       />

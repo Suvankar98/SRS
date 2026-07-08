@@ -4,7 +4,6 @@ import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
-import { CopyPhoneButton } from "./copy-phone-button";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { DashboardRequestRow } from "./dashboard-request-row";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
@@ -189,11 +188,6 @@ export function DashboardRequestList({
                 <p className="text-[11px] uppercase tracking-[0.08em] text-blue-600">Phone</p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-blue-900">
                   <span>{request.phoneNumber1}</span>
-                  {isEmployee ? (
-                    <span className="inline-flex items-center gap-2">
-                      <CopyPhoneButton value={request.phoneNumber1} />
-                    </span>
-                  ) : null}
                 </div>
               </div>
               {request.phoneNumber2 && <Detail label="Alt Phone" value={request.phoneNumber2} />}

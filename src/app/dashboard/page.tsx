@@ -125,7 +125,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
   const visibleRequests = isEmployee
-    ? filteredRequests.filter((request) => normalizeStatus(request.status) !== "Completed")
+    ? filteredRequests.filter(
+        (request) => !request.statusSubmittedAt && normalizeStatus(request.status) !== "Completed",
+      )
     : filteredRequests;
   const sortedFilteredRequests = isEmployee
     ? sortByEmployeeQueueOrder(visibleRequests)

@@ -2,6 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { normalizeIndianPhoneNumber } from "@/lib/phone";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
@@ -80,6 +81,32 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
 
   const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
   return submittedMinutes <= 21 * 60 ? 2 : -2;
+}
+
+function getRequiredPhoneField(formData: FormData, key: string, label: string) {
+  const value = getRequiredField(formData, key);
+  const normalized = normalizeIndianPhoneNumber(value);
+
+  if (!normalized) {
+    throw new Error(`${label} must be a valid 10-digit Indian mobile number.`);
+  }
+
+  return normalized;
+}
+
+function getOptionalPhoneField(formData: FormData, key: string, label: string) {
+  const value = formData.get(key);
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const normalized = normalizeIndianPhoneNumber(value);
+  if (!normalized) {
+    throw new Error(`${label} must be a valid 10-digit Indian mobile number.`);
+  }
+
+  return normalized;
 }
 
 function parsePerformanceAdjustmentDate(value: string) {
@@ -328,18 +355,14 @@ export async function createServiceRequest(formData: FormData) {
 
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
-  const phoneNumber1 = getRequiredField(formData, "phoneNumber1");
+  const phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number 1");
   const fullAddress = getRequiredField(formData, "fullAddress");
   const complaintDetails = getRequiredField(formData, "complaintDetails");
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
-  const phoneNumber2Value = formData.get("phoneNumber2");
-  const phoneNumber2 =
-    typeof phoneNumber2Value === "string" && phoneNumber2Value.trim() !== ""
-      ? phoneNumber2Value.trim()
-      : null;
+  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
 
   const request = await prisma.$transaction(async (transaction) => {
     const existingDockets = await transaction.serviceRequest.findMany({
@@ -397,18 +420,14 @@ export async function updateServiceRequestDetails(formData: FormData) {
   const requestId = getRequiredField(formData, "requestId");
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
-  const phoneNumber1 = getRequiredField(formData, "phoneNumber1");
+  const phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number 1");
   const fullAddress = getRequiredField(formData, "fullAddress");
   const complaintDetails = getRequiredField(formData, "complaintDetails");
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
-  const phoneNumber2Raw = formData.get("phoneNumber2");
-  const phoneNumber2 =
-    typeof phoneNumber2Raw === "string" && phoneNumber2Raw.trim() !== ""
-      ? phoneNumber2Raw.trim()
-      : null;
+  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
 
   await prisma.serviceRequest.update({
     where: { id: requestId },
@@ -876,10 +895,6 @@ export async function updateServiceCallStatus(formData: FormData) {
   const alreadyUpdatedForCurrentAllocation =
     !!assignment.statusSubmittedAt && assignment.statusSubmittedAt.getTime() >= allocationStartedAt.getTime();
 
-  if (alreadyUpdatedForCurrentAllocation) {
-    throw new Error("Status can only be updated once per allotment.");
-  }
-
   if (status === "New Call") {
     throw new Error("Please choose a status other than New Call.");
   }
@@ -924,7 +939,11 @@ export async function updateServiceCallStatus(formData: FormData) {
   });
 
   const submittedAt = new Date();
-  const pointsDelta = getStatusSubmissionPoints(assignment.assignedAt ?? assignment.request.createdAt, submittedAt);
+  const firstStatusPointsDelta = getStatusSubmissionPoints(assignment.assignedAt ?? assignment.request.createdAt, submittedAt);
+  const statusPointsDelta = alreadyUpdatedForCurrentAllocation
+    ? assignment.statusPointsDelta
+    : firstStatusPointsDelta;
+  const performancePointsIncrement = alreadyUpdatedForCurrentAllocation ? 0 : firstStatusPointsDelta;
 
   await prisma.$transaction(async (transaction) => {
     await transaction.serviceAssignment.update({
@@ -933,7 +952,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         status,
         statusReason: reasonValue || null,
         statusSubmittedAt: submittedAt,
-        statusPointsDelta: pointsDelta,
+        statusPointsDelta,
         closedByName: status === "Completed" ? (employee?.name || "Unknown") : null,
         closedAt: status === "Completed" ? submittedAt : null,
       },
@@ -966,7 +985,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusReason: latestSubmitted?.statusReason || null,
         customerReview: null,
         statusSubmittedAt: latestSubmitted?.statusSubmittedAt || submittedAt,
-        statusPointsDelta: pointsDelta,
+        statusPointsDelta,
         reviewPointsDelta: null,
         closedByName:
           aggregateStatus === "Completed"
@@ -976,14 +995,16 @@ export async function updateServiceCallStatus(formData: FormData) {
       },
     });
 
-    await transaction.user.update({
-      where: { id: session.userId },
-      data: {
-        performancePoints: {
-          increment: pointsDelta,
+    if (performancePointsIncrement !== 0) {
+      await transaction.user.update({
+        where: { id: session.userId },
+        data: {
+          performancePoints: {
+            increment: performancePointsIncrement,
+          },
         },
-      },
-    });
+      });
+    }
   });
 
   revalidatePath("/dashboard");

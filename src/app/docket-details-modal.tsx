@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { deleteServiceRequest, updateServiceRequestDetails } from "./actions";
 import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./dashboard/assignment-picker";
+import { CopyPhoneButton } from "./dashboard/copy-phone-button";
 import { ProductAutocomplete } from "./product-autocomplete";
+import { formatIndianPhoneNumber, getIndianPhoneCopyValue } from "@/lib/phone";
 
 type SimpleOption = {
   id: string;
@@ -258,18 +260,33 @@ export function DocketDetailsModal({
                 </GridField>
 
                 <GridField label="Phone numbers">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
-                    <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
-                  </div>
+                  {canEdit ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
+                      <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <PhoneInfoField label="Primary phone" value={phoneNumber1} />
+                      {phoneNumber2.trim() ? <PhoneInfoField label="Alternate phone" value={phoneNumber2} /> : null}
+                    </div>
+                  )}
                 </GridField>
 
                 <GridField label="Address">
-                  <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
+                  {canEdit ? (
+                    <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
+                  ) : (
+                    <InfoField label="Address" value={fullAddress} />
+                  )}
                 </GridField>
 
                 <GridField label="Complaint details">
-                  <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
+                  {canEdit ? (
+                    <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
+                  ) : (
+                    <InfoField label="Complaint" value={complaintDetails || "Not specified"} />
+                  )}
                 </GridField>
               </div>
 
@@ -291,41 +308,58 @@ export function DocketDetailsModal({
                 </GridField>
 
                 <GridField label="Call type">
-                  <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
-                    {callTypeOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  {canEdit ? (
+                    <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
+                      {callTypeOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <InfoField label="Call type" value={callType} />
+                  )}
                 </GridField>
 
                 {isServiceCall && (
                   <GridField label="Service billing type">
-                    <div className="flex flex-wrap gap-2">
-                      {BILLING_TYPE_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => toggleServiceBillingType(opt.id)}
-                          className={`rounded px-3 py-1 ${serviceBillingType === opt.id ? "bg-blue-600 text-white" : "border text-gray-700"}`}>
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
+                    {canEdit ? (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {BILLING_TYPE_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => toggleServiceBillingType(opt.id)}
+                              className={`rounded px-3 py-1 ${serviceBillingType === opt.id ? "bg-blue-600 text-white" : "border text-gray-700"}`}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
 
-                    {isChargeable && (
-                      <div className="mt-2">
-                        <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Amount" />
+                        {isChargeable && (
+                          <div className="mt-2">
+                            <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Amount" />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <InfoField label="Billing" value={formatServiceBillingType(serviceBillingType)} />
+                        {isChargeable ? <InfoField label="Amount" value={chargeableAmount || "0"} /> : null}
                       </div>
                     )}
                   </GridField>
                 )}
 
                 <GridField label="Area">
-                  <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
-                    {AREAS.map((a) => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
+                  {canEdit ? (
+                    <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
+                      {AREAS.map((a) => (
+                        <option key={a} value={a}>{a}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <InfoField label="Area" value={area} />
+                  )}
                 </GridField>
 
                 <div className="space-y-2">
@@ -368,7 +402,10 @@ export function DocketDetailsModal({
           </div>
 
           <div className="grid gap-2 border-t px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
-            <button type="button" onClick={handleOpenMap} className="w-full rounded border px-3 py-2 text-sm sm:w-auto">Open in maps</button>
+            <button type="button" onClick={handleOpenMap} className="inline-flex w-full items-center justify-center gap-2 rounded border px-3 py-2 text-sm sm:w-auto">
+              <MapIcon />
+              Open in maps
+            </button>
             {canEdit ? (
               <>
                 <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded border px-3 py-2 text-sm text-red-600 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
@@ -429,9 +466,55 @@ function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
       <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{label}</p>
-      <p className="mt-1 font-semibold">{value}</p>
+      <p className="mt-1 whitespace-pre-line font-semibold">{value}</p>
     </div>
   );
+}
+
+function PhoneInfoField({ label, value }: { label: string; value: string }) {
+  const displayValue = formatIndianPhoneNumber(value);
+  const copyValue = getIndianPhoneCopyValue(value);
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{label}</p>
+        <p className="mt-1 break-words font-semibold">{displayValue}</p>
+      </div>
+      <CopyPhoneButton value={copyValue} />
+    </div>
+  );
+}
+
+function MapIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function formatServiceBillingType(value: string) {
+  if (value === "amc") {
+    return "AMC";
+  }
+
+  if (value === "warranty") {
+    return "Warranty";
+  }
+
+  if (value === "chargeable") {
+    return "Chargeable";
+  }
+
+  return value || "Not specified";
 }
 
 function formatRequestDateTime(value: Date | string) {

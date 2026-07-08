@@ -117,7 +117,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   <option value="Completed">Completed</option>
                   <option value="Cancel">Cancel</option>
                 </select>
-                <p className="mt-2 text-xs text-blue-600">This can be changed only once for this allotted call.</p>
+                <p className="mt-2 text-xs text-blue-600">After saving, this call will move off your dashboard.</p>
               </div>
 
               {showWorkDoneInput && (
