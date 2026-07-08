@@ -67,11 +67,13 @@ export function getProductOptions(databaseProducts: ProductOption[]) {
     options.push(product);
   };
 
-  SRTEC_PRODUCT_NAMES.forEach((name, index) => {
-    addProduct({ id: `srtec-${index}`, name });
-  });
-
-  databaseProducts.forEach(addProduct);
+  if (databaseProducts.length > 0) {
+    databaseProducts.forEach(addProduct);
+  } else {
+    SRTEC_PRODUCT_NAMES.forEach((name, index) => {
+      addProduct({ id: `srtec-${index}`, name });
+    });
+  }
 
   return options;
 }

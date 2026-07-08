@@ -17,6 +17,7 @@ import { OptionalPasswordField } from "./optional-password-field";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { SRTEC_PRODUCT_NAMES } from "@/lib/product-options";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const tabParam = resolvedSearchParams.tab;
   const activeTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
   const duplicateItemLabel = activeTab === "call-types" ? "call type" : "product";
+
+  const existingProductsForSeed = await prisma.product.findMany({
+    select: { name: true },
+  });
+  const existingProductNames = new Set(existingProductsForSeed.map((product) => product.name.trim().toLowerCase()));
+  const missingSrtecProductNames = SRTEC_PRODUCT_NAMES.filter((name) => !existingProductNames.has(name.toLowerCase()));
+
+  if (missingSrtecProductNames.length > 0) {
+    await prisma.product.createMany({
+      data: missingSrtecProductNames.map((name) => ({ name })),
+      skipDuplicates: true,
+    });
+  }
 
   const [staffMembers, products, callTypes] = await Promise.all([
     prisma.user.findMany({
@@ -309,11 +323,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Add
                 </button>
               </form>
-              <div className="mt-5 space-y-3">
+              <div className="mt-5 max-h-[34rem] space-y-3 overflow-y-auto pr-2">
                 {products.map((product) => (
                   <div key={product.id} className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <form action={updateProduct} className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
+                      <form action={updateProduct} className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
                         <input type="hidden" name="id" value={product.id} />
                         <input
                           name="name"
@@ -323,9 +337,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         />
                         <button
                           type="submit"
-                          className="rounded-2xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50 sm:whitespace-nowrap"
+                          aria-label={`Update ${product.name}`}
+                          title="Update product"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-300 bg-white text-blue-700 transition hover:bg-blue-50"
                         >
-                          Update
+                          <EditIcon />
                         </button>
                       </form>
                       <form action={deleteProduct}>
@@ -334,7 +350,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                           confirmMessage={`Are you sure you want to delete product ${product.name}?`}
                           ariaLabel={`Delete ${product.name}`}
                           title="Delete product"
-                          className="inline-flex h-10 w-full items-center justify-center rounded-2xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 sm:w-10"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
                         >
                           <TrashIcon />
                         </ConfirmSubmitButton>
