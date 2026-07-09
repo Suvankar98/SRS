@@ -181,6 +181,45 @@ function isCompletedReassignWindowOpen(completedAt: Date | null) {
   return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
 }
 
+function getActorRoleLabel(role: AppRole) {
+  return role === APP_ROLES.ADMIN ? "Admin" : role === APP_ROLES.MANAGER ? "Manager" : "Employee";
+}
+
+async function addServiceActivity(
+  transaction: Prisma.TransactionClient,
+  data: {
+    requestId: string;
+    type: string;
+    title: string;
+    details?: string | null;
+    status?: string | null;
+    statusReason?: string | null;
+    actorId?: string | null;
+    actorName?: string | null;
+    actorRole?: string | null;
+    employeeId?: string | null;
+    employeeName?: string | null;
+    createdAt?: Date;
+  },
+) {
+  await transaction.serviceRequestActivity.create({
+    data: {
+      requestId: data.requestId,
+      type: data.type,
+      title: data.title,
+      details: data.details ?? null,
+      status: data.status ?? null,
+      statusReason: data.statusReason ?? null,
+      actorId: data.actorId ?? null,
+      actorName: data.actorName ?? null,
+      actorRole: data.actorRole ?? null,
+      employeeId: data.employeeId ?? null,
+      employeeName: data.employeeName ?? null,
+      createdAt: data.createdAt,
+    },
+  });
+}
+
 function shouldUseTmpUploads() {
   return process.env.USE_TMP_UPLOADS === "1" || process.env.VERCEL === "1";
 }
@@ -386,6 +425,10 @@ export async function createServiceRequest(formData: FormData) {
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
   const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  const creator = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true },
+  });
 
   const request = await prisma.$transaction(async (transaction) => {
     const existingDockets = await transaction.serviceRequest.findMany({
@@ -409,6 +452,18 @@ export async function createServiceRequest(formData: FormData) {
         chargeableAmount,
         createdById: session.userId,
       },
+    });
+
+    await addServiceActivity(transaction, {
+      requestId: created.id,
+      type: "created",
+      title: "Service Request Created",
+      details: `Created docket ${created.docketNumber}`,
+      status: created.status,
+      actorId: session.userId,
+      actorName: creator?.name ?? "Admin / Manager",
+      actorRole: getActorRoleLabel(session.role),
+      createdAt: created.createdAt,
     });
 
     return created;
@@ -768,30 +823,63 @@ export async function assignServiceCall(formData: FormData) {
     (assignedToId !== previousRequest.assignedToId || normalizeStatus(previousRequest.status) !== "New Call");
 
   const allocationChanged = assignedToId !== previousRequest?.assignedToId;
+  const assignedAt = new Date();
+  const [actor, assignee] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    }),
+    assignedToId
+      ? prisma.user.findUnique({
+          where: { id: assignedToId },
+          select: { name: true, role: true, whatsappNumber: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
-  await prisma.serviceRequest.update({
-    where: { id: requestId },
-    data: {
-      assignedToId,
-      assignedAt:
-        assignedToId === null
-          ? null
-          : shouldReopenForQueue || allocationChanged
-            ? new Date()
-            : undefined,
-      ...(isCompletedRequest && assignedToId
-        ? {
-            status: "New Call",
-            statusReason: null,
-            customerReview: null,
-            statusSubmittedAt: null,
-            statusPointsDelta: null,
-            reviewPointsDelta: null,
-            closedByName: null,
-            closedAt: null,
-          }
-        : {}),
-    },
+  await prisma.$transaction(async (transaction) => {
+    await transaction.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        assignedToId,
+        assignedAt:
+          assignedToId === null
+            ? null
+            : shouldReopenForQueue || allocationChanged
+              ? assignedAt
+              : undefined,
+        ...(isCompletedRequest && assignedToId
+          ? {
+              status: "New Call",
+              statusReason: null,
+              customerReview: null,
+              statusSubmittedAt: null,
+              statusPointsDelta: null,
+              reviewPointsDelta: null,
+              closedByName: null,
+              closedAt: null,
+            }
+          : {}),
+      },
+    });
+
+    if (allocationChanged || shouldReopenForQueue) {
+      await addServiceActivity(transaction, {
+        requestId,
+        type: assignedToId ? "assigned" : "unassigned",
+        title: assignedToId ? "Service Request Assigned" : "Service Request Unassigned",
+        details: assignedToId
+          ? `Assigned to ${assignee?.name ?? "Employee"}`
+          : "Assignment removed",
+        status: assignedToId && isCompletedRequest ? "New Call" : previousRequest.status,
+        actorId: session.userId,
+        actorName: actor?.name ?? "Admin / Manager",
+        actorRole: getActorRoleLabel(session.role),
+        employeeId: assignedToId,
+        employeeName: assignee?.name ?? null,
+        createdAt: assignedAt,
+      });
+    }
   });
 
   const shouldNotify =
@@ -800,11 +888,6 @@ export async function assignServiceCall(formData: FormData) {
     assignedToId !== previousRequest.assignedToId;
 
   if (shouldNotify) {
-    const assignee = await prisma.user.findUnique({
-      where: { id: assignedToId },
-      select: { name: true, role: true, whatsappNumber: true },
-    });
-
     if (assignee?.role === APP_ROLES.EMPLOYEE && assignee.whatsappNumber) {
       try {
         const whatsappResult = await sendAssignmentWhatsApp({
@@ -989,6 +1072,21 @@ export async function updateServiceCallStatus(formData: FormData) {
       },
     });
 
+    await addServiceActivity(transaction, {
+      requestId,
+      type: status === "Completed" ? "completed" : "status",
+      title: status === "Completed" ? "Service Request Completed" : "Status Updated",
+      details: `${employee?.name || "Unknown"} marked this call as ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
+      status,
+      statusReason: reasonValue || null,
+      actorId: session.userId,
+      actorName: employee?.name || "Unknown",
+      actorRole: getActorRoleLabel(session.role),
+      employeeId: session.userId,
+      employeeName: employee?.name || "Unknown",
+      createdAt: submittedAt,
+    });
+
     await transaction.serviceAssignment.deleteMany({
       where: { requestId },
     });
@@ -1042,6 +1140,19 @@ export async function updateManagerServiceStatus(formData: FormData) {
         closedByName,
         closedAt,
       },
+    });
+
+    await addServiceActivity(transaction, {
+      requestId,
+      type: status === "Completed" ? "completed" : "manager-status",
+      title: status === "Completed" ? "Service Request Completed" : "Status Updated by Admin / Manager",
+      details: `${user?.name || "Admin / Manager"} changed status to ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
+      status,
+      statusReason: reasonValue || null,
+      actorId: session.userId,
+      actorName: user?.name || "Admin / Manager",
+      actorRole: getActorRoleLabel(session.role),
+      createdAt: submittedAt ?? new Date(),
     });
 
     await transaction.serviceAssignment.deleteMany({

@@ -104,6 +104,21 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
           name: true,
         },
       },
+      activities: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          details: true,
+          status: true,
+          statusReason: true,
+          actorName: true,
+          actorRole: true,
+          employeeName: true,
+          createdAt: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });

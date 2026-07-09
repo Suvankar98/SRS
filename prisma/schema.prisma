@@ -61,6 +61,7 @@ model ServiceRequest {
   assignedTo   User?    @relation("AssignedToRequests", fields: [assignedToId], references: [id])
   assignedAt   DateTime?
   assignments  ServiceAssignment[] @relation("ServiceRequestAssignments")
+  activities    ServiceRequestActivity[] @relation("ServiceRequestActivities")
   dashboardOrder Int?
   createdAt    DateTime @default(now())
   status       String?  @default("New Call")
@@ -93,6 +94,26 @@ model ServiceAssignment {
 
   @@unique([requestId, employeeId])
   @@index([employeeId])
+}
+
+model ServiceRequestActivity {
+  id            String   @id @default(uuid()) @db.Uuid
+  requestId     String   @db.Uuid
+  type          String
+  title         String
+  details       String?
+  status        String?
+  statusReason  String?
+  actorId       String?  @db.Uuid
+  actorName     String?
+  actorRole     String?
+  employeeId    String?  @db.Uuid
+  employeeName  String?
+  createdAt     DateTime @default(now())
+
+  request       ServiceRequest @relation("ServiceRequestActivities", fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
 }
 
 model EmployeePointAdjustment {

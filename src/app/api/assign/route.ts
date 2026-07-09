@@ -76,19 +76,46 @@ export async function POST(request: Request) {
             id: { in: assignedEmployeeIds },
             role: APP_ROLES.EMPLOYEE,
           },
-          select: { id: true },
+          select: { id: true, name: true },
         })
       : [];
     const validEmployeeIds = validEmployees.map((employee) => employee.id);
+    const validEmployeeNames = new Map(validEmployees.map((employee) => [employee.id, employee.name]));
+    const actor = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    });
     const assignedAt = new Date();
     const isReopeningCompletedRequest = isCompletedRequest && validEmployeeIds.length > 0;
     const assignmentStatus = isReopeningCompletedRequest ? "New Call" : normalizeStatus(serviceRequest.status);
 
     await prisma.$transaction(async (transaction) => {
+      const existingAssignments = await transaction.serviceAssignment.findMany({
+        where: { requestId: String(requestId) },
+        select: { employeeId: true, employee: { select: { name: true } } },
+      });
+      const existingEmployeeIds = new Set(existingAssignments.map((assignment) => assignment.employeeId));
+
       if (validEmployeeIds.length === 0) {
         await transaction.serviceAssignment.deleteMany({
           where: { requestId: String(requestId) },
         });
+
+        if (existingAssignments.length > 0) {
+          await transaction.serviceRequestActivity.create({
+            data: {
+              requestId: String(requestId),
+              type: "unassigned",
+              title: "Service Request Unassigned",
+              details: `Removed assignment for ${existingAssignments.map((assignment) => assignment.employee?.name ?? "Employee").join(", ")}`,
+              status: serviceRequest.status,
+              actorId: session.userId,
+              actorName: actor?.name ?? "Admin / Manager",
+              actorRole: session.role,
+              createdAt: assignedAt,
+            },
+          });
+        }
       } else {
         await transaction.serviceAssignment.deleteMany({
           where: {
@@ -97,12 +124,10 @@ export async function POST(request: Request) {
           },
         });
 
-        const existingAssignments = await transaction.serviceAssignment.findMany({
-          where: { requestId: String(requestId) },
-          select: { employeeId: true },
-        });
-        const existingEmployeeIds = new Set(existingAssignments.map((assignment) => assignment.employeeId));
         const newEmployeeIds = validEmployeeIds.filter((employeeId) => !existingEmployeeIds.has(employeeId));
+        const removedAssignments = existingAssignments.filter(
+          (assignment) => !validEmployeeIds.includes(assignment.employeeId),
+        );
 
         if (newEmployeeIds.length > 0) {
           await transaction.serviceAssignment.createMany({
@@ -116,6 +141,40 @@ export async function POST(request: Request) {
               closedAt: assignmentStatus === "Completed" ? serviceRequest.closedAt : null,
             })),
             skipDuplicates: true,
+          });
+
+          await transaction.serviceRequestActivity.createMany({
+            data: newEmployeeIds.map((employeeId) => ({
+              requestId: String(requestId),
+              type: "assigned",
+              title: "Service Request Assigned",
+              details: `Assigned to ${validEmployeeNames.get(employeeId) ?? "Employee"}`,
+              status: assignmentStatus,
+              actorId: session.userId,
+              actorName: actor?.name ?? "Admin / Manager",
+              actorRole: session.role,
+              employeeId,
+              employeeName: validEmployeeNames.get(employeeId) ?? null,
+              createdAt: assignedAt,
+            })),
+          });
+        }
+
+        if (removedAssignments.length > 0) {
+          await transaction.serviceRequestActivity.createMany({
+            data: removedAssignments.map((assignment) => ({
+              requestId: String(requestId),
+              type: "unassigned",
+              title: "Employee Removed from Service Request",
+              details: `Removed ${assignment.employee?.name ?? "Employee"} from assignment`,
+              status: serviceRequest.status,
+              actorId: session.userId,
+              actorName: actor?.name ?? "Admin / Manager",
+              actorRole: session.role,
+              employeeId: assignment.employeeId,
+              employeeName: assignment.employee?.name ?? null,
+              createdAt: assignedAt,
+            })),
           });
         }
       }
