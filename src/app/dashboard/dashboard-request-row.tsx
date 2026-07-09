@@ -377,7 +377,7 @@ export function DashboardRequestRow({
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
         <p className="font-semibold text-blue-950">{request.name}</p>
-        <p className="mt-0.5 text-xs font-semibold text-blue-900">{request.company}</p>
+        <p className="mt-1 border-t border-blue-100 pt-1 text-xs font-semibold text-blue-900">{request.company}</p>
       </td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>

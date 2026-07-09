@@ -246,7 +246,7 @@ export function DocketDetailsModal({
                 </span>
               ) : null}
             </h3>
-            <p className="text-xs text-gray-500">{formatRequestDateTime(request.createdAt)}</p>
+            <p className="text-xs text-gray-500 sm:hidden">{formatRequestDateTime(request.createdAt)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {request.status ? (
@@ -272,7 +272,7 @@ export function DocketDetailsModal({
                   {canEdit ? (
                     <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
                   ) : (
-                    <InfoField label="Name" value={`${name} ${company ? `\n${company}` : ""}`.trim()} />
+                    <CustomerNameField name={name} company={company} />
                   )}
                 </GridField>
 
@@ -499,6 +499,18 @@ function InfoField({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
       <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{label}</p>
       <p className="mt-1 whitespace-pre-line font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function CustomerNameField({ name, company }: { name: string; company: string }) {
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+      <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">Name</p>
+      <p className="mt-1 break-words font-semibold">{name}</p>
+      {company.trim() ? (
+        <p className="mt-2 border-t border-blue-200 pt-2 break-words font-semibold text-blue-900">{company}</p>
+      ) : null}
     </div>
   );
 }
