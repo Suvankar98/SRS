@@ -15,7 +15,16 @@ function shouldUseDatabase() {
     return false;
   }
 
-  return !/(HOST|USER|PASSWORD|DBNAME)/i.test(databaseUrl);
+  try {
+    const url = new URL(databaseUrl);
+
+    return (
+      url.protocol === "postgresql:" ||
+      url.protocol === "postgres:"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function createPrismaClient() {
@@ -26,7 +35,9 @@ function createPrismaClient() {
 
     return new Proxy({} as PrismaClient, {
       get() {
-        throw new Error("Database is not configured. Set DATABASE_URL to a valid PostgreSQL connection string.");
+        throw new Error(
+          "Database is not configured. Set DATABASE_URL to a valid PostgreSQL connection string."
+        );
       },
     });
   }
