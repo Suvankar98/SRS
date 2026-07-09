@@ -7,13 +7,12 @@ import {
   deleteStaff,
   deleteProduct,
   logout,
-  updateStaff,
   updateProduct,
 } from "../actions";
 import { BrandLogo } from "../brand-logo";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { FixedCallTypesSection } from "./fixed-call-types-section";
-import { OptionalPasswordField } from "./optional-password-field";
+import { StaffEditModal } from "./staff-edit-modal";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -39,9 +38,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const editStaffParam = resolvedSearchParams.editStaff;
-  const editingStaffId = Array.isArray(editStaffParam) ? editStaffParam[0] : editStaffParam;
-  const hasEditingStaff = typeof editingStaffId === "string" && editingStaffId.trim() !== "";
   const duplicateParam = resolvedSearchParams.duplicate;
   const showDuplicateWarning = (Array.isArray(duplicateParam) ? duplicateParam[0] : duplicateParam) === "1";
   const tabParam = resolvedSearchParams.tab;
@@ -224,91 +220,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   >
                     <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
                       <div className="min-w-0 space-y-3">
-                        {hasEditingStaff && editingStaffId === member.id ? (
-                          <form action={updateStaff} className="grid gap-3">
-                            <input type="hidden" name="id" value={member.id} />
-                            <input
-                              name="name"
-                              defaultValue={member.name}
-                              placeholder="Full name"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                              required
-                            />
-                            <input
-                              name="username"
-                              defaultValue={member.username}
-                              placeholder="Username"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                              required
-                            />
-                            <OptionalPasswordField />
-                            <input
-                              name="phoneNumber1"
-                              defaultValue={member.phoneNumber1 ?? member.whatsappNumber ?? ""}
-                              placeholder="Phone number 1"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                            />
-                            <input
-                              name="phoneNumber2"
-                              defaultValue={member.phoneNumber2 ?? ""}
-                              placeholder="Phone number 2"
-                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                            />
-                            <select
-                              name="department"
-                              defaultValue={member.department ?? "service"}
-                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                              required
-                            >
-                              {STAFF_DEPARTMENT_OPTIONS.map((department) => (
-                                <option key={department.value} value={department.value}>
-                                  {department.label}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              name="role"
-                              defaultValue={member.role}
-                              className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                              required
-                            >
-                              <option value={APP_ROLES.EMPLOYEE}>Employee</option>
-                              <option value={APP_ROLES.MANAGER}>Manager</option>
-                            </select>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="submit"
-                                className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-                              >
-                                Save
-                              </button>
-                              <Link
-                                href="/admin?tab=staff"
-                                className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                              >
-                                Cancel
-                              </Link>
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-blue-950">{member.name}</p>
+                              <p className="text-xs text-blue-600">@{member.username}</p>
                             </div>
-                          </form>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <p className="font-semibold text-blue-950">{member.name}</p>
-                                <p className="text-xs text-blue-600">@{member.username}</p>
-                              </div>
-                              <span className="inline-flex rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-                                {member.role.toLowerCase()}
-                              </span>
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <p className="text-xs text-blue-700">Points: {member.performancePoints}</p>
-                              <p className="text-xs text-blue-700">Phone 1: {member.phoneNumber1 ?? member.whatsappNumber ?? "Not provided"}</p>
-                              <p className="text-xs text-blue-700">Phone 2: {member.phoneNumber2 ?? "Not provided"}</p>
-                              <p className="text-xs text-blue-700">Department: {formatStaffDepartment(member.department)}</p>
-                            </div>
+                            <span className="inline-flex rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                              {member.role.toLowerCase()}
+                            </span>
                           </div>
-                        )}
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <p className="text-xs text-blue-700">Points: {member.performancePoints}</p>
+                            <p className="text-xs text-blue-700">Phone 1: {member.phoneNumber1 ?? member.whatsappNumber ?? "Not provided"}</p>
+                            <p className="text-xs text-blue-700">Phone 2: {member.phoneNumber2 ?? "Not provided"}</p>
+                            <p className="text-xs text-blue-700">Department: {formatStaffDepartment(member.department)}</p>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-start gap-2 justify-end">
                         <form action={deleteStaff}>
@@ -322,14 +250,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             <TrashIcon />
                           </ConfirmSubmitButton>
                         </form>
-                        <Link
-                          href={`/admin?tab=staff&editStaff=${member.id}`}
-                          aria-label={`Edit ${member.name}`}
-                          title="Edit profile"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50"
-                        >
-                          <EditIcon />
-                        </Link>
+                        <StaffEditModal member={member} departments={[...STAFF_DEPARTMENT_OPTIONS]} />
                       </div>
                     </div>
                   </div>
