@@ -124,6 +124,35 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         },
       });
 
+  const employeeReportRequests =
+    isEmployee && currentUser?.name
+      ? await prisma.serviceRequest.findMany({
+          where: {
+            OR: [
+              { lastAttemptByName: { equals: currentUser.name, mode: "insensitive" } },
+              { closedByName: { equals: currentUser.name, mode: "insensitive" } },
+            ],
+          },
+          select: {
+            id: true,
+            docketNumber: true,
+            name: true,
+            company: true,
+            area: true,
+            status: true,
+            statusReason: true,
+            statusPointsDelta: true,
+            createdAt: true,
+            assignedAt: true,
+            statusSubmittedAt: true,
+            lastAttemptAt: true,
+            closedAt: true,
+          },
+          orderBy: [{ lastAttemptAt: "desc" }, { statusSubmittedAt: "desc" }, { createdAt: "desc" }],
+          take: 20,
+        })
+      : [];
+
   const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
   const visibleRequests = isEmployee
     ? filteredRequests.filter(
@@ -138,6 +167,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const assignedRequests = sortedFilteredRequests.filter(
     (request) => Boolean(request.assignedToId) || (request.assignments?.length ?? 0) > 0,
   ).length;
+  const employeeReportRows = isEmployee
+    ? buildEmployeeReportRows({
+        activeRequests: allRequests,
+        reportRequests: employeeReportRequests,
+        totalPoints: currentUser?.performancePoints ?? 0,
+      })
+    : [];
 
   const unassignedRequests = totalRequests - assignedRequests;
 
@@ -322,10 +358,151 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   isEmployee={isEmployee}
                 />
               )}
+              {isEmployee ? (
+                <EmployeeReportTable
+                  rows={employeeReportRows}
+                  totalPoints={currentUser?.performancePoints ?? 0}
+                />
+              ) : null}
             </div>
           </div>
       </section>
     </main>
+  );
+}
+
+type EmployeeReportRequest = {
+  id: string;
+  docketNumber: string;
+  name: string;
+  company: string;
+  area: string;
+  status: string | null;
+  statusReason: string | null;
+  statusPointsDelta: number | null;
+  createdAt: Date;
+  assignedAt?: Date | string | null;
+  statusSubmittedAt?: Date | string | null;
+  lastAttemptAt?: Date | string | null;
+  closedAt?: Date | string | null;
+};
+
+type EmployeeReportRow = {
+  id: string;
+  assignSite: string;
+  docketNumber: string;
+  name: string;
+  company: string;
+  date: Date | null;
+  dailyReport: string;
+  points: number | null;
+  totalPoints: number;
+};
+
+function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[]; totalPoints: number }) {
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3">
+        <div>
+          <h2 className="text-base font-semibold text-blue-950">Report</h2>
+          <p className="mt-0.5 text-xs text-blue-600">Daily site report and points summary</p>
+        </div>
+        <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">
+          Total Point: {totalPoints}
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-blue-700">
+          No report entries available yet.
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3 p-3 md:hidden">
+            {rows.map((row) => (
+              <article key={row.id} className="rounded-xl border border-blue-100 bg-white p-3 text-xs text-blue-900 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Assign Site</p>
+                    <p className="mt-1 break-words font-semibold text-blue-950">{row.assignSite}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{row.docketNumber}</p>
+                  </div>
+                  <div className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-right">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">Points</p>
+                    <p className="font-semibold text-blue-950">{formatPointDelta(row.points)}</p>
+                  </div>
+                </div>
+                <div className="mt-3 border-t border-blue-100 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Name</p>
+                  <p className="mt-1 break-words font-semibold text-blue-950">{row.name}</p>
+                  <p className="mt-1 break-words text-blue-700">{row.company}</p>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <EmployeeReportMobileField label="Date" value={formatEmployeeReportDate(row.date)} />
+                  <EmployeeReportMobileField label="Total Point" value={String(row.totalPoints)} />
+                </div>
+                <div className="mt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Daily Report</p>
+                  <p className="mt-1 break-words font-medium text-blue-900">{row.dailyReport}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-[760px] w-full table-auto divide-y divide-blue-100 text-left text-xs">
+              <thead className="bg-white text-blue-700">
+                <tr>
+                  <EmployeeReportTh>Assign Site</EmployeeReportTh>
+                  <EmployeeReportTh>Name</EmployeeReportTh>
+                  <EmployeeReportTh>Date</EmployeeReportTh>
+                  <EmployeeReportTh>Daily Report</EmployeeReportTh>
+                  <EmployeeReportTh>Points</EmployeeReportTh>
+                  <EmployeeReportTh>Total Point</EmployeeReportTh>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-blue-100 bg-white">
+                {rows.map((row) => (
+                  <tr key={row.id} className="align-top">
+                    <td className="px-3 py-3 font-semibold text-blue-950">
+                      <p className="break-words">{row.assignSite}</p>
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{row.docketNumber}</p>
+                    </td>
+                    <td className="px-3 py-3 text-blue-950">
+                      <p className="break-words font-semibold">{row.name}</p>
+                      <p className="mt-1 border-t border-blue-100 pt-1 break-words text-blue-700">{row.company}</p>
+                    </td>
+                    <td className="px-3 py-3 font-medium text-blue-900">{formatEmployeeReportDate(row.date)}</td>
+                    <td className="px-3 py-3 text-blue-900">
+                      <p className="max-w-[18rem] break-words">{row.dailyReport}</p>
+                    </td>
+                    <td className="px-3 py-3 font-semibold text-blue-950">{formatPointDelta(row.points)}</td>
+                    <td className="px-3 py-3 font-semibold text-blue-950">{row.totalPoints}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function EmployeeReportTh({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="px-3 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-blue-800">
+      {children}
+    </th>
+  );
+}
+
+function EmployeeReportMobileField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
+      <p className="mt-1 break-words font-semibold text-blue-950">{value}</p>
+    </div>
   );
 }
 
@@ -368,6 +545,99 @@ function Td({ children, strong = false }: { children: React.ReactNode; strong?: 
       {children}
     </td>
   );
+}
+
+function buildEmployeeReportRows({
+  activeRequests,
+  reportRequests,
+  totalPoints,
+}: {
+  activeRequests: EmployeeReportRequest[];
+  reportRequests: EmployeeReportRequest[];
+  totalPoints: number;
+}) {
+  const rows = new Map<string, EmployeeReportRow>();
+
+  for (const request of activeRequests) {
+    rows.set(request.id, toEmployeeReportRow(request, totalPoints));
+  }
+
+  for (const request of reportRequests) {
+    rows.set(request.id, toEmployeeReportRow(request, totalPoints));
+  }
+
+  return Array.from(rows.values())
+    .sort((a, b) => getNullableDateTime(b.date) - getNullableDateTime(a.date))
+    .slice(0, 20);
+}
+
+function toEmployeeReportRow(request: EmployeeReportRequest, totalPoints: number): EmployeeReportRow {
+  const status = normalizeStatus(request.status);
+  const statusLabel = getStatusLabelForReport(status);
+  const reason = request.statusReason?.trim();
+
+  return {
+    id: request.id,
+    assignSite: request.area,
+    docketNumber: request.docketNumber,
+    name: request.name,
+    company: request.company,
+    date: getEmployeeReportDate(request),
+    dailyReport: reason ? `${statusLabel}: ${reason}` : statusLabel,
+    points: request.statusPointsDelta,
+    totalPoints,
+  };
+}
+
+function getEmployeeReportDate(request: EmployeeReportRequest) {
+  return (
+    getDateValue(request.lastAttemptAt) ??
+    getDateValue(request.statusSubmittedAt) ??
+    getDateValue(request.closedAt) ??
+    getDateValue(request.assignedAt) ??
+    getDateValue(request.createdAt)
+  );
+}
+
+function getDateValue(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getNullableDateTime(value: Date | null) {
+  return value ? value.getTime() : 0;
+}
+
+function formatEmployeeReportDate(value: Date | null) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(value);
+}
+
+function formatPointDelta(value: number | null) {
+  if (typeof value !== "number") {
+    return "-";
+  }
+
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function getStatusLabelForReport(status: DashboardStatus) {
+  if (status === "New Call") {
+    return "Assigned";
+  }
+
+  return status;
 }
 
 function getComplaintAgeLabel(request: { createdAt: Date; status: string | null } & Record<string, unknown>) {
