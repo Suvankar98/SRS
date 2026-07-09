@@ -23,7 +23,7 @@ export default async function Home({ searchParams }: HomeProps) {
             <BrandLogo width={185} className="h-auto w-auto" />
           </div>
 
-          <h1 className="text-center text-4xl font-bold tracking-tight">USER LOGIN</h1>
+          <h1 className="text-center text-4xl font-bold tracking-tight">Task Management System</h1>
 
           <form action={login} className="mt-8 space-y-6">
             <label className="relative block">
