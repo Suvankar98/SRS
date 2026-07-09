@@ -5,6 +5,7 @@ import { uploadEmployeeImage } from "../actions";
 
 type EmployeeMediaUploadProps = {
   requestId: string;
+  onUploaded?: () => void;
 };
 
 const allowedTypes = [
@@ -41,7 +42,7 @@ const allowedExtensions = [
   "wmv",
 ];
 
-export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
+export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUploadProps) {
   const [fileName, setFileName] = useState<string>("");
   const [fileError, setFileError] = useState<string>("");
   const [uploadMessage, setUploadMessage] = useState<string>("");
@@ -94,8 +95,9 @@ export function EmployeeMediaUpload({ requestId }: EmployeeMediaUploadProps) {
     startTransition(async () => {
       try {
         await uploadEmployeeImage(formData);
-        setUploadMessage("Uploaded. You can save status now.");
+        setUploadMessage("Media uploaded successfully. You can save status now.");
         setFileName("");
+        onUploaded?.();
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }

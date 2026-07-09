@@ -11,6 +11,7 @@ type StatusRequest = {
   docketNumber: string;
   status: string | null;
   statusReason: string | null;
+  mediaUploadedAt?: Date | string | null;
 };
 
 type EditableStatus = "In Process" | "Completed" | "Cancel";
@@ -23,6 +24,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [reason, setReason] = React.useState(request.statusReason || "");
   const [submitError, setSubmitError] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [hasUploadedMedia, setHasUploadedMedia] = React.useState(Boolean(request.mediaUploadedAt));
   const currentStatusLabel = getStatusLabel(request.status);
   const showWorkDoneInput = status === "In Process";
   const showCancelReasonInput = status === "Cancel";
@@ -31,6 +33,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setStatus("");
     setReason("");
     setSubmitError("");
+    setHasUploadedMedia(Boolean(request.mediaUploadedAt));
     setIsOpen(true);
   };
 
@@ -56,6 +59,11 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
     if (showCancelReasonInput && reason.trim() === "") {
       setSubmitError("Reason is required when status is Cancel.");
+      return;
+    }
+
+    if (status === "Completed" && !hasUploadedMedia) {
+      setSubmitError("Uploading media is necessary before completing this service.");
       return;
     }
 
@@ -152,8 +160,19 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
               {status === "Completed" ? (
                 <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
-                  <p className="text-sm text-blue-700">Upload media before marking this call as Completed.</p>
-                  <EmployeeMediaUpload requestId={request.id} />
+                  <p className="text-sm text-blue-700">
+                    {hasUploadedMedia
+                      ? "Media uploaded successfully. You can save this call as Completed."
+                      : "Uploading media is necessary before marking this call as Completed."}
+                  </p>
+                  <EmployeeMediaUpload
+                    requestId={request.id}
+                    onUploaded={() => {
+                      setHasUploadedMedia(true);
+                      setSubmitError("");
+                      router.refresh();
+                    }}
+                  />
                 </div>
               ) : null}
               {submitError ? <p className="text-sm font-medium text-red-600">{submitError}</p> : null}

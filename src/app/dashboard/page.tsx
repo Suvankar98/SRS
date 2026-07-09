@@ -82,6 +82,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           statusReason: assignment.statusReason,
           statusSubmittedAt: assignment.statusSubmittedAt,
           statusPointsDelta: assignment.statusPointsDelta,
+          mediaUploadedAt: assignment.mediaUploadedAt,
           closedByName: assignment.closedByName,
           closedAt: assignment.closedAt,
         })),

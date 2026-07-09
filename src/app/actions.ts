@@ -941,36 +941,8 @@ export async function updateServiceCallStatus(formData: FormData) {
   }
 
   if (status === "Completed") {
-    const path = await import("path");
-    const fs = await import("fs");
-    const os = await import("os");
-
-    const publicUploads = path.join(process.cwd(), "public", "uploads");
-    const tmpUploads = path.join(os.tmpdir(), "srs-uploads");
-
-    const requestDirsToCheck = [];
-    if (shouldUseTmpUploads()) {
-      requestDirsToCheck.push(path.join(tmpUploads, session.userId, requestId));
-    }
-    requestDirsToCheck.push(path.join(publicUploads, session.userId, requestId));
-
-    let hasMedia = !!assignment.mediaUploadedAt;
-    for (const dir of requestDirsToCheck) {
-      // check directory for any file except .DS_Store
-      // ignore errors and continue to next location
-      const exists = await fs.promises
-        .readdir(dir)
-        .then((entries) => entries.some((entry) => entry !== ".DS_Store"))
-        .catch(() => false);
-
-      if (exists) {
-        hasMedia = true;
-        break;
-      }
-    }
-
-    if (!hasMedia) {
-      throw new Error("Please upload at least one image or video before marking this call as Completed.");
+    if (!assignment.mediaUploadedAt) {
+      throw new Error("Uploading media is necessary before completing this service.");
     }
   }
 
@@ -1248,8 +1220,8 @@ export async function uploadEmployeeImage(formData: FormData) {
 
   const requestId = getRequiredField(formData, "requestId");
   const file = formData.get("file") as File | null;
-  if (!file || typeof file === "string") {
-    throw new Error("No file uploaded");
+  if (!file || typeof file === "string" || file.size === 0 || !file.name) {
+    throw new Error("Please select a valid image or video file.");
   }
 
   const allowedTypes = [
