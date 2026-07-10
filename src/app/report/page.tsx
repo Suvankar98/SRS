@@ -11,6 +11,7 @@ import { getSession, roleCanAssign } from "@/lib/auth";
 import {
   buildEmployeeReportRows,
   type EmployeeReportRequest,
+  type EmployeeReportRow,
 } from "@/lib/employee-report";
 import { prisma } from "@/lib/prisma";
 
@@ -19,42 +20,6 @@ export const dynamic = "force-dynamic";
 type ReportPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
-
-type ReportPointFilter =
-  | ""
-  | "monthly-positive"
-  | "monthly-zero"
-  | "monthly-negative"
-  | "all-time-positive"
-  | "all-time-zero"
-  | "all-time-negative";
-
-type ReportSort =
-  | "monthly-desc"
-  | "monthly-asc"
-  | "all-time-desc"
-  | "all-time-asc"
-  | "name-asc"
-  | "name-desc";
-
-const REPORT_POINT_FILTERS: Array<{ value: ReportPointFilter; label: string }> = [
-  { value: "", label: "All points" },
-  { value: "monthly-positive", label: "Monthly positive" },
-  { value: "monthly-zero", label: "Monthly zero" },
-  { value: "monthly-negative", label: "Monthly negative" },
-  { value: "all-time-positive", label: "All-time positive" },
-  { value: "all-time-zero", label: "All-time zero" },
-  { value: "all-time-negative", label: "All-time negative" },
-];
-
-const REPORT_SORT_OPTIONS: Array<{ value: ReportSort; label: string }> = [
-  { value: "monthly-desc", label: "Monthly high to low" },
-  { value: "monthly-asc", label: "Monthly low to high" },
-  { value: "all-time-desc", label: "All-time high to low" },
-  { value: "all-time-asc", label: "All-time low to high" },
-  { value: "name-asc", label: "Name A to Z" },
-  { value: "name-desc", label: "Name Z to A" },
-];
 
 const employeeReportRequestSelect = {
   id: true,
@@ -87,9 +52,13 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   }
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
-  const selectedPointFilter = getReportPointFilter(getSearchParamValue(resolvedSearchParams.points));
-  const selectedSort = getReportSort(getSearchParamValue(resolvedSearchParams.sort));
+  const fromDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.from));
+  const toDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.to));
+  const dateRange = getDateRange(fromDate, toDate);
+  const hasDateRange = Boolean(dateRange.startAt || dateRange.endAt);
+  const last7DaysRange = getRollingDateRange(7);
+  const last30DaysRange = getRollingDateRange(30);
+  const last90DaysRange = getRollingDateRange(90);
 
   const employees = await prisma.user.findMany({
     where: { role: APP_ROLES.EMPLOYEE },
@@ -100,7 +69,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
       monthlyPerformancePoints: true,
       pointAdjustments: {
         orderBy: { createdAt: "desc" },
-        take: 120,
         select: {
           id: true,
           attendanceOption: true,
@@ -155,7 +123,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
           },
           select: employeeReportRequestSelect,
           orderBy: [{ lastAttemptAt: "desc" }, { statusSubmittedAt: "desc" }, { createdAt: "desc" }],
-          take: 500,
         })
       : Promise.resolve([]),
   ]);
@@ -175,17 +142,29 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
       const completedByEmployee = completedRequests.length;
 
+      const report = buildEmployeeReportRows({
+        activeRequests: employeeReportInputsByEmployeeId.get(employee.id)?.activeRequests ?? [],
+        reportRequests: employeeReportInputsByEmployeeId.get(employee.id)?.reportRequests ?? [],
+        pointAdjustments: employee.pointAdjustments,
+        limit: null,
+      });
+      const periodPoints = hasDateRange ? calculateReportPointsForDateRange(report.rows, dateRange) : employee.monthlyPerformancePoints;
+      const popupRows = hasDateRange ? filterReportRowsForDateRange(report.rows, dateRange) : report.rows;
+      const popupTotalPoints = calculateReportPoints(popupRows);
+
       return {
         id: employee.id,
         name: employee.name,
         totalPoints: employee.performancePoints,
         monthlyPoints: employee.monthlyPerformancePoints,
+        last7DaysPoints: calculateReportPointsForDateRange(report.rows, last7DaysRange),
+        last30DaysPoints: calculateReportPointsForDateRange(report.rows, last30DaysRange),
+        last90DaysPoints: calculateReportPointsForDateRange(report.rows, last90DaysRange),
+        periodPoints,
         completedByEmployee,
-        report: buildEmployeeReportRows({
-          activeRequests: employeeReportInputsByEmployeeId.get(employee.id)?.activeRequests ?? [],
-          reportRequests: employeeReportInputsByEmployeeId.get(employee.id)?.reportRequests ?? [],
-          pointAdjustments: employee.pointAdjustments,
-        }),
+        report,
+        popupRows,
+        popupTotalPoints,
         pointAdjustments: employee.pointAdjustments.map((adjustment) => ({
           ...adjustment,
           createdAt: adjustment.createdAt.toISOString(),
@@ -198,53 +177,17 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         b.completedByEmployee - a.completedByEmployee ||
         a.name.localeCompare(b.name),
     );
-  const filteredEmployeeRows = employeeRows.filter((row) => {
-    const matchesSearch = searchQuery === "" || row.name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!matchesSearch) {
-      return false;
-    }
-
-    if (selectedPointFilter === "monthly-positive") return row.monthlyPoints > 0;
-    if (selectedPointFilter === "monthly-zero") return row.monthlyPoints === 0;
-    if (selectedPointFilter === "monthly-negative") return row.monthlyPoints < 0;
-    if (selectedPointFilter === "all-time-positive") return row.totalPoints > 0;
-    if (selectedPointFilter === "all-time-zero") return row.totalPoints === 0;
-    if (selectedPointFilter === "all-time-negative") return row.totalPoints < 0;
-
-    return true;
-  });
-  const sortedEmployeeRows = [...filteredEmployeeRows].sort((a, b) => {
-    if (selectedSort === "monthly-asc") {
-      return a.monthlyPoints - b.monthlyPoints || a.name.localeCompare(b.name);
-    }
-
-    if (selectedSort === "all-time-desc") {
-      return b.totalPoints - a.totalPoints || a.name.localeCompare(b.name);
-    }
-
-    if (selectedSort === "all-time-asc") {
-      return a.totalPoints - b.totalPoints || a.name.localeCompare(b.name);
-    }
-
-    if (selectedSort === "name-asc") {
-      return a.name.localeCompare(b.name);
-    }
-
-    if (selectedSort === "name-desc") {
-      return b.name.localeCompare(a.name);
-    }
-
+  const sortedEmployeeRows = [...employeeRows].sort((a, b) => {
     return (
-      b.monthlyPoints - a.monthlyPoints ||
+      b.periodPoints - a.periodPoints ||
       b.completedByEmployee - a.completedByEmployee ||
       a.name.localeCompare(b.name)
     );
   });
   const leaderboardTopThree = sortedEmployeeRows.slice(0, 3);
-  const activeFilterCount = [searchQuery, selectedPointFilter, selectedSort === "monthly-desc" ? "" : selectedSort].filter(
-    (value) => value !== "",
-  ).length;
+  const leaderboardOtherEmployees = sortedEmployeeRows.slice(3);
+  const activeFilterCount = [fromDate, toDate].filter((value) => value !== "").length;
+  const leaderboardSubtitle = hasDateRange ? "Selected date range" : "Current monthly points";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -292,85 +235,59 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         </div>
       </header>
 
-      <section className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-blue-950">Report Filters</h2>
-            <p className="mt-1 text-xs text-blue-600">
-              Showing {sortedEmployeeRows.length} of {employeeRows.length} employees
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
-              {activeFilterCount} active
-            </span>
-            <a
-              href="/report"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Reset
-            </a>
-          </div>
-        </div>
-
-        <form className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Search Employee</span>
-            <input
-              name="q"
-              defaultValue={searchQuery}
-              placeholder="Employee name..."
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Points</span>
-            <select
-              name="points"
-              defaultValue={selectedPointFilter}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            >
-              {REPORT_POINT_FILTERS.map((option) => (
-                <option key={option.value || "all"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Sort</span>
-            <select
-              name="sort"
-              defaultValue={selectedSort}
-              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-            >
-              {REPORT_SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 md:w-auto"
-            >
-              Apply Filters
-            </button>
-          </div>
-        </form>
-      </section>
-
       <section className="mt-5 grid gap-4 lg:grid-cols-3">
         <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] lg:col-span-2">
-          <div>
-            <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
-            <p className="mt-1 text-xs text-blue-600">Monthly & All-Time Points</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
+              <p className="mt-1 text-xs text-blue-600">
+                Showing {sortedEmployeeRows.length} of {employeeRows.length} employees
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
+                {activeFilterCount} active
+              </span>
+              <a
+                href="/report"
+                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+              >
+                Reset
+              </a>
+            </div>
           </div>
+
+          <form className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">From Date</span>
+              <input
+                type="date"
+                name="from"
+                defaultValue={fromDate}
+                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">To Date</span>
+              <input
+                type="date"
+                name="to"
+                defaultValue={toDate}
+                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+              />
+            </label>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </form>
+
           {sortedEmployeeRows.length === 0 ? (
             <p className="mt-3 text-sm text-blue-700">No employees found.</p>
           ) : (
@@ -380,25 +297,15 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                   <tr>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Employee</th>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Tag</th>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Monthly Points</th>
-                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">All-Time Points</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Last 7 Days</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Last 30 Days</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Last 90 Days</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-100 bg-white">
                   {sortedEmployeeRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="px-2.5 py-2.5 text-blue-950">
-                        <EmployeeReportPopup
-                          buttonContent={row.name}
-                          title={`${row.name} report`}
-                        >
-                          <EmployeeReportTable
-                            employeeName={row.name}
-                            rows={row.report.rows}
-                            totalPoints={row.report.totalPoints}
-                          />
-                        </EmployeeReportPopup>
-                      </td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-950">{row.name}</td>
                       <td className="px-2.5 py-2.5 text-blue-900">
                         <EmployeePointsPopup
                           employeeId={row.id}
@@ -407,8 +314,9 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                           pointAdjustments={row.pointAdjustments}
                         />
                       </td>
-                      <td className="px-2.5 py-2.5 text-blue-900 font-semibold">{row.monthlyPoints}</td>
-                      <td className="px-2.5 py-2.5 text-blue-600">{row.totalPoints}</td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{row.last7DaysPoints}</td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{row.last30DaysPoints}</td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{row.last90DaysPoints}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -419,7 +327,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
         <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-blue-950">Leaderboard</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-blue-950">Leaderboard</h2>
+              <p className="mt-1 text-xs text-blue-600">{leaderboardSubtitle}</p>
+            </div>
             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
               Top 3
             </span>
@@ -436,15 +347,65 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Rank {rank}</p>
-                    <p className="truncate text-sm font-medium text-blue-950">{employee?.name ?? "-"}</p>
+                    {employee ? (
+                      <EmployeeReportPopup
+                        buttonContent={employee.name}
+                        title={`${employee.name} report`}
+                        buttonClassName="block max-w-full truncate rounded-md text-left text-sm font-medium text-blue-950 underline-offset-4 transition hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      >
+                        <EmployeeReportTable
+                          employeeName={employee.name}
+                          rows={employee.popupRows}
+                          totalPoints={employee.popupTotalPoints}
+                        />
+                      </EmployeeReportPopup>
+                    ) : (
+                      <p className="truncate text-sm font-medium text-blue-950">-</p>
+                    )}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.monthlyPoints} pts` : "-"}</p>
+                    <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.periodPoints} pts` : "-"}</p>
                     <p className="text-xs text-blue-600">{employee ? `${employee.totalPoints} all-time` : ""}</p>
                   </div>
                 </div>
               );
             })}
+            {leaderboardOtherEmployees.length > 0 ? (
+              <>
+                <div className="py-1">
+                  <div className="border-t border-blue-200" />
+                </div>
+                {leaderboardOtherEmployees.map((employee, index) => {
+                  const rank = index + 4;
+
+                  return (
+                    <div
+                      key={employee.id}
+                      className="flex items-center justify-between rounded-xl border border-blue-100 bg-white px-3 py-2 transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-500">Rank {rank}</p>
+                        <EmployeeReportPopup
+                          buttonContent={employee.name}
+                          title={`${employee.name} report`}
+                          buttonClassName="block max-w-full truncate rounded-md text-left text-sm font-medium text-blue-950 underline-offset-4 transition hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                          <EmployeeReportTable
+                            employeeName={employee.name}
+                            rows={employee.popupRows}
+                            totalPoints={employee.popupTotalPoints}
+                          />
+                        </EmployeeReportPopup>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-blue-900">{employee.periodPoints} pts</p>
+                        <p className="text-xs text-blue-600">{employee.totalPoints} all-time</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            ) : null}
           </div>
         </article>
       </section>
@@ -558,12 +519,69 @@ function getSearchParamValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
-function getReportPointFilter(value: string): ReportPointFilter {
-  return REPORT_POINT_FILTERS.some((option) => option.value === value) ? (value as ReportPointFilter) : "";
+function getDateInputValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
-function getReportSort(value: string): ReportSort {
-  return REPORT_SORT_OPTIONS.some((option) => option.value === value) ? (value as ReportSort) : "monthly-desc";
+function getDateRange(fromDate: string, toDate: string) {
+  return {
+    startAt: fromDate ? new Date(`${fromDate}T00:00:00.000+05:30`) : null,
+    endAt: toDate ? new Date(`${toDate}T23:59:59.999+05:30`) : null,
+  };
+}
+
+function getRollingDateRange(days: number) {
+  const todayInput = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const todayStart = new Date(`${todayInput}T00:00:00.000+05:30`);
+  const endAt = new Date(`${todayInput}T23:59:59.999+05:30`);
+  const startAt = new Date(todayStart.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+
+  return { startAt, endAt };
+}
+
+function filterReportRowsForDateRange(rows: EmployeeReportRow[], dateRange: { startAt: Date | null; endAt: Date | null }) {
+  return rows.filter((row) => {
+    const rowTime = row.date.getTime();
+
+    if (dateRange.startAt && rowTime < dateRange.startAt.getTime()) {
+      return false;
+    }
+
+    if (dateRange.endAt && rowTime > dateRange.endAt.getTime()) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function calculateReportPointsForDateRange(
+  rows: EmployeeReportRow[],
+  dateRange: { startAt: Date | null; endAt: Date | null },
+) {
+  return calculateReportPoints(filterReportRowsForDateRange(rows, dateRange));
+}
+
+function calculateReportPoints(rows: EmployeeReportRow[]) {
+  return rows.reduce((total, row) => {
+    return total + getReportRowPoints(row);
+  }, 0);
+}
+
+function getReportRowPoints(row: EmployeeReportRow) {
+  return (
+    (row.workSubmission.points ?? 0) +
+    (row.attendanceIn.points ?? 0) +
+    (row.attendanceOut.points ?? 0) +
+    (row.review.points ?? 0) +
+    (row.documentSubmission.points ?? 0) +
+    (row.materialHandover.points ?? 0)
+  );
 }
 
 function equalsIgnoreCase(a: string | null, b: string) {
