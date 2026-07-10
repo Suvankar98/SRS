@@ -2,12 +2,10 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 
 import { logout } from "../actions";
-import ReportFilters from "./report-filters";
-import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
+import { normalizeStatus } from "../status-utils";
 import { EmployeePointsPopup } from "./employee-points-popup";
 import { EmployeeReportPopup } from "./employee-report-popup";
 import { EmployeeReportTable } from "./employee-report-table";
-import { ReportCallDetailsModal } from "./call-details-modal";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import {
@@ -18,13 +16,45 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
-
-const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
-
 type ReportPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+type ReportPointFilter =
+  | ""
+  | "monthly-positive"
+  | "monthly-zero"
+  | "monthly-negative"
+  | "all-time-positive"
+  | "all-time-zero"
+  | "all-time-negative";
+
+type ReportSort =
+  | "monthly-desc"
+  | "monthly-asc"
+  | "all-time-desc"
+  | "all-time-asc"
+  | "name-asc"
+  | "name-desc";
+
+const REPORT_POINT_FILTERS: Array<{ value: ReportPointFilter; label: string }> = [
+  { value: "", label: "All points" },
+  { value: "monthly-positive", label: "Monthly positive" },
+  { value: "monthly-zero", label: "Monthly zero" },
+  { value: "monthly-negative", label: "Monthly negative" },
+  { value: "all-time-positive", label: "All-time positive" },
+  { value: "all-time-zero", label: "All-time zero" },
+  { value: "all-time-negative", label: "All-time negative" },
+];
+
+const REPORT_SORT_OPTIONS: Array<{ value: ReportSort; label: string }> = [
+  { value: "monthly-desc", label: "Monthly high to low" },
+  { value: "monthly-asc", label: "Monthly low to high" },
+  { value: "all-time-desc", label: "All-time high to low" },
+  { value: "all-time-asc", label: "All-time low to high" },
+  { value: "name-asc", label: "Name A to Z" },
+  { value: "name-desc", label: "Name Z to A" },
+];
 
 const employeeReportRequestSelect = {
   id: true,
@@ -58,66 +88,35 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
-  const selectedStatus = getCanonicalStatus(getSearchParamValue(resolvedSearchParams.status));
-  const selectedEmployee = getSearchParamValue(resolvedSearchParams.employeeId).trim();
-  const selectedCallType = getSearchParamValue(resolvedSearchParams.callType).trim();
-  const selectedServiceBillingType = getServiceBillingType(
-    getSearchParamValue(resolvedSearchParams.serviceBillingType),
-  );
-  const selectedArea = getSearchParamValue(resolvedSearchParams.area).trim();
-  const fromDate = getSearchParamValue(resolvedSearchParams.from).trim();
-  const toDate = getSearchParamValue(resolvedSearchParams.to).trim();
+  const selectedPointFilter = getReportPointFilter(getSearchParamValue(resolvedSearchParams.points));
+  const selectedSort = getReportSort(getSearchParamValue(resolvedSearchParams.sort));
 
-  const [employees, callTypeOptions, areaOptions] = await Promise.all([
-    prisma.user.findMany({
-      where: { role: APP_ROLES.EMPLOYEE },
-      select: {
-        id: true,
-        name: true,
-        performancePoints: true,
-        monthlyPerformancePoints: true,
-        pointAdjustments: {
-          orderBy: { createdAt: "desc" },
-          take: 120,
-          select: {
-            id: true,
-            attendanceOption: true,
-            attendancePoints: true,
-            reviewOption: true,
-            reviewPoints: true,
-            documentSubmissionOption: true,
-            documentSubmissionPoints: true,
-            materialHandoverOption: true,
-            materialHandoverPoints: true,
-            totalDelta: true,
-            createdAt: true,
-          },
+  const employees = await prisma.user.findMany({
+    where: { role: APP_ROLES.EMPLOYEE },
+    select: {
+      id: true,
+      name: true,
+      performancePoints: true,
+      monthlyPerformancePoints: true,
+      pointAdjustments: {
+        orderBy: { createdAt: "desc" },
+        take: 120,
+        select: {
+          id: true,
+          attendanceOption: true,
+          attendancePoints: true,
+          reviewOption: true,
+          reviewPoints: true,
+          documentSubmissionOption: true,
+          documentSubmissionPoints: true,
+          materialHandoverOption: true,
+          materialHandoverPoints: true,
+          totalDelta: true,
+          createdAt: true,
         },
       },
-      orderBy: { name: "asc" },
-    }),
-    prisma.serviceRequest.findMany({
-      distinct: ["callType"],
-      select: { callType: true },
-      orderBy: { callType: "asc" },
-    }),
-    prisma.serviceRequest.findMany({
-      distinct: ["area"],
-      select: { area: true },
-      orderBy: { area: "asc" },
-    }),
-  ]);
-
-  const where: Prisma.ServiceRequestWhereInput = buildReportWhere({
-    searchQuery,
-    selectedStatus,
-    selectedEmployee,
-    selectedCallType,
-    selectedServiceBillingType,
-    selectedArea,
-    fromDate,
-    toDate,
-    employees,
+    },
+    orderBy: { name: "asc" },
   });
 
   const employeeIds = employees.map((employee) => employee.id);
@@ -127,56 +126,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     { closedByName: { equals: name, mode: "insensitive" as const } },
   ]);
 
-  const [requests, employeeReportAssignments, employeeReportRequests] = await Promise.all([
-    prisma.serviceRequest.findMany({
-      where,
-      select: {
-        id: true,
-        docketNumber: true,
-        name: true,
-        company: true,
-        phoneNumber1: true,
-        phoneNumber2: true,
-        fullAddress: true,
-        complaintDetails: true,
-        product: true,
-        status: true,
-        statusReason: true,
-        statusPointsDelta: true,
-        assignedToId: true,
-        createdAt: true,
-        assignedAt: true,
-        statusSubmittedAt: true,
-        closedAt: true,
-        closedByName: true,
-        callType: true,
-        area: true,
-        serviceBillingType: true,
-        chargeableAmount: true,
-        customerReview: true,
-        assignedTo: {
-          select: {
-            name: true,
-          },
-        },
-        activities: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            details: true,
-            status: true,
-            statusReason: true,
-            actorName: true,
-            actorRole: true,
-            employeeName: true,
-            createdAt: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
+  const [employeeReportAssignments, employeeReportRequests] = await Promise.all([
     employeeIds.length > 0
       ? prisma.serviceAssignment.findMany({
           where: { employeeId: { in: employeeIds } },
@@ -209,47 +159,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         })
       : Promise.resolve([]),
   ]);
-
-  const statusCounts: Record<CanonicalStatus, number> = {
-    "New Call": 0,
-    "In Process": 0,
-    Completed: 0,
-    Cancel: 0,
-  };
-
-  for (const request of requests) {
-    const status = normalizeStatus(request.status);
-    statusCounts[status] += 1;
-  }
-
-  const totalCalls = requests.length;
-  const completedCalls = statusCounts.Completed;
-  const cancelCalls = statusCounts.Cancel;
-  const activeCalls = statusCounts["New Call"] + statusCounts["In Process"];
-  const unassignedCalls = requests.filter((request) => request.assignedToId === null).length;
-  const todayCalls = requests.filter((request) => isTodayInIndia(request.createdAt)).length;
-  const activeFilters = getActiveFilterCount({
-    searchQuery,
-    selectedStatus,
-    selectedEmployee,
-    selectedCallType,
-    selectedServiceBillingType,
-    selectedArea,
-    fromDate,
-    toDate,
-  });
-  const exportParams = new URLSearchParams();
-  if (searchQuery !== "") exportParams.set("q", searchQuery);
-  if (selectedStatus !== "") exportParams.set("status", selectedStatus);
-  if (selectedEmployee !== "") exportParams.set("employeeId", selectedEmployee);
-  if (selectedCallType !== "") exportParams.set("callType", selectedCallType);
-  if (selectedServiceBillingType !== "") exportParams.set("serviceBillingType", selectedServiceBillingType);
-  if (selectedArea !== "") exportParams.set("area", selectedArea);
-  if (fromDate !== "") exportParams.set("from", fromDate);
-  if (toDate !== "") exportParams.set("to", toDate);
-  const exportQuery = exportParams.toString();
-  const csvExportHref = `/api/report/export?format=csv${exportQuery ? `&${exportQuery}` : ""}`;
-  const pdfExportHref = `/api/report/export?format=pdf${exportQuery ? `&${exportQuery}` : ""}`;
   const employeeReportInputsByEmployeeId = buildEmployeeReportInputsByEmployeeId({
     employees,
     assignments: employeeReportAssignments,
@@ -258,7 +167,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
 
   const employeeRows = employees
     .map((employee) => {
-      const completedRequests = requests.filter(
+      const completedRequests = employeeReportRequests.filter(
         (request) =>
           normalizeStatus(request.status) === "Completed" &&
           equalsIgnoreCase(request.closedByName, employee.name),
@@ -289,9 +198,53 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         b.completedByEmployee - a.completedByEmployee ||
         a.name.localeCompare(b.name),
     );
-  const leaderboardTopThree = employeeRows.slice(0, 3);
+  const filteredEmployeeRows = employeeRows.filter((row) => {
+    const matchesSearch = searchQuery === "" || row.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const recentCalls = requests;
+    if (!matchesSearch) {
+      return false;
+    }
+
+    if (selectedPointFilter === "monthly-positive") return row.monthlyPoints > 0;
+    if (selectedPointFilter === "monthly-zero") return row.monthlyPoints === 0;
+    if (selectedPointFilter === "monthly-negative") return row.monthlyPoints < 0;
+    if (selectedPointFilter === "all-time-positive") return row.totalPoints > 0;
+    if (selectedPointFilter === "all-time-zero") return row.totalPoints === 0;
+    if (selectedPointFilter === "all-time-negative") return row.totalPoints < 0;
+
+    return true;
+  });
+  const sortedEmployeeRows = [...filteredEmployeeRows].sort((a, b) => {
+    if (selectedSort === "monthly-asc") {
+      return a.monthlyPoints - b.monthlyPoints || a.name.localeCompare(b.name);
+    }
+
+    if (selectedSort === "all-time-desc") {
+      return b.totalPoints - a.totalPoints || a.name.localeCompare(b.name);
+    }
+
+    if (selectedSort === "all-time-asc") {
+      return a.totalPoints - b.totalPoints || a.name.localeCompare(b.name);
+    }
+
+    if (selectedSort === "name-asc") {
+      return a.name.localeCompare(b.name);
+    }
+
+    if (selectedSort === "name-desc") {
+      return b.name.localeCompare(a.name);
+    }
+
+    return (
+      b.monthlyPoints - a.monthlyPoints ||
+      b.completedByEmployee - a.completedByEmployee ||
+      a.name.localeCompare(b.name)
+    );
+  });
+  const leaderboardTopThree = sortedEmployeeRows.slice(0, 3);
+  const activeFilterCount = [searchQuery, selectedPointFilter, selectedSort === "monthly-desc" ? "" : selectedSort].filter(
+    (value) => value !== "",
+  ).length;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -321,6 +274,12 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
             >
               Gallery
             </a>
+            <a
+              href="/call-history"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Call History
+            </a>
             <form action={logout}>
               <button
                 type="submit"
@@ -333,13 +292,86 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         </div>
       </header>
 
+      <section className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-blue-950">Report Filters</h2>
+            <p className="mt-1 text-xs text-blue-600">
+              Showing {sortedEmployeeRows.length} of {employeeRows.length} employees
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
+              {activeFilterCount} active
+            </span>
+            <a
+              href="/report"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+            >
+              Reset
+            </a>
+          </div>
+        </div>
+
+        <form className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Search Employee</span>
+            <input
+              name="q"
+              defaultValue={searchQuery}
+              placeholder="Employee name..."
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Points</span>
+            <select
+              name="points"
+              defaultValue={selectedPointFilter}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            >
+              {REPORT_POINT_FILTERS.map((option) => (
+                <option key={option.value || "all"} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">Sort</span>
+            <select
+              name="sort"
+              defaultValue={selectedSort}
+              className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+            >
+              {REPORT_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-end">
+            <button
+              type="submit"
+              className="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 md:w-auto"
+            >
+              Apply Filters
+            </button>
+          </div>
+        </form>
+      </section>
+
       <section className="mt-5 grid gap-4 lg:grid-cols-3">
         <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] lg:col-span-2">
           <div>
             <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
             <p className="mt-1 text-xs text-blue-600">Monthly & All-Time Points</p>
           </div>
-          {employeeRows.length === 0 ? (
+          {sortedEmployeeRows.length === 0 ? (
             <p className="mt-3 text-sm text-blue-700">No employees found.</p>
           ) : (
             <div className="mt-3 overflow-x-auto">
@@ -353,7 +385,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-100 bg-white">
-                  {employeeRows.map((row) => (
+                  {sortedEmployeeRows.map((row) => (
                     <tr key={row.id}>
                       <td className="px-2.5 py-2.5 text-blue-950">
                         <EmployeeReportPopup
@@ -417,141 +449,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         </article>
       </section>
 
-      <section className="mt-5 mb-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-blue-950">Filters</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
-              {activeFilters} active
-            </span>
-            <a
-              href={csvExportHref}
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Download CSV
-            </a>
-            <a
-              href={pdfExportHref}
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Download PDF
-            </a>
-            <a
-              href="/report"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Reset
-            </a>
-          </div>
-        </div>
-
-        {/* client-side filter component so we can show billing options when Call Type=Service */}
-        <ReportFilters
-          key={`${selectedCallType}:${selectedServiceBillingType}`}
-          searchQuery={searchQuery}
-          selectedStatus={selectedStatus}
-          selectedEmployee={selectedEmployee}
-          selectedCallType={selectedCallType}
-          selectedServiceBillingType={selectedServiceBillingType}
-          selectedArea={selectedArea}
-          fromDate={fromDate}
-          toDate={toDate}
-          employees={employees}
-          callTypeOptions={callTypeOptions}
-          areaOptions={areaOptions}
-        />
-      </section>
-
-      <section className="mt-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
-        {recentCalls.length === 0 ? (
-          <p className="mt-3 text-sm text-blue-700">No call history found for selected filters.</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
-              <thead className="bg-blue-50 text-blue-700">
-                <tr>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Docket</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Customer</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Area</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-blue-100 bg-white">
-                {recentCalls.map((request) => {
-                  const status = normalizeStatus(request.status);
-                  
-                  const getBillingLabel = () => {
-                    if (!request.serviceBillingType) return "₹0";
-                    const billingMap: Record<string, string> = {
-                      warranty: "WARRANTY",
-                      amc: "AMC",
-                      chargeable: "CHARGEABLE",
-                    };
-                    const label = billingMap[request.serviceBillingType] || request.serviceBillingType;
-                    if (request.serviceBillingType === "chargeable" && request.chargeableAmount) {
-                      return `₹${request.chargeableAmount}`;
-                    }
-                    return "₹0";
-                  };
-
-                  const getCallTypeDisplay = () => {
-                    if (!request.serviceBillingType) return request.callType;
-                    const billingMap: Record<string, string> = {
-                      warranty: "WARRANTY",
-                      amc: "AMC",
-                      chargeable: "CHARGEABLE",
-                    };
-                    const billingLabel = billingMap[request.serviceBillingType] || request.serviceBillingType;
-                    return `${request.callType} ${billingLabel}`;
-                  };
-
-                  return (
-                    <tr key={request.id}>
-                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">
-                        <div>
-                          <ReportCallDetailsModal request={request} />
-                          <p className="text-[11px] text-blue-600">{request.company}</p>
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{request.area}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">
-                        <div>
-                          <p className="font-medium">{request.callType}</p>
-                          {request.serviceBillingType && (
-                            <p className="text-[11px] text-blue-600 font-semibold">
-                              {request.serviceBillingType.toUpperCase()}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900 font-medium">
-                        {request.serviceBillingType === "chargeable" ? `₹${request.chargeableAmount || 0}` : "₹0"}
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{request.assignedTo?.name ?? "Unassigned"}</td>
-                      <td className="px-2.5 py-2.5">
-                        <span
-                          className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
-                            status,
-                          )}`}
-                        >
-                          {getStatusLabel(status)}
-                        </span>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{formatDateTime(request.createdAt)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </main>
   );
 }
@@ -653,153 +550,6 @@ function getEmployeeNameKey(value: string | null) {
   return value?.trim().toLowerCase() ?? "";
 }
 
-function buildReportWhere({
-  searchQuery,
-  selectedStatus,
-  selectedEmployee,
-  selectedCallType,
-  selectedServiceBillingType,
-  selectedArea,
-  fromDate,
-  toDate,
-  employees,
-}: {
-  searchQuery: string;
-  selectedStatus: CanonicalStatus | "";
-  selectedEmployee: string;
-  selectedCallType: string;
-  selectedServiceBillingType: string;
-  selectedArea: string;
-  fromDate: string;
-  toDate: string;
-  employees: Array<{ id: string; name: string }>;
-}): Prisma.ServiceRequestWhereInput {
-  const andClauses: Prisma.ServiceRequestWhereInput[] = [];
-
-  if (searchQuery !== "") {
-    andClauses.push({
-      OR: [
-        { docketNumber: { contains: searchQuery, mode: "insensitive" } },
-        { name: { contains: searchQuery, mode: "insensitive" } },
-        { company: { contains: searchQuery, mode: "insensitive" } },
-        { area: { contains: searchQuery, mode: "insensitive" } },
-        { callType: { contains: searchQuery, mode: "insensitive" } },
-      ],
-    });
-  }
-
-  if (selectedStatus !== "") {
-    andClauses.push(getStatusWhereClause(selectedStatus));
-  }
-
-  if (selectedEmployee === "unassigned") {
-    andClauses.push({ assignedToId: null });
-  } else if (selectedEmployee !== "" && employees.some((employee) => employee.id === selectedEmployee)) {
-    andClauses.push({ assignedToId: selectedEmployee });
-  }
-
-  if (selectedCallType !== "") {
-    andClauses.push({ callType: selectedCallType });
-  }
-
-  if (selectedServiceBillingType !== "") {
-    andClauses.push({ serviceBillingType: selectedServiceBillingType });
-  }
-
-  if (selectedArea !== "") {
-    andClauses.push({ area: selectedArea });
-  }
-
-  const createdAtFilter = getCreatedAtFilter(fromDate, toDate);
-  if (createdAtFilter) {
-    andClauses.push({ createdAt: createdAtFilter });
-  }
-
-  if (andClauses.length === 0) {
-    return {};
-  }
-
-  return { AND: andClauses };
-}
-
-function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhereInput {
-  if (status === "New Call") {
-    return {
-      OR: [{ status: null }, { status: "New Call" }, { status: "Pending" }, { status: "New" }],
-    };
-  }
-
-  if (status === "In Process") {
-    return {
-      OR: [
-        { status: "In Process" },
-        { status: "in process" },
-        { status: "Visit & Reschedule" },
-        { status: "Visit and Reschedule" },
-        { status: "Reschedule" },
-      ],
-    };
-  }
-
-  if (status === "Completed") {
-    return {
-      OR: [{ status: "Completed" }, { status: "Close" }, { status: "Closed" }],
-    };
-  }
-
-  return {
-    OR: [{ status: "Cancel" }, { status: "Cancelled" }, { status: "Canceled" }],
-  };
-}
-
-function getCreatedAtFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
-  const from = parseDateInput(fromDate, false);
-  const to = parseDateInput(toDate, true);
-
-  if (!from && !to) {
-    return undefined;
-  }
-
-  return {
-    gte: from || undefined,
-    lte: to || undefined,
-  };
-}
-
-function parseDateInput(value: string, endOfDay: boolean): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  if (endOfDay) {
-    date.setUTCHours(23, 59, 59, 999);
-  }
-
-  return date;
-}
-
-function getCanonicalStatus(value: string): CanonicalStatus | "" {
-  if (STATUS_ORDER.includes(value as CanonicalStatus)) {
-    return value as CanonicalStatus;
-  }
-
-  return "";
-}
-
-function getServiceBillingType(value: string) {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "warranty" || normalized === "amc" || normalized === "chargeable") {
-    return normalized;
-  }
-
-  return "";
-}
-
 function getSearchParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
     return value[0] ?? "";
@@ -808,68 +558,12 @@ function getSearchParamValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
-function getActiveFilterCount({
-  searchQuery,
-  selectedStatus,
-  selectedEmployee,
-  selectedCallType,
-  selectedServiceBillingType,
-  selectedArea,
-  fromDate,
-  toDate,
-}: {
-  searchQuery: string;
-  selectedStatus: CanonicalStatus | "";
-  selectedEmployee: string;
-  selectedCallType: string;
-  selectedServiceBillingType: string;
-  selectedArea: string;
-  fromDate: string;
-  toDate: string;
-}) {
-  return [
-    searchQuery,
-    selectedStatus,
-    selectedEmployee,
-    selectedCallType,
-    selectedServiceBillingType,
-    selectedArea,
-    fromDate,
-    toDate,
-  ].filter((value) => value !== "").length;
+function getReportPointFilter(value: string): ReportPointFilter {
+  return REPORT_POINT_FILTERS.some((option) => option.value === value) ? (value as ReportPointFilter) : "";
 }
 
-function MetricCard({ title, value, subtitle }: { title: string; value: string; subtitle: string }) {
-  return (
-    <article className="rounded-xl border border-blue-200 bg-white px-3 py-2.5 sm:p-4">
-      <div className="flex items-end justify-between sm:block">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500 sm:text-xs sm:tracking-[0.2em]">{title}</p>
-        <p className="text-2xl leading-none font-semibold text-blue-950 sm:mt-1 sm:text-2xl">{value}</p>
-      </div>
-      <p className="mt-1 hidden text-xs text-blue-600 sm:block">{subtitle}</p>
-    </article>
-  );
-}
-
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Kolkata",
-  }).format(value);
-}
-
-function isTodayInIndia(value: Date) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-
-  const today = formatter.format(new Date());
-  const target = formatter.format(value);
-  return today === target;
+function getReportSort(value: string): ReportSort {
+  return REPORT_SORT_OPTIONS.some((option) => option.value === value) ? (value as ReportSort) : "monthly-desc";
 }
 
 function equalsIgnoreCase(a: string | null, b: string) {
