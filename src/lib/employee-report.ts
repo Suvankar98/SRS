@@ -58,10 +58,12 @@ export function buildEmployeeReportRows({
   activeRequests,
   reportRequests,
   pointAdjustments,
+  limit = 20,
 }: {
   activeRequests: EmployeeReportRequest[];
   reportRequests: EmployeeReportRequest[];
   pointAdjustments: EmployeeReportPointAdjustment[];
+  limit?: number | null;
 }) {
   const rows = new Map<string, EmployeeReportRow>();
   const countedRequestIds = new Set<string>();
@@ -97,13 +99,12 @@ export function buildEmployeeReportRows({
     addEmployeeReportPoints(row.materialHandover, adjustment.materialHandoverPoints);
   }
 
-  const sortedRows = Array.from(rows.values())
-    .sort((a, b) => getNullableDateTime(b.date) - getNullableDateTime(a.date))
-    .slice(0, 20);
+  const sortedRows = Array.from(rows.values()).sort((a, b) => getNullableDateTime(b.date) - getNullableDateTime(a.date));
+  const visibleRows = typeof limit === "number" ? sortedRows.slice(0, limit) : sortedRows;
 
   return {
-    rows: sortedRows,
-    totalPoints: calculateEmployeeReportTotal(sortedRows),
+    rows: visibleRows,
+    totalPoints: calculateEmployeeReportTotal(visibleRows),
   };
 }
 
