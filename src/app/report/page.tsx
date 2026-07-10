@@ -46,7 +46,29 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const [employees, callTypeOptions, areaOptions] = await Promise.all([
     prisma.user.findMany({
       where: { role: APP_ROLES.EMPLOYEE },
-      select: { id: true, name: true, performancePoints: true, monthlyPerformancePoints: true },
+      select: {
+        id: true,
+        name: true,
+        performancePoints: true,
+        monthlyPerformancePoints: true,
+        pointAdjustments: {
+          orderBy: { createdAt: "desc" },
+          take: 120,
+          select: {
+            id: true,
+            attendanceOption: true,
+            attendancePoints: true,
+            reviewOption: true,
+            reviewPoints: true,
+            documentSubmissionOption: true,
+            documentSubmissionPoints: true,
+            materialHandoverOption: true,
+            materialHandoverPoints: true,
+            totalDelta: true,
+            createdAt: true,
+          },
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.serviceRequest.findMany({
@@ -180,6 +202,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         totalPoints: employee.performancePoints,
         monthlyPoints: employee.monthlyPerformancePoints,
         completedByEmployee,
+        pointAdjustments: employee.pointAdjustments.map((adjustment) => ({
+          ...adjustment,
+          createdAt: adjustment.createdAt.toISOString(),
+        })),
       };
     })
     .sort(
@@ -260,6 +286,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                           employeeId={row.id}
                           employeeName={row.name}
                           currentPoints={row.monthlyPoints}
+                          pointAdjustments={row.pointAdjustments}
                         />
                       </td>
                       <td className="px-2.5 py-2.5 text-blue-900 font-semibold">{row.monthlyPoints}</td>

@@ -290,7 +290,21 @@ export function DocketDetailsModal({
                   )}
                 </GridField>
 
-                <GridField label="Address">
+                <GridField
+                  label="Address"
+                  action={
+                    <button
+                      type="button"
+                      onClick={handleOpenMap}
+                      disabled={!fullAddress.trim()}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Open address in maps"
+                      title="Open address in maps"
+                    >
+                      <MapIcon />
+                    </button>
+                  }
+                >
                   {canEdit ? (
                     <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
                   ) : (
@@ -425,28 +439,12 @@ export function DocketDetailsModal({
             </div>
           </div>
 
-          <div className="grid gap-2 border-t px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
-            <button type="button" onClick={handleOpenMap} className="inline-flex w-full items-center justify-center gap-2 rounded border px-3 py-2 text-sm sm:w-auto">
-              <MapIcon />
-              Open in maps
-            </button>
-            {canEdit ? (
-              <>
-                <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded border px-3 py-2 text-sm text-red-600 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
-                <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Save changes</button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="inline-flex h-10 w-full items-center justify-center rounded bg-blue-600 text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 sm:w-10"
-                aria-label="Close docket details"
-                title="Close"
-              >
-                <CloseIcon />
-              </button>
-            )}
-          </div>
+          {canEdit ? (
+            <div className="grid gap-2 border-t px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
+              <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded border px-3 py-2 text-sm text-red-600 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
+              <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Save changes</button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>
@@ -484,13 +482,13 @@ function GridField({
   action?: React.ReactNode;
 }) {
   return (
-    <label className="block">
+    <div className="block">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="block text-sm font-medium text-blue-700">{label}</span>
         {action ? <div>{action}</div> : null}
       </div>
       {children}
-    </label>
+    </div>
   );
 }
 

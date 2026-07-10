@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 type ConfirmSubmitButtonProps = {
   confirmMessage: string;
+  detailText?: string;
   ariaLabel: string;
   title: string;
   className: string;
@@ -13,6 +14,7 @@ type ConfirmSubmitButtonProps = {
 
 export function ConfirmSubmitButton({
   confirmMessage,
+  detailText = "This action permanently removes data from the database.",
   ariaLabel,
   title,
   className,
@@ -48,7 +50,7 @@ export function ConfirmSubmitButton({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">Delete Confirmation</p>
             <p className="mt-3 text-sm font-medium leading-6 text-rose-800">{confirmMessage}</p>
             <p className="mt-2 text-xs leading-5 text-rose-700/90">
-              This action permanently removes data from the database.
+              {detailText}
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button

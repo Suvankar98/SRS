@@ -7,16 +7,16 @@ import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from 
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
 import {
-  ATTENDANCE_POINTS,
+  ATTENDANCE_IN_POINTS,
+  ATTENDANCE_OUT_POINTS,
   DOCUMENT_SUBMISSION_POINTS,
   MATERIAL_HANDOVER_POINTS,
   REVIEW_POINTS,
-  TEAMWORK_POINTS,
-  isAttendanceOption,
+  isAttendanceInOption,
+  isAttendanceOutOption,
   isDocumentSubmissionOption,
   isMaterialHandoverOption,
   isReviewOption,
-  isTeamworkOption,
 } from "@/lib/employee-performance-rules";
 import { normalizeStatus } from "./status-utils";
 import { cookies } from "next/headers";
@@ -31,6 +31,11 @@ function getRequiredField(formData: FormData, key: string) {
   }
 
   return value.trim();
+}
+
+function getOptionalField(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
 }
 
 const STATUS_SCORING_TIME_ZONE = "Asia/Kolkata";
@@ -76,11 +81,11 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
     assignedParts.day === submittedParts.day;
 
   if (!isSameAllocationDay) {
-    return -5;
+    return -4;
   }
 
   const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
-  return submittedMinutes <= 21 * 60 ? 2 : -2;
+  return submittedMinutes <= 21 * 60 ? 4 : 2;
 }
 
 function getRequiredPhoneField(formData: FormData, key: string, label: string) {
@@ -131,6 +136,15 @@ function parsePerformanceAdjustmentDate(value: string) {
   }
 
   return adjustmentDate;
+}
+
+function getPerformanceAdjustmentDateRange(value: Date) {
+  const parts = getLocalDateTimeParts(value, PERFORMANCE_TIME_ZONE);
+  const dateInput = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+  const startAt = new Date(`${dateInput}T00:00:00.000+05:30`);
+  const endAt = new Date(startAt.getTime() + 24 * 60 * 60 * 1000);
+
+  return { startAt, endAt };
 }
 
 function isCurrentPerformanceMonth(value: Date) {
@@ -1171,40 +1185,51 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
   }
 
   const employeeId = getRequiredField(formData, "employeeId");
-  const attendanceRaw = getRequiredField(formData, "attendanceOption");
-  const reviewRaw = getRequiredField(formData, "reviewOption");
-  const documentSubmissionRaw = getRequiredField(formData, "documentSubmissionOption");
-  const materialHandoverRaw = getRequiredField(formData, "materialHandoverOption");
-  const teamworkRaw = getRequiredField(formData, "teamworkOption");
+  const attendanceInRaw = getOptionalField(formData, "attendanceInOption");
+  const attendanceOutRaw = getOptionalField(formData, "attendanceOutOption");
+  const reviewRaw = getOptionalField(formData, "reviewOption");
+  const documentSubmissionRaw = getOptionalField(formData, "documentSubmissionOption");
+  const materialHandoverRaw = getOptionalField(formData, "materialHandoverOption");
   const adjustmentDate = parsePerformanceAdjustmentDate(getRequiredField(formData, "adjustmentDate"));
 
-  if (!isAttendanceOption(attendanceRaw)) {
-    throw new Error("Invalid attendance option");
+  if (attendanceInRaw && !isAttendanceInOption(attendanceInRaw)) {
+    throw new Error("Invalid attendance IN option");
   }
 
-  if (!isReviewOption(reviewRaw)) {
+  if (attendanceOutRaw && !isAttendanceOutOption(attendanceOutRaw)) {
+    throw new Error("Invalid attendance OUT option");
+  }
+
+  if (reviewRaw && !isReviewOption(reviewRaw)) {
     throw new Error("Invalid review option");
   }
 
-  if (!isDocumentSubmissionOption(documentSubmissionRaw)) {
+  if (documentSubmissionRaw && !isDocumentSubmissionOption(documentSubmissionRaw)) {
     throw new Error("Invalid document submission option");
   }
 
-  if (!isMaterialHandoverOption(materialHandoverRaw)) {
+  if (materialHandoverRaw && !isMaterialHandoverOption(materialHandoverRaw)) {
     throw new Error("Invalid material handover option");
   }
 
-  if (!isTeamworkOption(teamworkRaw)) {
-    throw new Error("Invalid teamwork option");
-  }
-
-  const attendance = ATTENDANCE_POINTS[attendanceRaw];
-  const review = REVIEW_POINTS[reviewRaw];
-  const documentSubmission = DOCUMENT_SUBMISSION_POINTS[documentSubmissionRaw];
-  const materialHandover = MATERIAL_HANDOVER_POINTS[materialHandoverRaw];
-  const teamwork = TEAMWORK_POINTS[teamworkRaw];
+  const attendanceIn = attendanceInRaw && isAttendanceInOption(attendanceInRaw) ? ATTENDANCE_IN_POINTS[attendanceInRaw] : null;
+  const attendanceOut = attendanceOutRaw && isAttendanceOutOption(attendanceOutRaw) ? ATTENDANCE_OUT_POINTS[attendanceOutRaw] : null;
+  const review = reviewRaw && isReviewOption(reviewRaw) ? REVIEW_POINTS[reviewRaw] : null;
+  const documentSubmission =
+    documentSubmissionRaw && isDocumentSubmissionOption(documentSubmissionRaw)
+      ? DOCUMENT_SUBMISSION_POINTS[documentSubmissionRaw]
+      : null;
+  const materialHandover =
+    materialHandoverRaw && isMaterialHandoverOption(materialHandoverRaw)
+      ? MATERIAL_HANDOVER_POINTS[materialHandoverRaw]
+      : null;
+  const attendancePoints = (attendanceIn?.points ?? 0) + (attendanceOut?.points ?? 0);
   const totalDelta =
-    attendance.points + review.points + documentSubmission.points + materialHandover.points + teamwork.points;
+    attendancePoints +
+    (review?.points ?? 0) +
+    (documentSubmission?.points ?? 0) +
+    (materialHandover?.points ?? 0);
+  const adjustmentDateRange = getPerformanceAdjustmentDateRange(adjustmentDate);
 
   try {
     await prisma.$transaction(async (transaction) => {
@@ -1225,25 +1250,64 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
         employee.lastMonthlyResetDate,
       );
 
+      let previousDayDelta = 0;
+
       try {
-        await transaction.employeePointAdjustment.create({
-          data: {
+        const existingAdjustments = await transaction.employeePointAdjustment.findMany({
+          where: {
             employeeId,
-            updatedById: session.userId,
-            attendanceOption: attendance.label,
-            attendancePoints: attendance.points,
-            reviewOption: review.label,
-            reviewPoints: review.points,
-            documentSubmissionOption: documentSubmission.label,
-            documentSubmissionPoints: documentSubmission.points,
-            materialHandoverOption: materialHandover.label,
-            materialHandoverPoints: materialHandover.points,
-            teamworkOption: teamwork.label,
-            teamworkPoints: teamwork.points,
-            totalDelta,
-            createdAt: adjustmentDate,
+            createdAt: {
+              gte: adjustmentDateRange.startAt,
+              lt: adjustmentDateRange.endAt,
+            },
           },
+          select: {
+            id: true,
+            totalDelta: true,
+          },
+          orderBy: { createdAt: "desc" },
         });
+
+        previousDayDelta = existingAdjustments.reduce((total, adjustment) => total + adjustment.totalDelta, 0);
+
+        const existingAdjustment = existingAdjustments[0] ?? null;
+        const adjustmentData = {
+          employeeId,
+          updatedById: session.userId,
+          attendanceOption: JSON.stringify({ inOption: attendanceInRaw, outOption: attendanceOutRaw }),
+          attendancePoints,
+          reviewOption: reviewRaw,
+          reviewPoints: review?.points ?? 0,
+          documentSubmissionOption: documentSubmissionRaw,
+          documentSubmissionPoints: documentSubmission?.points ?? 0,
+          materialHandoverOption: materialHandoverRaw,
+          materialHandoverPoints: materialHandover?.points ?? 0,
+          teamworkOption: "N/A",
+          teamworkPoints: 0,
+          totalDelta,
+          createdAt: adjustmentDate,
+        };
+
+        if (existingAdjustment) {
+          await transaction.employeePointAdjustment.update({
+            where: { id: existingAdjustment.id },
+            data: adjustmentData,
+          });
+
+          const duplicateAdjustmentIds = existingAdjustments.slice(1).map((adjustment) => adjustment.id);
+
+          if (duplicateAdjustmentIds.length > 0) {
+            await transaction.employeePointAdjustment.deleteMany({
+              where: {
+                id: { in: duplicateAdjustmentIds },
+              },
+            });
+          }
+        } else {
+          await transaction.employeePointAdjustment.create({
+            data: adjustmentData,
+          });
+        }
       } catch (error) {
         const code = (error as { code?: string } | null)?.code;
         const message = error instanceof Error ? error.message : "";
@@ -1262,23 +1326,27 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
         });
       }
 
-      await transaction.user.update({
-        where: { id: employeeId },
-        data: {
-          performancePoints: {
-            increment: totalDelta,
-          },
-          ...(isCurrentPerformanceMonth(adjustmentDate)
-            ? {
-                monthlyPerformancePoints: {
-                  increment: totalDelta,
-                },
-              }
-            : {}),
-        },
-      });
+      const pointsDelta = totalDelta - previousDayDelta;
 
-      if (!isCurrentPerformanceMonth(adjustmentDate)) {
+      if (pointsDelta !== 0) {
+        await transaction.user.update({
+          where: { id: employeeId },
+          data: {
+            performancePoints: {
+              increment: pointsDelta,
+            },
+            ...(isCurrentPerformanceMonth(adjustmentDate)
+              ? {
+                  monthlyPerformancePoints: {
+                    increment: pointsDelta,
+                  },
+                }
+              : {}),
+          },
+        });
+      }
+
+      if (pointsDelta !== 0 && !isCurrentPerformanceMonth(adjustmentDate)) {
         const adjustmentParts = getLocalDateTimeParts(adjustmentDate, PERFORMANCE_TIME_ZONE);
         await transaction.monthlyPerformanceHistory.upsert({
           where: {
@@ -1290,14 +1358,14 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
           },
           update: {
             totalPoints: {
-              increment: totalDelta,
+              increment: pointsDelta,
             },
           },
           create: {
             employeeId,
             year: adjustmentParts.year,
             month: adjustmentParts.month,
-            totalPoints: totalDelta,
+            totalPoints: pointsDelta,
           },
         });
       }
@@ -1423,6 +1491,76 @@ export async function uploadEmployeeImage(formData: FormData) {
   return { success: true, fileName: safeName };
 }
 
+export async function deleteGalleryMedia(formData: FormData) {
+  const session = await requireSession();
+
+  if (!roleCanAssign(session.role)) {
+    redirect("/dashboard");
+  }
+
+  const fileUrl = getRequiredField(formData, "fileUrl");
+  const fs = await import("fs");
+  const path = await import("path");
+
+  const uploadsBase = path.resolve(process.cwd(), "public", "uploads");
+  const urlParts = fileUrl.split("/").filter(Boolean);
+
+  if (urlParts.length !== 4 || urlParts[0] !== "uploads") {
+    throw new Error("Invalid gallery file");
+  }
+
+  const userId = decodeURIComponent(urlParts[1]);
+  const requestId = decodeURIComponent(urlParts[2]);
+  const fileName = decodeURIComponent(urlParts[3]);
+  const requestDir = path.resolve(uploadsBase, userId, requestId);
+  const filePath = path.resolve(requestDir, fileName);
+  const uploadsRootPrefix = `${uploadsBase}${path.sep}`;
+
+  if (!filePath.startsWith(uploadsRootPrefix)) {
+    throw new Error("Invalid gallery file");
+  }
+
+  const stat = await fs.promises.stat(filePath).catch(() => null);
+
+  if (!stat?.isFile()) {
+    throw new Error("Gallery file not found");
+  }
+
+  await fs.promises.unlink(filePath);
+
+  const remainingFiles = await fs.promises.readdir(requestDir, { withFileTypes: true }).catch(() => []);
+  const hasRemainingMedia = remainingFiles.some((file) => {
+    if (!file.isFile()) {
+      return false;
+    }
+
+    return isGalleryMediaFile(file.name);
+  });
+
+  if (!hasRemainingMedia) {
+    await prisma.serviceAssignment.updateMany({
+      where: {
+        requestId,
+        employeeId: userId,
+      },
+      data: {
+        mediaUploadedAt: null,
+      },
+    });
+  }
+
+  await fs.promises.rmdir(requestDir).catch(() => undefined);
+  await fs.promises.rmdir(path.resolve(uploadsBase, userId)).catch(() => undefined);
+
+  revalidatePath("/gallery");
+  revalidatePath("/dashboard");
+}
+
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 200);
+}
+
+function isGalleryMediaFile(name: string) {
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
+  return ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "avi", "mkv", "3gp", "wmv"].includes(extension);
 }

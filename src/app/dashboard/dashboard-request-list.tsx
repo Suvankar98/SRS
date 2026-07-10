@@ -242,11 +242,6 @@ export function DashboardRequestList({
                       <p className="mt-1 text-[11px] text-blue-700">Reassigned to {request.assignedTo.name}</p>
                     ) : null}
                   </div>
-                  {request.status === "Completed" ? (
-                    <p className={`text-[11px] font-medium ${isReassignLocked ? "text-slate-600" : "text-blue-700"}`}>
-                      {isReassignLocked ? "Reassign window closed after 72 hours." : "Reassign available within 72 hours of completion."}
-                    </p>
-                  ) : null}
                   <AssignmentPicker
                     key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
                     requestId={request.id}

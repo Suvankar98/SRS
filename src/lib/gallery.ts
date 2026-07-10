@@ -6,6 +6,10 @@ type DashboardGalleryItem = {
   url: string;
   type: "image" | "video";
   label: string;
+  fileName: string;
+  requestId: string;
+  sizeLabel: string;
+  uploadedAt: Date;
 };
 
 export type DashboardGalleryGroup = {
@@ -69,11 +73,17 @@ export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGall
           continue;
         }
 
+        const stat = await fs.promises.stat(path.join(folder.requestPath, file.name));
+
         groups[company] = groups[company] || [];
         groups[company].push({
           url: `/uploads/${encodeURIComponent(folder.userId)}/${encodeURIComponent(folder.requestId)}/${encodeURIComponent(file.name)}`,
           type: isVideo ? "video" : "image",
-          label: `${folder.requestId} • ${file.name}`,
+          label: `${folder.requestId} - ${file.name}`,
+          fileName: file.name,
+          requestId: folder.requestId,
+          sizeLabel: formatFileSize(stat.size),
+          uploadedAt: stat.mtime,
         });
       }
     }
@@ -82,6 +92,23 @@ export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGall
   }
 
   return Object.entries(groups)
-    .map(([company, items]) => ({ company, items }))
+    .map(([company, items]) => ({
+      company,
+      items: items.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()),
+    }))
     .sort((a, b) => a.company.localeCompare(b.company));
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) {
+    return `${kilobytes.toFixed(kilobytes >= 10 ? 0 : 1)} KB`;
+  }
+
+  const megabytes = kilobytes / 1024;
+  return `${megabytes.toFixed(megabytes >= 10 ? 0 : 1)} MB`;
 }

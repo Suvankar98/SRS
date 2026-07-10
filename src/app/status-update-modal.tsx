@@ -28,6 +28,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const currentStatusLabel = getStatusLabel(request.status);
   const showWorkDoneInput = status === "In Process";
   const showCancelReasonInput = status === "Cancel";
+  const showCompletedRemarkInput = status === "Completed";
 
   const openModal = () => {
     setStatus("");
@@ -39,7 +40,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
   const handleStatusChange = (newStatus: StatusChoice) => {
     setStatus(newStatus);
-    if (newStatus !== "Cancel" && newStatus !== "In Process") {
+    if (newStatus !== "Cancel" && newStatus !== "In Process" && newStatus !== "Completed") {
       setReason("");
     }
   };
@@ -159,20 +160,37 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
               )}
 
               {status === "Completed" ? (
-                <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
-                  <p className="text-sm text-blue-700">
-                    {hasUploadedMedia
-                      ? "Media uploaded successfully. You can save this call as Completed."
-                      : "Uploading media is necessary before marking this call as Completed."}
-                  </p>
-                  <EmployeeMediaUpload
-                    requestId={request.id}
-                    onUploaded={() => {
-                      setHasUploadedMedia(true);
-                      setSubmitError("");
-                      router.refresh();
-                    }}
-                  />
+                <div className="space-y-4">
+                  {showCompletedRemarkInput ? (
+                    <div>
+                      <label className="block text-sm font-medium text-blue-700">
+                        Remark
+                      </label>
+                      <textarea
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Enter completion remark..."
+                        className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+                        rows={4}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                    <p className="text-sm text-blue-700">
+                      {hasUploadedMedia
+                        ? "Media uploaded successfully. You can save this call as Completed."
+                        : "Uploading media is necessary before marking this call as Completed."}
+                    </p>
+                    <EmployeeMediaUpload
+                      requestId={request.id}
+                      onUploaded={() => {
+                        setHasUploadedMedia(true);
+                        setSubmitError("");
+                        router.refresh();
+                      }}
+                    />
+                  </div>
                 </div>
               ) : null}
               {submitError ? <p className="text-sm font-medium text-red-600">{submitError}</p> : null}

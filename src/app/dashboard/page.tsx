@@ -7,11 +7,13 @@ import CreatedToast from "./created-toast";
 import { BrandLogo } from "../brand-logo";
 import { DashboardFilters } from "./dashboard-filters";
 import { DashboardRequestList } from "./dashboard-request-list";
+import { EmployeeReportPopup } from "./employee-report-popup";
 import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getProductOptions } from "@/lib/product-options";
+import { ATTENDANCE_IN_POINTS, ATTENDANCE_OUT_POINTS } from "@/lib/employee-performance-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
 
-  const [employees, databaseProducts, currentUser] = await Promise.all([
+  const [employees, databaseProducts, currentUser, employeePointAdjustments] = await Promise.all([
     canAssign
       ? prisma.user.findMany({
           where: { role: APP_ROLES.EMPLOYEE },
@@ -48,6 +50,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       : Promise.resolve([]),
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, performancePoints: true } }),
+    isEmployee
+      ? prisma.employeePointAdjustment.findMany({
+          where: { employeeId: session.userId },
+          select: {
+            id: true,
+            attendanceOption: true,
+            attendancePoints: true,
+            reviewOption: true,
+            reviewPoints: true,
+            documentSubmissionOption: true,
+            documentSubmissionPoints: true,
+            materialHandoverOption: true,
+            materialHandoverPoints: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
   ]);
   const products = getProductOptions(databaseProducts);
 
@@ -167,13 +188,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const assignedRequests = sortedFilteredRequests.filter(
     (request) => Boolean(request.assignedToId) || (request.assignments?.length ?? 0) > 0,
   ).length;
-  const employeeReportRows = isEmployee
+  const employeeReport = isEmployee
     ? buildEmployeeReportRows({
         activeRequests: allRequests,
         reportRequests: employeeReportRequests,
-        totalPoints: currentUser?.performancePoints ?? 0,
+        pointAdjustments: employeePointAdjustments,
       })
-    : [];
+    : { rows: [], totalPoints: 0 };
 
   const unassignedRequests = totalRequests - assignedRequests;
 
@@ -198,7 +219,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="min-w-0 text-center">
               <p className="text-[10px] uppercase tracking-[0.22em] text-blue-500">{session.role}</p>
               <p className="truncate text-base font-semibold text-blue-950">{currentUser?.name || "User"}</p>
-              {isEmployee ? <p className="text-xs text-blue-600">Points: {currentUser?.performancePoints ?? 0}</p> : null}
             </div>
           </div>
 
@@ -243,6 +263,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 Admin Panel
               </Link>
             )}
+            {isEmployee ? (
+              <EmployeeReportPopup>
+                <EmployeeReportTable
+                  rows={employeeReport.rows}
+                  totalPoints={employeeReport.totalPoints}
+                />
+              </EmployeeReportPopup>
+            ) : null}
             <form action={logout}>
               <button
                 type="submit"
@@ -264,7 +292,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/80 p-2.5">
                 <p className="text-[10px] uppercase tracking-[0.2em] text-blue-500">{session.role}</p>
                 <p className="mt-1 text-sm font-semibold text-blue-950">{currentUser?.name || "User"}</p>
-                {isEmployee ? <p className="mt-1 text-xs text-blue-600">Points: {currentUser?.performancePoints ?? 0}</p> : null}
               </div>
               <div className="space-y-2">
                 {(session.role === APP_ROLES.ADMIN || canAssign) && (
@@ -299,6 +326,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     Admin Panel
                   </Link>
                 )}
+                {isEmployee ? (
+                  <EmployeeReportPopup buttonClassName="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">
+                    <EmployeeReportTable
+                      rows={employeeReport.rows}
+                      totalPoints={employeeReport.totalPoints}
+                    />
+                  </EmployeeReportPopup>
+                ) : null}
                 <form action={logout}>
                   <button
                     type="submit"
@@ -358,12 +393,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   isEmployee={isEmployee}
                 />
               )}
-              {isEmployee ? (
-                <EmployeeReportTable
-                  rows={employeeReportRows}
-                  totalPoints={currentUser?.performancePoints ?? 0}
-                />
-              ) : null}
             </div>
           </div>
       </section>
@@ -387,28 +416,51 @@ type EmployeeReportRequest = {
   closedAt?: Date | string | null;
 };
 
+type EmployeeReportPointAdjustment = {
+  id: string;
+  attendanceOption: string;
+  attendancePoints: number;
+  reviewOption: string;
+  reviewPoints: number;
+  documentSubmissionOption: string;
+  documentSubmissionPoints: number;
+  materialHandoverOption: string;
+  materialHandoverPoints: number;
+  createdAt: Date;
+};
+
+type EmployeeReportPointCell = {
+  label: string;
+  points: number | null;
+};
+
+type EmployeeReportCompanyDocket = {
+  companyName: string;
+  docketNumber: string;
+};
+
 type EmployeeReportRow = {
   id: string;
-  assignSite: string;
-  docketNumber: string;
-  name: string;
-  company: string;
-  date: Date | null;
-  dailyReport: string;
-  points: number | null;
-  totalPoints: number;
+  companyDockets: EmployeeReportCompanyDocket[];
+  date: Date;
+  workSubmission: EmployeeReportPointCell;
+  attendanceIn: EmployeeReportPointCell;
+  attendanceOut: EmployeeReportPointCell;
+  review: EmployeeReportPointCell;
+  documentSubmission: EmployeeReportPointCell;
+  materialHandover: EmployeeReportPointCell;
 };
 
 function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[]; totalPoints: number }) {
   return (
-    <section className="mt-4 overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-blue-950">Report</h2>
-          <p className="mt-0.5 text-xs text-blue-600">Daily site report and points summary</p>
+          <p className="mt-0.5 text-xs text-blue-600">Work submission and performance points summary</p>
         </div>
         <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">
-          Total Point: {totalPoints}
+          Total Points: {totalPoints}
         </div>
       </div>
 
@@ -423,61 +475,47 @@ function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[];
               <article key={row.id} className="rounded-xl border border-blue-100 bg-white p-3 text-xs text-blue-900 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Assign Site</p>
-                    <p className="mt-1 break-words font-semibold text-blue-950">{row.assignSite}</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{row.docketNumber}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Company Name / Docket Number</p>
+                    <EmployeeReportCompanyDockets companyDockets={row.companyDockets} />
                   </div>
-                  <div className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">Points</p>
-                    <p className="font-semibold text-blue-950">{formatPointDelta(row.points)}</p>
-                  </div>
+                  <EmployeeReportPointBadge label="Work Submission" value={row.workSubmission} />
                 </div>
-                <div className="mt-3 border-t border-blue-100 pt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Name</p>
-                  <p className="mt-1 break-words font-semibold text-blue-950">{row.name}</p>
-                  <p className="mt-1 break-words text-blue-700">{row.company}</p>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <EmployeeReportMobileField label="Date" value={formatEmployeeReportDate(row.date)} />
-                  <EmployeeReportMobileField label="Total Point" value={String(row.totalPoints)} />
-                </div>
-                <div className="mt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Daily Report</p>
-                  <p className="mt-1 break-words font-medium text-blue-900">{row.dailyReport}</p>
+                  <EmployeeReportAttendancePointField attendanceIn={row.attendanceIn} attendanceOut={row.attendanceOut} />
+                  <EmployeeReportPointField label="Review" value={row.review} />
+                  <EmployeeReportPointField label="Documents Submission" value={row.documentSubmission} />
+                  <EmployeeReportPointField label="Material Handover" value={row.materialHandover} />
                 </div>
               </article>
             ))}
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-[760px] w-full table-auto divide-y divide-blue-100 text-left text-xs">
+            <table className="min-w-[980px] w-full table-auto divide-y divide-blue-100 text-left text-xs">
               <thead className="bg-white text-blue-700">
                 <tr>
-                  <EmployeeReportTh>Assign Site</EmployeeReportTh>
-                  <EmployeeReportTh>Name</EmployeeReportTh>
+                  <EmployeeReportTh>Company Name / Docket Number</EmployeeReportTh>
                   <EmployeeReportTh>Date</EmployeeReportTh>
-                  <EmployeeReportTh>Daily Report</EmployeeReportTh>
-                  <EmployeeReportTh>Points</EmployeeReportTh>
-                  <EmployeeReportTh>Total Point</EmployeeReportTh>
+                  <EmployeeReportTh>Work Submission</EmployeeReportTh>
+                  <EmployeeReportTh>Attendance</EmployeeReportTh>
+                  <EmployeeReportTh>Review</EmployeeReportTh>
+                  <EmployeeReportTh>Documents Submission</EmployeeReportTh>
+                  <EmployeeReportTh>Material Handover</EmployeeReportTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-100 bg-white">
                 {rows.map((row) => (
                   <tr key={row.id} className="align-top">
-                    <td className="px-3 py-3 font-semibold text-blue-950">
-                      <p className="break-words">{row.assignSite}</p>
-                      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{row.docketNumber}</p>
-                    </td>
                     <td className="px-3 py-3 text-blue-950">
-                      <p className="break-words font-semibold">{row.name}</p>
-                      <p className="mt-1 border-t border-blue-100 pt-1 break-words text-blue-700">{row.company}</p>
+                      <EmployeeReportCompanyDockets companyDockets={row.companyDockets} />
                     </td>
                     <td className="px-3 py-3 font-medium text-blue-900">{formatEmployeeReportDate(row.date)}</td>
-                    <td className="px-3 py-3 text-blue-900">
-                      <p className="max-w-[18rem] break-words">{row.dailyReport}</p>
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-blue-950">{formatPointDelta(row.points)}</td>
-                    <td className="px-3 py-3 font-semibold text-blue-950">{row.totalPoints}</td>
+                    <EmployeeReportPointTd value={row.workSubmission} />
+                    <EmployeeReportAttendancePointTd attendanceIn={row.attendanceIn} attendanceOut={row.attendanceOut} />
+                    <EmployeeReportPointTd value={row.review} />
+                    <EmployeeReportPointTd value={row.documentSubmission} />
+                    <EmployeeReportPointTd value={row.materialHandover} />
                   </tr>
                 ))}
               </tbody>
@@ -497,11 +535,100 @@ function EmployeeReportTh({ children }: { children: React.ReactNode }) {
   );
 }
 
+function EmployeeReportCompanyDockets({ companyDockets }: { companyDockets: EmployeeReportCompanyDocket[] }) {
+  if (companyDockets.length === 0) {
+    return <p className="font-semibold text-blue-950">-</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {companyDockets.map((entry) => (
+        <div key={`${entry.companyName}-${entry.docketNumber}`}>
+          <p className="break-words font-semibold text-blue-950">{entry.companyName}</p>
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{entry.docketNumber}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EmployeeReportMobileField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
       <p className="mt-1 break-words font-semibold text-blue-950">{value}</p>
+    </div>
+  );
+}
+
+function EmployeeReportPointField({ label, value }: { label: string; value: EmployeeReportPointCell }) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
+      <p className="mt-1 break-words font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
+    </div>
+  );
+}
+
+function EmployeeReportAttendancePointField({
+  attendanceIn,
+  attendanceOut,
+}: {
+  attendanceIn: EmployeeReportPointCell;
+  attendanceOut: EmployeeReportPointCell;
+}) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Attendance</p>
+      <EmployeeReportAttendanceLines attendanceIn={attendanceIn} attendanceOut={attendanceOut} />
+    </div>
+  );
+}
+
+function EmployeeReportPointBadge({ label, value }: { label: string; value: EmployeeReportPointCell }) {
+  return (
+    <div className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-right">
+      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{label}</p>
+      <p className="font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
+    </div>
+  );
+}
+
+function EmployeeReportPointTd({ value }: { value: EmployeeReportPointCell }) {
+  return (
+    <td className="px-3 py-3 text-blue-900">
+      <p className="font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
+    </td>
+  );
+}
+
+function EmployeeReportAttendancePointTd({
+  attendanceIn,
+  attendanceOut,
+}: {
+  attendanceIn: EmployeeReportPointCell;
+  attendanceOut: EmployeeReportPointCell;
+}) {
+  return (
+    <td className="px-3 py-3 text-blue-900">
+      <EmployeeReportAttendanceLines attendanceIn={attendanceIn} attendanceOut={attendanceOut} />
+    </td>
+  );
+}
+
+function EmployeeReportAttendanceLines({
+  attendanceIn,
+  attendanceOut,
+}: {
+  attendanceIn: EmployeeReportPointCell;
+  attendanceOut: EmployeeReportPointCell;
+}) {
+  return (
+    <div className="grid w-fit min-w-24 grid-cols-2 gap-x-4 text-center">
+      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">IN</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">OUT</p>
+      <p className="mt-1 font-semibold text-blue-950">{formatEmployeeReportPoint(attendanceIn)}</p>
+      <p className="mt-1 font-semibold text-blue-950">{formatEmployeeReportPoint(attendanceOut)}</p>
     </div>
   );
 }
@@ -550,43 +677,145 @@ function Td({ children, strong = false }: { children: React.ReactNode; strong?: 
 function buildEmployeeReportRows({
   activeRequests,
   reportRequests,
-  totalPoints,
+  pointAdjustments,
 }: {
   activeRequests: EmployeeReportRequest[];
   reportRequests: EmployeeReportRequest[];
-  totalPoints: number;
+  pointAdjustments: EmployeeReportPointAdjustment[];
 }) {
   const rows = new Map<string, EmployeeReportRow>();
+  const countedRequestIds = new Set<string>();
 
-  for (const request of activeRequests) {
-    rows.set(request.id, toEmployeeReportRow(request, totalPoints));
+  for (const request of [...activeRequests, ...reportRequests]) {
+    if (countedRequestIds.has(request.id)) {
+      continue;
+    }
+
+    const reportDate = getEmployeeReportDate(request);
+
+    if (!reportDate) {
+      continue;
+    }
+
+    const row = getOrCreateEmployeeReportRow(rows, reportDate);
+    addCompanyDocketToEmployeeReportRow(row, request);
+
+    if (typeof request.statusPointsDelta === "number") {
+      addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
+    }
+
+    countedRequestIds.add(request.id);
   }
 
-  for (const request of reportRequests) {
-    rows.set(request.id, toEmployeeReportRow(request, totalPoints));
+  for (const adjustment of pointAdjustments) {
+    const row = getOrCreateEmployeeReportRow(rows, adjustment.createdAt);
+    const attendancePoints = getEmployeeReportAttendancePoints(adjustment);
+    addEmployeeReportPoints(row.attendanceIn, attendancePoints.inPoints);
+    addEmployeeReportPoints(row.attendanceOut, attendancePoints.outPoints);
+    addEmployeeReportPoints(row.review, adjustment.reviewPoints);
+    addEmployeeReportPoints(row.documentSubmission, adjustment.documentSubmissionPoints);
+    addEmployeeReportPoints(row.materialHandover, adjustment.materialHandoverPoints);
   }
 
-  return Array.from(rows.values())
+  const sortedRows = Array.from(rows.values())
     .sort((a, b) => getNullableDateTime(b.date) - getNullableDateTime(a.date))
     .slice(0, 20);
-}
-
-function toEmployeeReportRow(request: EmployeeReportRequest, totalPoints: number): EmployeeReportRow {
-  const status = normalizeStatus(request.status);
-  const statusLabel = getStatusLabelForReport(status);
-  const reason = request.statusReason?.trim();
 
   return {
-    id: request.id,
-    assignSite: request.area,
-    docketNumber: request.docketNumber,
-    name: request.name,
-    company: request.company,
-    date: getEmployeeReportDate(request),
-    dailyReport: reason ? `${statusLabel}: ${reason}` : statusLabel,
-    points: request.statusPointsDelta,
-    totalPoints,
+    rows: sortedRows,
+    totalPoints: calculateEmployeeReportTotal(sortedRows),
   };
+}
+
+function getOrCreateEmployeeReportRow(rows: Map<string, EmployeeReportRow>, date: Date) {
+  const dateKey = getEmployeeReportDateKey(date);
+  const existingRow = rows.get(dateKey);
+
+  if (existingRow) {
+    return existingRow;
+  }
+
+  const row: EmployeeReportRow = {
+    id: dateKey,
+    companyDockets: [],
+    date,
+    workSubmission: emptyEmployeeReportPointCell(),
+    attendanceIn: emptyEmployeeReportPointCell(),
+    attendanceOut: emptyEmployeeReportPointCell(),
+    review: emptyEmployeeReportPointCell(),
+    documentSubmission: emptyEmployeeReportPointCell(),
+    materialHandover: emptyEmployeeReportPointCell(),
+  };
+
+  rows.set(dateKey, row);
+  return row;
+}
+
+function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: EmployeeReportRequest) {
+  const exists = row.companyDockets.some((entry) => entry.docketNumber === request.docketNumber);
+
+  if (!exists) {
+    row.companyDockets.push({
+      companyName: request.company,
+      docketNumber: request.docketNumber,
+    });
+  }
+}
+
+function addEmployeeReportPoints(cell: EmployeeReportPointCell, points: number) {
+  cell.points = (cell.points ?? 0) + points;
+}
+
+function getEmployeeReportAttendancePoints(adjustment: EmployeeReportPointAdjustment) {
+  try {
+    const parsed = JSON.parse(adjustment.attendanceOption) as { inOption?: unknown; outOption?: unknown };
+    const inOption = typeof parsed.inOption === "string" ? parsed.inOption : "";
+    const outOption = typeof parsed.outOption === "string" ? parsed.outOption : "";
+
+    return {
+      inPoints: getAttendanceInPoints(inOption),
+      outPoints: getAttendanceOutPoints(outOption),
+    };
+  } catch {
+    return {
+      inPoints: adjustment.attendancePoints,
+      outPoints: 0,
+    };
+  }
+}
+
+function getAttendanceInPoints(value: string) {
+  if (value in ATTENDANCE_IN_POINTS) {
+    return ATTENDANCE_IN_POINTS[value as keyof typeof ATTENDANCE_IN_POINTS].points;
+  }
+
+  return 0;
+}
+
+function getAttendanceOutPoints(value: string) {
+  if (value in ATTENDANCE_OUT_POINTS) {
+    return ATTENDANCE_OUT_POINTS[value as keyof typeof ATTENDANCE_OUT_POINTS].points;
+  }
+
+  return 0;
+}
+
+function calculateEmployeeReportTotal(rows: EmployeeReportRow[]) {
+  return rows.reduce(
+    (total, row) =>
+      total +
+      (row.workSubmission.points ?? 0) +
+      (row.attendanceIn.points ?? 0) +
+      (row.attendanceOut.points ?? 0) +
+      (row.review.points ?? 0) +
+      (row.documentSubmission.points ?? 0) +
+      (row.materialHandover.points ?? 0),
+    0,
+  );
+}
+
+function emptyEmployeeReportPointCell(): EmployeeReportPointCell {
+  return { label: "-", points: null };
 }
 
 function getEmployeeReportDate(request: EmployeeReportRequest) {
@@ -612,6 +841,15 @@ function getNullableDateTime(value: Date | null) {
   return value ? value.getTime() : 0;
 }
 
+function getEmployeeReportDateKey(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
 function formatEmployeeReportDate(value: Date | null) {
   if (!value) {
     return "-";
@@ -632,12 +870,8 @@ function formatPointDelta(value: number | null) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-function getStatusLabelForReport(status: DashboardStatus) {
-  if (status === "New Call") {
-    return "Assigned";
-  }
-
-  return status;
+function formatEmployeeReportPoint(value: EmployeeReportPointCell) {
+  return formatPointDelta(value.points);
 }
 
 function getComplaintAgeLabel(request: { createdAt: Date; status: string | null } & Record<string, unknown>) {
