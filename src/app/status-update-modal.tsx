@@ -23,6 +23,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [status, setStatus] = React.useState<StatusChoice>("");
   const [reason, setReason] = React.useState(request.statusReason || "");
   const [submitError, setSubmitError] = React.useState("");
+  const [uploadToast, setUploadToast] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [hasUploadedMedia, setHasUploadedMedia] = React.useState(Boolean(request.mediaUploadedAt));
   const currentStatusLabel = getStatusLabel(request.status);
@@ -34,9 +35,19 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setStatus("");
     setReason("");
     setSubmitError("");
+    setUploadToast("");
     setHasUploadedMedia(Boolean(request.mediaUploadedAt));
     setIsOpen(true);
   };
+
+  React.useEffect(() => {
+    if (!uploadToast) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setUploadToast(""), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [uploadToast]);
 
   const handleStatusChange = (newStatus: StatusChoice) => {
     setStatus(newStatus);
@@ -64,7 +75,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     }
 
     if (status === "Completed" && !hasUploadedMedia) {
-      setSubmitError("Uploading media is necessary before completing this service.");
+      setSubmitError("Upload media first.");
       return;
     }
 
@@ -98,6 +109,11 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setIsOpen(false)}>
+          {uploadToast ? (
+            <div className="fixed right-4 top-4 z-[60] max-w-[calc(100vw-2rem)] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg">
+              {uploadToast}
+            </div>
+          ) : null}
           <div
             className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -177,16 +193,15 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   ) : null}
 
                   <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
-                    <p className="text-sm text-blue-700">
-                      {hasUploadedMedia
-                        ? "Media uploaded successfully. You can save this call as Completed."
-                        : "Uploading media is necessary before marking this call as Completed."}
+                    <p className="break-words text-xs font-medium text-blue-700 sm:text-sm">
+                      {hasUploadedMedia ? "Media ready." : "Upload media to complete."}
                     </p>
                     <EmployeeMediaUpload
                       requestId={request.id}
                       onUploaded={() => {
                         setHasUploadedMedia(true);
                         setSubmitError("");
+                        setUploadToast("Media uploaded successfully.");
                         router.refresh();
                       }}
                     />

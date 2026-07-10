@@ -7,6 +7,7 @@ import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardRequestRow } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
+import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
 
@@ -38,6 +39,7 @@ export type DashboardListRequest = {
   assignedTo?: { name: string } | null;
   assignments?: AssignmentPickerAssignment[];
   createdBy?: { name: string } | null;
+  mediaItems?: DashboardRequestMediaItem[];
 };
 
 type DashboardRequestListProps = {

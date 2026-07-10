@@ -5,9 +5,15 @@ import { logout } from "../actions";
 import ReportFilters from "./report-filters";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
 import { EmployeePointsPopup } from "./employee-points-popup";
+import { EmployeeReportPopup } from "./employee-report-popup";
+import { EmployeeReportTable } from "./employee-report-table";
 import { ReportCallDetailsModal } from "./call-details-modal";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
+import {
+  buildEmployeeReportRows,
+  type EmployeeReportRequest,
+} from "@/lib/employee-report";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +25,25 @@ const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", 
 type ReportPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const employeeReportRequestSelect = {
+  id: true,
+  docketNumber: true,
+  name: true,
+  company: true,
+  area: true,
+  status: true,
+  statusReason: true,
+  statusPointsDelta: true,
+  assignedToId: true,
+  createdAt: true,
+  assignedAt: true,
+  statusSubmittedAt: true,
+  lastAttemptAt: true,
+  lastAttemptByName: true,
+  closedAt: true,
+  closedByName: true,
+} satisfies Prisma.ServiceRequestSelect;
 
 export default async function ReportPage({ searchParams }: ReportPageProps) {
   const session = await getSession();
@@ -95,55 +120,95 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     employees,
   });
 
-  const requests = await prisma.serviceRequest.findMany({
-    where,
-    select: {
-      id: true,
-      docketNumber: true,
-      name: true,
-      company: true,
-      phoneNumber1: true,
-      phoneNumber2: true,
-      fullAddress: true,
-      complaintDetails: true,
-      product: true,
-      status: true,
-      statusReason: true,
-      statusPointsDelta: true,
-      assignedToId: true,
-      createdAt: true,
-      assignedAt: true,
-      statusSubmittedAt: true,
-      closedAt: true,
-      closedByName: true,
-      callType: true,
-      area: true,
-      serviceBillingType: true,
-      chargeableAmount: true,
-      customerReview: true,
-      assignedTo: {
-        select: {
-          name: true,
+  const employeeIds = employees.map((employee) => employee.id);
+  const employeeNames = employees.map((employee) => employee.name).filter((name) => name.trim() !== "");
+  const employeeNameFilters = employeeNames.flatMap((name) => [
+    { lastAttemptByName: { equals: name, mode: "insensitive" as const } },
+    { closedByName: { equals: name, mode: "insensitive" as const } },
+  ]);
+
+  const [requests, employeeReportAssignments, employeeReportRequests] = await Promise.all([
+    prisma.serviceRequest.findMany({
+      where,
+      select: {
+        id: true,
+        docketNumber: true,
+        name: true,
+        company: true,
+        phoneNumber1: true,
+        phoneNumber2: true,
+        fullAddress: true,
+        complaintDetails: true,
+        product: true,
+        status: true,
+        statusReason: true,
+        statusPointsDelta: true,
+        assignedToId: true,
+        createdAt: true,
+        assignedAt: true,
+        statusSubmittedAt: true,
+        closedAt: true,
+        closedByName: true,
+        callType: true,
+        area: true,
+        serviceBillingType: true,
+        chargeableAmount: true,
+        customerReview: true,
+        assignedTo: {
+          select: {
+            name: true,
+          },
+        },
+        activities: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            details: true,
+            status: true,
+            statusReason: true,
+            actorName: true,
+            actorRole: true,
+            employeeName: true,
+            createdAt: true,
+          },
         },
       },
-      activities: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          details: true,
-          status: true,
-          statusReason: true,
-          actorName: true,
-          actorRole: true,
-          employeeName: true,
-          createdAt: true,
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+    employeeIds.length > 0
+      ? prisma.serviceAssignment.findMany({
+          where: { employeeId: { in: employeeIds } },
+          orderBy: { assignedAt: "desc" },
+          select: {
+            employeeId: true,
+            assignedAt: true,
+            status: true,
+            statusReason: true,
+            statusSubmittedAt: true,
+            statusPointsDelta: true,
+            closedAt: true,
+            request: {
+              select: employeeReportRequestSelect,
+            },
+          },
+        })
+      : Promise.resolve([]),
+    employeeIds.length > 0
+      ? prisma.serviceRequest.findMany({
+          where: {
+            OR: [
+              { assignedToId: { in: employeeIds } },
+              ...employeeNameFilters,
+            ],
+          },
+          select: employeeReportRequestSelect,
+          orderBy: [{ lastAttemptAt: "desc" }, { statusSubmittedAt: "desc" }, { createdAt: "desc" }],
+          take: 500,
+        })
+      : Promise.resolve([]),
+  ]);
 
   const statusCounts: Record<CanonicalStatus, number> = {
     "New Call": 0,
@@ -185,6 +250,11 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const exportQuery = exportParams.toString();
   const csvExportHref = `/api/report/export?format=csv${exportQuery ? `&${exportQuery}` : ""}`;
   const pdfExportHref = `/api/report/export?format=pdf${exportQuery ? `&${exportQuery}` : ""}`;
+  const employeeReportInputsByEmployeeId = buildEmployeeReportInputsByEmployeeId({
+    employees,
+    assignments: employeeReportAssignments,
+    linkedRequests: employeeReportRequests,
+  });
 
   const employeeRows = employees
     .map((employee) => {
@@ -202,6 +272,11 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
         totalPoints: employee.performancePoints,
         monthlyPoints: employee.monthlyPerformancePoints,
         completedByEmployee,
+        report: buildEmployeeReportRows({
+          activeRequests: employeeReportInputsByEmployeeId.get(employee.id)?.activeRequests ?? [],
+          reportRequests: employeeReportInputsByEmployeeId.get(employee.id)?.reportRequests ?? [],
+          pointAdjustments: employee.pointAdjustments,
+        }),
         pointAdjustments: employee.pointAdjustments.map((adjustment) => ({
           ...adjustment,
           createdAt: adjustment.createdAt.toISOString(),
@@ -280,7 +355,18 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                 <tbody className="divide-y divide-blue-100 bg-white">
                   {employeeRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="px-2.5 py-2.5 text-blue-950">{row.name}</td>
+                      <td className="px-2.5 py-2.5 text-blue-950">
+                        <EmployeeReportPopup
+                          buttonContent={row.name}
+                          title={`${row.name} report`}
+                        >
+                          <EmployeeReportTable
+                            employeeName={row.name}
+                            rows={row.report.rows}
+                            totalPoints={row.report.totalPoints}
+                          />
+                        </EmployeeReportPopup>
+                      </td>
                       <td className="px-2.5 py-2.5 text-blue-900">
                         <EmployeePointsPopup
                           employeeId={row.id}
@@ -468,6 +554,103 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
       </section>
     </main>
   );
+}
+
+type EmployeeReportLinkedRequest = EmployeeReportRequest & {
+  assignedToId: string | null;
+  lastAttemptByName: string | null;
+  closedByName: string | null;
+};
+
+type EmployeeReportAssignmentInput = {
+  employeeId: string;
+  assignedAt: Date;
+  status: string | null;
+  statusReason: string | null;
+  statusSubmittedAt: Date | null;
+  statusPointsDelta: number | null;
+  closedAt: Date | null;
+  request: EmployeeReportLinkedRequest;
+};
+
+type EmployeeReportInputs = {
+  activeRequests: EmployeeReportRequest[];
+  reportRequests: EmployeeReportRequest[];
+};
+
+function buildEmployeeReportInputsByEmployeeId({
+  employees,
+  assignments,
+  linkedRequests,
+}: {
+  employees: Array<{ id: string; name: string }>;
+  assignments: EmployeeReportAssignmentInput[];
+  linkedRequests: EmployeeReportLinkedRequest[];
+}) {
+  const inputsByEmployeeId = new Map<string, EmployeeReportInputs>();
+  const employeeIdsByName = new Map<string, string[]>();
+
+  for (const employee of employees) {
+    inputsByEmployeeId.set(employee.id, { activeRequests: [], reportRequests: [] });
+
+    const nameKey = getEmployeeNameKey(employee.name);
+    if (!nameKey) {
+      continue;
+    }
+
+    const ids = employeeIdsByName.get(nameKey) ?? [];
+    ids.push(employee.id);
+    employeeIdsByName.set(nameKey, ids);
+  }
+
+  for (const assignment of assignments) {
+    const input = inputsByEmployeeId.get(assignment.employeeId);
+
+    if (!input) {
+      continue;
+    }
+
+    input.activeRequests.push({
+      ...assignment.request,
+      assignedAt: assignment.assignedAt,
+      status: assignment.status ?? assignment.request.status,
+      statusReason: assignment.statusReason ?? assignment.request.statusReason,
+      statusSubmittedAt: assignment.statusSubmittedAt,
+      statusPointsDelta: assignment.statusPointsDelta,
+      closedAt: assignment.closedAt ?? assignment.request.closedAt,
+    });
+  }
+
+  for (const request of linkedRequests) {
+    const matchingEmployeeIds = new Set<string>();
+
+    if (request.assignedToId) {
+      matchingEmployeeIds.add(request.assignedToId);
+    }
+
+    for (const name of [request.lastAttemptByName, request.closedByName]) {
+      const nameKey = getEmployeeNameKey(name);
+      const employeeIds = nameKey ? employeeIdsByName.get(nameKey) : null;
+
+      for (const employeeId of employeeIds ?? []) {
+        matchingEmployeeIds.add(employeeId);
+      }
+    }
+
+    for (const employeeId of matchingEmployeeIds) {
+      const input = inputsByEmployeeId.get(employeeId);
+
+      if (input) {
+        input.reportRequests.push(request);
+      }
+    }
+  }
+
+  return inputsByEmployeeId;
+}
+
+function getEmployeeNameKey(value: string | null) {
+  return value?.trim().toLowerCase() ?? "";
 }
 
 function buildReportWhere({

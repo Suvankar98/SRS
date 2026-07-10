@@ -9,6 +9,7 @@ import {
   formatServiceBillingType,
   formatINRCurrency,
 } from "../status-utils";
+import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
 
@@ -40,6 +41,7 @@ type DashboardRequestRowRequest = {
   assignedTo?: { name: string } | null;
   assignments?: AssignmentPickerAssignment[];
   createdBy?: { name: string } | null;
+  mediaItems?: DashboardRequestMediaItem[];
 };
 
 type DashboardRequestRowProps = {

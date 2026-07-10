@@ -1039,7 +1039,7 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   if (status === "Completed") {
     if (!assignment.mediaUploadedAt) {
-      throw new Error("Uploading media is necessary before completing this service.");
+      throw new Error("Upload media first.");
     }
   }
 

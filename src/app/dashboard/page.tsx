@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 
 import { logout } from "../actions";
 import CreatedToast from "./created-toast";
-import { BrandLogo } from "../brand-logo";
 import { DashboardFilters } from "./dashboard-filters";
 import { DashboardRequestList } from "./dashboard-request-list";
 import { EmployeeReportPopup } from "./employee-report-popup";
@@ -14,6 +13,10 @@ import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getProductOptions } from "@/lib/product-options";
 import { ATTENDANCE_IN_POINTS, ATTENDANCE_OUT_POINTS } from "@/lib/employee-performance-rules";
+import {
+  getDashboardMediaItemsByRequestIds,
+  type DashboardRequestMediaItem,
+} from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -174,7 +177,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         })
       : [];
 
-  const filteredRequests = filterRequests(allRequests, searchQuery, selectedStatuses);
+  const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
+    ? await getDashboardMediaItemsByRequestIds(allRequests.map((request) => request.id))
+    : new Map();
+  const dashboardRequests = allRequests.map((request) => ({
+    ...request,
+    mediaItems: mediaByRequestId.get(request.id) ?? [],
+  }));
+
+  const filteredRequests = filterRequests(dashboardRequests, searchQuery, selectedStatuses);
   const visibleRequests = isEmployee
     ? filteredRequests.filter(
         (request) => !request.statusSubmittedAt && normalizeStatus(request.status) !== "Completed",
@@ -204,8 +215,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <CreatedToast docket={createdDocket} />
       <header className="fixed left-0 right-0 top-0 z-40 border-b border-blue-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[95rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <div className="rounded-md bg-[#003d73] px-2 py-1 shadow-sm">
-            <BrandLogo width={96} className="h-8 w-auto" />
+          <div className="flex h-12 w-36 items-center rounded-lg border border-blue-100 bg-white px-2 shadow-sm">
+            <Image
+              src="/dashboard-srtec-logo.svg"
+              alt="SRTEC Automation"
+              width={144}
+              height={65}
+              className="h-10 w-full object-contain"
+              priority
+              unoptimized
+            />
           </div>
 
           <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-2 md:flex">
@@ -384,7 +403,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </section>
               ) : (
                 <DashboardRequestList
-                  key={requests.map((request) => `${request.id}:${request.dashboardOrder ?? ""}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.statusSubmittedAt ?? ""}:${request.lastAttemptByName ?? ""}:${request.lastAttemptAt ?? ""}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
+                  key={requests.map((request) => `${request.id}:${request.dashboardOrder ?? ""}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.statusSubmittedAt ?? ""}:${request.lastAttemptByName ?? ""}:${request.lastAttemptAt ?? ""}:${request.mediaItems?.length ?? 0}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
                   requests={requests}
                   products={products}
                   employees={employees}

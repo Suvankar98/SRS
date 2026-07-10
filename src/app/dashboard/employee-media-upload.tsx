@@ -45,7 +45,6 @@ const allowedExtensions = [
 export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUploadProps) {
   const [fileName, setFileName] = useState<string>("");
   const [fileError, setFileError] = useState<string>("");
-  const [uploadMessage, setUploadMessage] = useState<string>("");
   const [uploadError, setUploadError] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +53,6 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     if (!file) {
       setFileName("");
       setFileError("");
-      setUploadMessage("");
       setUploadError("");
       return;
     }
@@ -64,7 +62,6 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     const isAllowedExtension = allowedExtensions.includes(extension);
 
     setFileName(file.name);
-    setUploadMessage("");
     setUploadError("");
 
     if (!isAllowedType && !isAllowedExtension) {
@@ -90,12 +87,10 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     const form = event.currentTarget;
     const formData = new FormData(form);
     setUploadError("");
-    setUploadMessage("");
 
     startTransition(async () => {
       try {
         await uploadEmployeeImage(formData);
-        setUploadMessage("Media uploaded successfully. You can save status now.");
         setFileName("");
         onUploaded?.();
         if (fileInputRef.current) {
@@ -141,9 +136,8 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
       </div>
       {fileError ? <p className="text-xs text-red-600">{fileError}</p> : null}
       {uploadError ? <p className="text-xs font-medium text-red-600">{uploadError}</p> : null}
-      {uploadMessage ? <p className="text-xs font-medium text-emerald-700">{uploadMessage}</p> : null}
       {isPending ? <p className="text-xs font-medium text-blue-700">Uploading...</p> : null}
-      <p className="text-[10px] text-blue-600">Required before status update.</p>
+      <p className="text-[10px] text-blue-600">Required to complete.</p>
     </form>
   );
 }
