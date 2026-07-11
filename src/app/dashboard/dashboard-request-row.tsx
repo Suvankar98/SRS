@@ -300,7 +300,7 @@ export function DashboardRequestRow({
     }
 
     return (
-      <span className="inline-flex max-w-[12rem] flex-col rounded-md bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-900 ring-1 ring-inset ring-blue-200">
+      <span className="inline-flex w-full min-w-0 max-w-full flex-col rounded-md bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-900 ring-1 ring-inset ring-blue-200">
         <span className="text-[9px] uppercase tracking-[0.12em] text-blue-500">Last attempt</span>
         <span className="truncate">{lastAttempt.name}</span>
         {lastAttempt.attemptedAt ? (
@@ -327,11 +327,11 @@ export function DashboardRequestRow({
       tabIndex={canEditDocket ? 0 : -1}
       className={`align-top text-blue-900 ${!isEmployee && isClosedStatus(request.status) ? "bg-emerald-50/80" : ""} ${canEditDocket ? "cursor-pointer" : ""}`}
     >
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
-        <div className="flex items-start gap-3">
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
+        <div className="flex items-start gap-2">
           {!isEmployee ? (
-            <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm" onClick={(e)=>e.stopPropagation()} title="Drag to reorder">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm" onClick={(e)=>e.stopPropagation()} title="Drag to reorder">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M10 6h6M10 12h6M10 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
@@ -354,7 +354,7 @@ export function DashboardRequestRow({
                     event.stopPropagation();
                     open();
                   }}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-300 bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-blue-800 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-300 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-800 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   aria-label={`Open docket details for ${request.docketNumber}`}
                 >
                   <span className="min-w-0 truncate">{request.docketNumber}</span>
@@ -371,19 +371,19 @@ export function DashboardRequestRow({
           </div>
         </div>
       </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
         <div className="flex flex-col gap-2">
-          <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">{getComplaintAgeLabel(request)}</span>
+          <span className="inline-flex max-w-full rounded-md bg-red-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.04em] text-red-800 ring-1 ring-inset ring-red-300">{getComplaintAgeLabel(request)}</span>
           {isEmployee && request.assignedToId ? renderAssignmentBadge(request) : renderLastAttemptBadge()}
         </div>
       </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
         <p className="font-semibold text-blue-950">{request.name}</p>
         <p className="mt-1 border-t border-blue-100 pt-1 text-[11px] font-medium leading-snug text-slate-500">{request.company}</p>
       </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
         <p>{request.callType}</p>
         {request.callType === "Service" ? (
           <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
@@ -391,10 +391,10 @@ export function DashboardRequestRow({
           </p>
         ) : null}
       </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
         {formatINRCurrency(request.serviceBillingType === "chargeable" ? request.chargeableAmount ?? 0 : 0)}
       </td>
-      <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
+      <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
         {isEmployee ? (
           <div className="whitespace-nowrap">
             <StatusUpdateModal request={request} />
@@ -404,7 +404,7 @@ export function DashboardRequestRow({
         )}
       </td>
       {canAssign ? (
-        <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
+        <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
           <div className="space-y-2">
             {isClosedStatus(request.status) ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
@@ -420,6 +420,7 @@ export function DashboardRequestRow({
               employees={employees}
               assignments={request.assignments}
               defaultEmployeeId={request.assignedToId}
+              compact
               disabled={isReassignLocked}
               disabledMessage={isReassignLocked ? "This completed service can no longer be reassigned." : undefined}
             />

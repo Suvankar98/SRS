@@ -3,6 +3,7 @@ import type {
   EmployeeReportPointCell,
   EmployeeReportRow,
 } from "@/lib/employee-report";
+import { EmployeeReportDownloadButton } from "./employee-report-download-button";
 
 export function EmployeeReportTable({
   employeeName,
@@ -13,6 +14,17 @@ export function EmployeeReportTable({
   rows: EmployeeReportRow[];
   totalPoints: number;
 }) {
+  const pdfRows = rows.map((row) => ({
+    companyDocket: formatCompanyDocketsForExport(row.companyDockets),
+    date: formatEmployeeReportDate(row.date),
+    workSubmission: formatEmployeeReportPoint(row.workSubmission),
+    attendance: `IN ${formatEmployeeReportPoint(row.attendanceIn)} / OUT ${formatEmployeeReportPoint(row.attendanceOut)}`,
+    review: formatEmployeeReportPoint(row.review),
+    documentSubmission: formatEmployeeReportPoint(row.documentSubmission),
+    materialHandover: formatEmployeeReportPoint(row.materialHandover),
+    dayTotal: formatPointDelta(getEmployeeReportDayTotal(row)),
+  }));
+
   return (
     <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3">
@@ -20,8 +32,11 @@ export function EmployeeReportTable({
           <h2 className="text-base font-semibold text-blue-950">{employeeName} Report</h2>
           <p className="mt-0.5 text-xs text-blue-600">Work submission and performance points summary</p>
         </div>
-        <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">
-          Total Points: {totalPoints}
+        <div className="flex flex-wrap items-center gap-2">
+          <EmployeeReportDownloadButton employeeName={employeeName} totalPoints={totalPoints} rows={pdfRows} />
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">
+            Total Points: {totalPoints}
+          </div>
         </div>
       </div>
 
@@ -47,6 +62,7 @@ export function EmployeeReportTable({
                   <EmployeeReportPointField label="Review" value={row.review} />
                   <EmployeeReportPointField label="Documents Submission" value={row.documentSubmission} />
                   <EmployeeReportPointField label="Material Handover" value={row.materialHandover} />
+                  <EmployeeReportMobileField label="Day Wise Total" value={formatPointDelta(getEmployeeReportDayTotal(row))} />
                 </div>
               </article>
             ))}
@@ -63,6 +79,7 @@ export function EmployeeReportTable({
                   <EmployeeReportTh>Review</EmployeeReportTh>
                   <EmployeeReportTh>Documents Submission</EmployeeReportTh>
                   <EmployeeReportTh>Material Handover</EmployeeReportTh>
+                  <EmployeeReportTh>Day Wise Total</EmployeeReportTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-100 bg-white">
@@ -77,6 +94,9 @@ export function EmployeeReportTable({
                     <EmployeeReportPointTd value={row.review} />
                     <EmployeeReportPointTd value={row.documentSubmission} />
                     <EmployeeReportPointTd value={row.materialHandover} />
+                    <td className="px-3 py-3 font-semibold text-blue-950">
+                      {formatPointDelta(getEmployeeReportDayTotal(row))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -204,6 +224,25 @@ function formatEmployeeReportDate(value: Date | null) {
     month: "short",
     year: "numeric",
   }).format(value);
+}
+
+function getEmployeeReportDayTotal(row: EmployeeReportRow) {
+  return (
+    (row.workSubmission.points ?? 0) +
+    (row.attendanceIn.points ?? 0) +
+    (row.attendanceOut.points ?? 0) +
+    (row.review.points ?? 0) +
+    (row.documentSubmission.points ?? 0) +
+    (row.materialHandover.points ?? 0)
+  );
+}
+
+function formatCompanyDocketsForExport(companyDockets: EmployeeReportCompanyDocket[]) {
+  if (companyDockets.length === 0) {
+    return "-";
+  }
+
+  return companyDockets.map((entry) => `${entry.companyName} / ${entry.docketNumber}`).join("; ");
 }
 
 function formatPointDelta(value: number | null) {

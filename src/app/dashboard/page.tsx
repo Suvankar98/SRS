@@ -1,8 +1,5 @@
-import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { logout } from "../actions";
 import CreatedToast from "./created-toast";
 import { DashboardFilters } from "./dashboard-filters";
 import { DashboardRequestList } from "./dashboard-request-list";
@@ -37,6 +34,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
   const selectedStatuses = getSelectedStatuses(resolvedSearchParams.status);
   const createdDocket = typeof resolvedSearchParams.created === 'string' ? resolvedSearchParams.created : null;
+  const reportFromDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.reportFrom));
+  const reportToDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.reportTo));
+  const reportDateRange = getDateRange(reportFromDate, reportToDate);
 
   const isEmployee = session.role === APP_ROLES.EMPLOYEE;
   const canEditDocket = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
@@ -206,6 +206,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         pointAdjustments: employeePointAdjustments,
       })
     : { rows: [], totalPoints: 0 };
+  const filteredEmployeeReportRows = isEmployee
+    ? filterEmployeeReportRowsForDateRange(employeeReport.rows, reportDateRange)
+    : [];
+  const filteredEmployeeReportTotal = isEmployee ? calculateEmployeeReportTotal(filteredEmployeeReportRows) : 0;
 
   const unassignedRequests = totalRequests - assignedRequests;
 
@@ -213,182 +217,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-2 py-4 sm:px-6 sm:py-6 lg:px-8"> 
       {/* show created toast client-side when a new service is created */}
       <CreatedToast docket={createdDocket} />
-      <header className="fixed left-0 right-0 top-0 z-40 border-b border-blue-200 bg-white/95 shadow-sm backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-[95rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <div className="flex h-12 w-36 items-center rounded-lg border border-blue-100 bg-white px-2 shadow-sm">
-            <Image
-              src="/dashboard-srtec-logo.svg"
-              alt="SRTEC Automation"
-              width={144}
-              height={65}
-              className="h-10 w-full object-contain"
-              priority
-              unoptimized
-            />
-          </div>
-
-          <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-2 md:flex">
-            <Image
-              src={getEmployeeAvatarDataUri(currentUser?.name || "User")}
-              alt={`${currentUser?.name || "User"} profile photo`}
-              width={42}
-              height={42}
-              className="h-10 w-10 rounded-full border border-blue-200 object-cover"
-            />
-            <div className="min-w-0 text-center">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-blue-500">{session.role}</p>
-              <p className="truncate text-base font-semibold text-blue-950">{currentUser?.name || "User"}</p>
-            </div>
-          </div>
-
-          <div className="hidden items-center gap-2 md:flex">
-            {!isEmployee && (
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                Dashboard
-              </Link>
-            )}
-            {(session.role === APP_ROLES.ADMIN || canAssign) && (
-              <Link
-                href="/gallery"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                Gallery
-              </Link>
-            )}
-            {(session.role === APP_ROLES.ADMIN || canAssign) && (
-              <Link
-                href="/report"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                Reports
-              </Link>
-            )}
-            {(session.role === APP_ROLES.ADMIN || canAssign) && (
-              <Link
-                href="/call-history"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                Call History
-              </Link>
-            )}
-            {(session.role === APP_ROLES.ADMIN || canAssign) && (
-              <Link
-                href="/form"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                New Call
-              </Link>
-            )}
-            {session.role === APP_ROLES.ADMIN && (
-              <Link
-                href="/admin"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                Admin Panel
-              </Link>
-            )}
-            {isEmployee ? (
-              <EmployeeReportPopup>
-                <EmployeeReportTable
-                  rows={employeeReport.rows}
-                  totalPoints={employeeReport.totalPoints}
-                />
-              </EmployeeReportPopup>
-            ) : null}
-            <form action={logout}>
-              <button
-                type="submit"
-                className="danger-btn inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium"
-              >
-                Logout
-              </button>
-            </form>
-          </div>
-
-          <details className="relative ml-auto md:hidden">
-            <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-800">
-              <span className="sr-only">Open menu</span>
-              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-                <path d="M4 7H20M4 12H20M4 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </summary>
-            <div className="absolute right-0 mt-2 w-64 rounded-xl border border-blue-200 bg-white p-3 shadow-xl">
-              <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/80 p-2.5">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-blue-500">{session.role}</p>
-                <p className="mt-1 text-sm font-semibold text-blue-950">{currentUser?.name || "User"}</p>
-              </div>
-              <div className="space-y-2">
-                {(session.role === APP_ROLES.ADMIN || canAssign) && (
-                  <Link
-                    href="/form"
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                  >
-                    New Call
-                  </Link>
-                )}
-                {(session.role === APP_ROLES.ADMIN || canAssign) && (
-                  <Link
-                    href="/gallery"
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                  >
-                    Gallery
-                  </Link>
-                )}
-                {(session.role === APP_ROLES.ADMIN || canAssign) && (
-                  <Link
-                    href="/report"
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                  >
-                    Reports
-                  </Link>
-                )}
-                {(session.role === APP_ROLES.ADMIN || canAssign) && (
-                  <Link
-                    href="/call-history"
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                  >
-                    Call History
-                  </Link>
-                )}
-                {session.role === APP_ROLES.ADMIN && (
-                  <Link
-                    href="/admin"
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                  >
-                    Admin Panel
-                  </Link>
-                )}
-                {isEmployee ? (
-                  <EmployeeReportPopup buttonClassName="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">
-                    <EmployeeReportTable
-                      rows={employeeReport.rows}
-                      totalPoints={employeeReport.totalPoints}
-                    />
-                  </EmployeeReportPopup>
-                ) : null}
-                <form action={logout}>
-                  <button
-                    type="submit"
-                    className="danger-btn inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium"
-                  >
-                    Logout
-                  </button>
-                </form>
-              </div>
-            </div>
-          </details>
-        </div>
-      </header>
-
-      <section className="min-h-[calc(100vh-3rem)] pt-20">
+      <section className="min-h-[calc(100vh-3rem)]">
 
         <div className="rounded-2xl border border-blue-200 bg-white p-2 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:rounded-[2rem] sm:p-6">
           <div>
+              {isEmployee ? (
+                <div className="mb-3 flex justify-end">
+                  <EmployeeReportPopup buttonClassName="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">
+                    <EmployeeReportTable
+                      rows={filteredEmployeeReportRows}
+                      totalPoints={filteredEmployeeReportTotal}
+                      fromDate={reportFromDate}
+                      toDate={reportToDate}
+                    />
+                  </EmployeeReportPopup>
+                </div>
+              ) : null}
+
               {!isEmployee ? (
-                <header className="mb-3 grid gap-2 xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                <header className="mb-3 grid gap-2 xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,1fr)]">
                   <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-5 py-5">
                     <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
                     <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -403,10 +250,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   </div>
 
                   {showSummaryCards && (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-                      <MetricCard title="Total Calls" value={totalRequests} subtitle="All visible complaints" />
-                      <MetricCard title="Assigned" value={assignedRequests} subtitle="Allocated to employee" />
-                      <MetricCard title="Unassigned" value={unassignedRequests} subtitle="Need allocation" />
+                    <div className="grid self-start grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+                      <MetricCard title="Total Calls" value={totalRequests} />
+                      <MetricCard title="Assigned" value={assignedRequests} />
+                      <MetricCard title="Unassigned" value={unassignedRequests} />
                     </div>
                   )}
                 </header>
@@ -486,18 +333,64 @@ type EmployeeReportRow = {
   materialHandover: EmployeeReportPointCell;
 };
 
-function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[]; totalPoints: number }) {
+function EmployeeReportTable({
+  rows,
+  totalPoints,
+  fromDate,
+  toDate,
+}: {
+  rows: EmployeeReportRow[];
+  totalPoints: number;
+  fromDate: string;
+  toDate: string;
+}) {
   return (
     <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-blue-950">Report</h2>
           <p className="mt-0.5 text-xs text-blue-600">Work submission and performance points summary</p>
         </div>
-        <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">
+        <div className="rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-900 shadow-sm">
           Total Points: {totalPoints}
         </div>
       </div>
+      <form action="/dashboard" className="grid gap-3 border-b border-blue-100 bg-white px-4 py-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em] text-blue-700">From Date</span>
+          <input
+            type="date"
+            name="reportFrom"
+            defaultValue={fromDate}
+            className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em] text-blue-700">To Date</span>
+          <input
+            type="date"
+            name="reportTo"
+            defaultValue={toDate}
+            className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+          />
+        </label>
+        <div className="flex items-end sm:col-span-1">
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+          >
+            Apply
+          </button>
+        </div>
+        <div className="flex items-end sm:col-span-1">
+          <a
+            href="/dashboard"
+            className="inline-flex w-full items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+          >
+            Reset
+          </a>
+        </div>
+      </form>
 
       {rows.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-blue-700">
@@ -507,20 +400,16 @@ function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[];
         <>
           <div className="space-y-3 p-3 md:hidden">
             {rows.map((row) => (
-              <article key={row.id} className="rounded-xl border border-blue-100 bg-white p-3 text-xs text-blue-900 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Company Name / Docket Number</p>
-                    <EmployeeReportCompanyDockets companyDockets={row.companyDockets} />
-                  </div>
-                  <EmployeeReportPointBadge label="Work Submission" value={row.workSubmission} />
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <article key={row.id} className="rounded-2xl border border-blue-100 bg-white p-3 text-xs text-blue-900 shadow-sm">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <EmployeeReportCompanyField companyDockets={row.companyDockets} />
                   <EmployeeReportMobileField label="Date" value={formatEmployeeReportDate(row.date)} />
+                  <EmployeeReportPointField label="Work Submission" value={row.workSubmission} />
                   <EmployeeReportAttendancePointField attendanceIn={row.attendanceIn} attendanceOut={row.attendanceOut} />
                   <EmployeeReportPointField label="Review" value={row.review} />
                   <EmployeeReportPointField label="Documents Submission" value={row.documentSubmission} />
                   <EmployeeReportPointField label="Material Handover" value={row.materialHandover} />
+                  <EmployeeReportMobileField label="Day Wise Total" value={formatPointDelta(getEmployeeReportDayTotal(row))} />
                 </div>
               </article>
             ))}
@@ -537,6 +426,7 @@ function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[];
                   <EmployeeReportTh>Review</EmployeeReportTh>
                   <EmployeeReportTh>Documents Submission</EmployeeReportTh>
                   <EmployeeReportTh>Material Handover</EmployeeReportTh>
+                  <EmployeeReportTh>Day Wise Total</EmployeeReportTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-100 bg-white">
@@ -551,6 +441,9 @@ function EmployeeReportTable({ rows, totalPoints }: { rows: EmployeeReportRow[];
                     <EmployeeReportPointTd value={row.review} />
                     <EmployeeReportPointTd value={row.documentSubmission} />
                     <EmployeeReportPointTd value={row.materialHandover} />
+                    <td className="px-3 py-3 font-semibold text-blue-950">
+                      {formatPointDelta(getEmployeeReportDayTotal(row))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -587,20 +480,31 @@ function EmployeeReportCompanyDockets({ companyDockets }: { companyDockets: Empl
   );
 }
 
+function EmployeeReportCompanyField({ companyDockets }: { companyDockets: EmployeeReportCompanyDocket[] }) {
+  return (
+    <div className="col-span-2 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 sm:col-span-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Company / Docket</p>
+      <div className="mt-1">
+        <EmployeeReportCompanyDockets companyDockets={companyDockets} />
+      </div>
+    </div>
+  );
+}
+
 function EmployeeReportMobileField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+    <div className="min-h-20 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5">
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
-      <p className="mt-1 break-words font-semibold text-blue-950">{value}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-blue-950">{value}</p>
     </div>
   );
 }
 
 function EmployeeReportPointField({ label, value }: { label: string; value: EmployeeReportPointCell }) {
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+    <div className="min-h-20 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5">
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
-      <p className="mt-1 break-words font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
     </div>
   );
 }
@@ -613,18 +517,9 @@ function EmployeeReportAttendancePointField({
   attendanceOut: EmployeeReportPointCell;
 }) {
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+    <div className="min-h-20 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5">
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Attendance</p>
       <EmployeeReportAttendanceLines attendanceIn={attendanceIn} attendanceOut={attendanceOut} />
-    </div>
-  );
-}
-
-function EmployeeReportPointBadge({ label, value }: { label: string; value: EmployeeReportPointCell }) {
-  return (
-    <div className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-right">
-      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{label}</p>
-      <p className="font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
     </div>
   );
 }
@@ -659,23 +554,23 @@ function EmployeeReportAttendanceLines({
   attendanceOut: EmployeeReportPointCell;
 }) {
   return (
-    <div className="grid w-fit min-w-24 grid-cols-2 gap-x-4 text-center">
+    <div className="mt-2 grid w-full grid-cols-2 gap-x-3 text-center">
       <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">IN</p>
       <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">OUT</p>
-      <p className="mt-1 font-semibold text-blue-950">{formatEmployeeReportPoint(attendanceIn)}</p>
-      <p className="mt-1 font-semibold text-blue-950">{formatEmployeeReportPoint(attendanceOut)}</p>
+      <p className="mt-1 text-sm font-semibold text-blue-950">{formatEmployeeReportPoint(attendanceIn)}</p>
+      <p className="mt-1 text-sm font-semibold text-blue-950">{formatEmployeeReportPoint(attendanceOut)}</p>
     </div>
   );
 }
 
-function MetricCard({ title, value, subtitle }: { title: string; value: number; subtitle: string }) {
+function MetricCard({ title, value }: { title: string; value: number }) {
   return (
-    <article className="rounded-xl border border-blue-200 bg-white px-3 py-2.5 sm:p-4">
-      <div className="flex items-end justify-between sm:block">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500 sm:text-xs sm:tracking-[0.2em]">{title}</p>
-        <p className="text-2xl leading-none font-semibold text-blue-950 sm:mt-1 sm:text-2xl">{value}</p>
+    <article className="flex min-h-24 flex-col justify-between rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50 px-4 py-4 shadow-sm">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-500">{title}</p>
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <p className="text-4xl leading-none font-semibold text-blue-950">{value}</p>
+        <span className="h-2.5 w-10 rounded-full bg-blue-500/20" aria-hidden="true" />
       </div>
-      <p className="mt-1 hidden text-xs text-blue-600 sm:block">{subtitle}</p>
     </article>
   );
 }
@@ -836,16 +731,17 @@ function getAttendanceOutPoints(value: string) {
 }
 
 function calculateEmployeeReportTotal(rows: EmployeeReportRow[]) {
-  return rows.reduce(
-    (total, row) =>
-      total +
-      (row.workSubmission.points ?? 0) +
-      (row.attendanceIn.points ?? 0) +
-      (row.attendanceOut.points ?? 0) +
-      (row.review.points ?? 0) +
-      (row.documentSubmission.points ?? 0) +
-      (row.materialHandover.points ?? 0),
-    0,
+  return rows.reduce((total, row) => total + getEmployeeReportDayTotal(row), 0);
+}
+
+function getEmployeeReportDayTotal(row: EmployeeReportRow) {
+  return (
+    (row.workSubmission.points ?? 0) +
+    (row.attendanceIn.points ?? 0) +
+    (row.attendanceOut.points ?? 0) +
+    (row.review.points ?? 0) +
+    (row.documentSubmission.points ?? 0) +
+    (row.materialHandover.points ?? 0)
   );
 }
 
@@ -1002,6 +898,36 @@ function getSearchParamValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
+function getDateInputValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function getDateRange(fromDate: string, toDate: string) {
+  return {
+    startAt: fromDate ? new Date(`${fromDate}T00:00:00.000+05:30`) : null,
+    endAt: toDate ? new Date(`${toDate}T23:59:59.999+05:30`) : null,
+  };
+}
+
+function filterEmployeeReportRowsForDateRange(
+  rows: EmployeeReportRow[],
+  dateRange: { startAt: Date | null; endAt: Date | null },
+) {
+  return rows.filter((row) => {
+    const rowTime = row.date.getTime();
+
+    if (dateRange.startAt && rowTime < dateRange.startAt.getTime()) {
+      return false;
+    }
+
+    if (dateRange.endAt && rowTime > dateRange.endAt.getTime()) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 function getSelectedStatuses(value: string | string[] | undefined): DashboardStatus[] {
   const values = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
   const allowedStatuses: DashboardStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
@@ -1108,20 +1034,4 @@ function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 }
-
-function getEmployeeAvatarDataUri(name: string) {
-  const trimmedName = name.trim() || "Employee";
-  const initials = trimmedName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("") || "E";
-
-  const safeLabel = trimmedName.replace(/[<>&"']/g, "");
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0%' stop-color='#1d4ed8'/><stop offset='100%' stop-color='#0ea5e9'/></linearGradient></defs><rect width='96' height='96' rx='48' fill='url(#g)'/><text x='48' y='52' dominant-baseline='middle' text-anchor='middle' font-size='34' font-family='Arial, sans-serif' font-weight='700' fill='white'>${initials}</text><title>${safeLabel}</title></svg>`;
-
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 

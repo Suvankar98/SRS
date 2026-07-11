@@ -25,7 +25,7 @@ export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectPr
           name="status"
           defaultValue={status}
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          className={`max-w-[8.75rem] rounded-md border px-2.5 py-1 text-xs font-semibold outline-none ring-1 ring-inset transition focus:border-blue-400 focus:ring-blue-400 ${getStatusPillClass(
+          className={`w-full max-w-[7.5rem] rounded-md border px-2 py-1 text-[11px] font-semibold outline-none ring-1 ring-inset transition focus:border-blue-400 focus:ring-blue-400 ${getStatusPillClass(
             status,
           )}`}
           aria-label="Update service status"

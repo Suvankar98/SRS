@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
@@ -6,10 +5,8 @@ import {
   addProduct,
   deleteStaff,
   deleteProduct,
-  logout,
   updateProduct,
 } from "../actions";
-import { BrandLogo } from "../brand-logo";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { FixedCallTypesSection } from "./fixed-call-types-section";
 import { StaffEditModal } from "./staff-edit-modal";
@@ -64,56 +61,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_#f8fbff_0%,_#eef6ff_100%)]">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <header className="mb-6 overflow-hidden rounded-[2rem] border border-blue-200/70 bg-gradient-to-br from-[#001f3f] via-[#003d73] to-[#1d4ed8] p-6 text-white shadow-[0_20px_80px_rgba(15,23,42,0.2)] sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl space-y-3">
-              <div className="inline-flex rounded-2xl border border-white/20 bg-white/10 p-2 backdrop-blur">
-                <BrandLogo width={180} className="h-auto w-auto" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm uppercase tracking-[0.28em] text-blue-100/90">Admin control center</p>
-                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Manage your team and service setup</h1>
-                <p className="max-w-xl text-sm leading-6 text-blue-100/85">
-                  Keep staff, products, and fixed call types organised from one modern workspace.
-                </p>
-              </div>
-            </div>
-            <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
-              <Link
-                href="/dashboard"
-                className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-white transition hover:bg-white/20 sm:w-auto"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/report"
-                className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-white transition hover:bg-white/20 sm:w-auto"
-              >
-                Reports
-              </Link>
-              <Link
-                href="/call-history"
-                className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-white transition hover:bg-white/20 sm:w-auto"
-              >
-                Call History
-              </Link>
-              <Link
-                href="/form"
-                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-white px-4 text-sm font-medium text-blue-950 transition hover:bg-blue-50 sm:w-auto"
-              >
-                New call
-              </Link>
-              <form action={logout}>
-                <button
-                  type="submit"
-                  className="danger-btn inline-flex h-12 w-full items-center justify-center rounded-full border border-rose-300/70 bg-rose-500/90 px-4 text-sm font-medium text-white transition hover:bg-rose-500 sm:w-auto"
-                >
-                  Logout
-                </button>
-              </form>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
               <p className="text-sm text-blue-100/80">Team members</p>
               <p className="mt-2 text-2xl font-semibold">{staffMembers.length}</p>

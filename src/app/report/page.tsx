@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 
-import { logout } from "../actions";
 import { normalizeStatus } from "../status-utils";
 import { EmployeePointsPopup } from "./employee-points-popup";
 import { EmployeeReportPopup } from "./employee-report-popup";
@@ -192,51 +191,13 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
       <header className="mb-5 rounded-[2rem] border border-blue-200 bg-white p-5 shadow-[0_20px_80px_rgba(29,78,216,0.12)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-blue-500">Service analytics</p>
-            <h1 className="mt-1 text-3xl font-semibold text-blue-950">Report Dashboard</h1>
-            <p className="mt-2 text-sm text-blue-700">Accessible only to Admin and Manager roles.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Dashboard
-            </a>
-            <a
-              href="/form"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              New Call
-            </a>
-            <a
-              href="/gallery"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Gallery
-            </a>
-            <a
-              href="/call-history"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Call History
-            </a>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="danger-btn inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium"
-              >
-                Logout
-              </button>
-            </form>
-          </div>
-        </div>
+        <p className="text-xs uppercase tracking-[0.2em] text-blue-500">Service analytics</p>
+        <h1 className="mt-1 text-3xl font-semibold text-blue-950">Report Dashboard</h1>
+        <p className="mt-2 text-sm text-blue-700">Accessible only to Admin and Manager roles.</p>
       </header>
 
-      <section className="mt-5 grid gap-4 lg:grid-cols-3">
-        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] lg:col-span-2">
+      <section className="mt-5 grid gap-4 lg:grid-cols-2">
+        <article className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-blue-950">Employee Performance</h2>
@@ -244,50 +205,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                 Showing {sortedEmployeeRows.length} of {employeeRows.length} employees
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
-                {activeFilterCount} active
-              </span>
-              <a
-                href="/report"
-                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                Reset
-              </a>
-            </div>
           </div>
-
-          <form className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">From Date</span>
-              <input
-                type="date"
-                name="from"
-                defaultValue={fromDate}
-                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">To Date</span>
-              <input
-                type="date"
-                name="to"
-                defaultValue={toDate}
-                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-              />
-            </label>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </form>
-
           {sortedEmployeeRows.length === 0 ? (
             <p className="mt-3 text-sm text-blue-700">No employees found.</p>
           ) : (
@@ -305,7 +223,19 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                 <tbody className="divide-y divide-blue-100 bg-white">
                   {sortedEmployeeRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="px-2.5 py-2.5 font-semibold text-blue-950">{row.name}</td>
+                      <td className="px-2.5 py-2.5 text-blue-950">
+                        <EmployeeReportPopup
+                          buttonContent={row.name}
+                          title={`${row.name} report`}
+                          buttonClassName="block max-w-full truncate rounded-md text-left font-semibold text-blue-950 underline-offset-4 transition hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                          <EmployeeReportTable
+                            employeeName={row.name}
+                            rows={row.report.rows}
+                            totalPoints={row.report.totalPoints}
+                          />
+                        </EmployeeReportPopup>
+                      </td>
                       <td className="px-2.5 py-2.5 text-blue-900">
                         <EmployeePointsPopup
                           employeeId={row.id}
@@ -335,6 +265,45 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
               Top 3
             </span>
           </div>
+          <form className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">From Date</span>
+              <input
+                type="date"
+                name="from"
+                defaultValue={fromDate}
+                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.1em] text-blue-700">To Date</span>
+              <input
+                type="date"
+                name="to"
+                defaultValue={toDate}
+                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
+              />
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+              <button
+                type="submit"
+                className="inline-flex min-w-36 flex-1 items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
+              >
+                Apply Filters
+              </button>
+              <a
+                href="/report"
+                className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+              >
+                Reset
+              </a>
+              <span className="rounded-full bg-blue-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
+                {activeFilterCount} active
+              </span>
+            </div>
+          </form>
           <div className="mt-3 space-y-2">
             {[0, 1, 2].map((index) => {
               const employee = leaderboardTopThree[index];

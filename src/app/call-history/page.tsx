@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 
-import { logout } from "../actions";
 import ReportFilters from "../report/report-filters";
 import { ReportCallDetailsModal } from "../report/call-details-modal";
+import { CallHistoryColumnToggle } from "./row-toggle";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
@@ -14,6 +14,16 @@ export const dynamic = "force-dynamic";
 type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
 const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
+const CALL_HISTORY_COLUMNS = [
+  { id: "docket", label: "Docket" },
+  { id: "customer", label: "Customer" },
+  { id: "area", label: "Area" },
+  { id: "call-type", label: "Call Type" },
+  { id: "amount", label: "Amount" },
+  { id: "assigned-to", label: "Assigned To" },
+  { id: "status", label: "Status" },
+  { id: "created", label: "Created" },
+];
 
 type CallHistoryPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -148,27 +158,9 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
       <header className="mb-5 rounded-[2rem] border border-blue-200 bg-white p-5 shadow-[0_20px_80px_rgba(29,78,216,0.12)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-blue-500">Service history</p>
-            <h1 className="mt-1 text-3xl font-semibold text-blue-950">Call History</h1>
-            <p className="mt-2 text-sm text-blue-700">Filter, inspect, and export service calls.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <a href="/dashboard" className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">Dashboard</a>
-            <a href="/gallery" className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">Gallery</a>
-            <a href="/report" className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">Reports</a>
-            <a href="/form" className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">New Call</a>
-            {session.role === APP_ROLES.ADMIN ? (
-              <a href="/admin" className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">Admin Panel</a>
-            ) : null}
-            <form action={logout}>
-              <button type="submit" className="danger-btn inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium">
-                Logout
-              </button>
-            </form>
-          </div>
-        </div>
+        <p className="text-xs uppercase tracking-[0.2em] text-blue-500">Service history</p>
+        <h1 className="mt-1 text-3xl font-semibold text-blue-950">Call History</h1>
+        <p className="mt-2 text-sm text-blue-700">Filter, inspect, and export service calls.</p>
       </header>
 
       <section className="mb-5 rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
@@ -205,62 +197,64 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         {calls.length === 0 ? (
           <p className="mt-3 text-sm text-blue-700">No call history found for selected filters.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
-              <thead className="bg-blue-50 text-blue-700">
-                <tr>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Docket</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Customer</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Area</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
-                  <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-blue-100 bg-white">
-                {calls.map((request) => {
-                  const status = normalizeStatus(request.status);
+          <CallHistoryColumnToggle columns={CALL_HISTORY_COLUMNS}>
+            <div className="mt-3 overflow-x-auto">
+              <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
+                <thead className="bg-blue-50 text-blue-700">
+                  <tr>
+                    <th data-call-history-column="docket" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Docket</th>
+                    <th data-call-history-column="customer" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Customer</th>
+                    <th data-call-history-column="area" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Area</th>
+                    <th data-call-history-column="call-type" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
+                    <th data-call-history-column="amount" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
+                    <th data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
+                    <th data-call-history-column="status" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
+                    <th data-call-history-column="created" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-blue-100 bg-white">
+                  {calls.map((request) => {
+                    const status = normalizeStatus(request.status);
 
-                  return (
-                    <tr key={request.id}>
-                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">
-                        <div>
-                          <ReportCallDetailsModal request={request} />
-                          <p className="text-[11px] text-blue-600">{request.company}</p>
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{request.area}</td>
-                      <td className="px-2.5 py-2.5 text-blue-900">
-                        <div>
-                          <p className="font-medium">{request.callType}</p>
-                          {request.serviceBillingType ? (
-                            <p className="text-[11px] font-semibold text-blue-600">{request.serviceBillingType.toUpperCase()}</p>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2.5 font-medium text-blue-900">
-                        {request.serviceBillingType === "chargeable" ? formatINR(request.chargeableAmount || 0) : formatINR(0)}
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{request.assignedTo?.name ?? "Unassigned"}</td>
-                      <td className="px-2.5 py-2.5">
-                        <span
-                          className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
-                            status,
-                          )}`}
-                        >
-                          {getStatusLabel(status)}
-                        </span>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-blue-900">{formatDateTime(request.createdAt)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr key={request.id}>
+                        <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
+                        <td data-call-history-column="customer" className="px-2.5 py-2.5 text-blue-900">
+                          <div>
+                            <ReportCallDetailsModal request={request} />
+                            <p className="text-[11px] text-blue-600">{request.company}</p>
+                          </div>
+                        </td>
+                        <td data-call-history-column="area" className="px-2.5 py-2.5 text-blue-900">{request.area}</td>
+                        <td data-call-history-column="call-type" className="px-2.5 py-2.5 text-blue-900">
+                          <div>
+                            <p className="font-medium">{request.callType}</p>
+                            {request.serviceBillingType ? (
+                              <p className="text-[11px] font-semibold text-blue-600">{request.serviceBillingType.toUpperCase()}</p>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td data-call-history-column="amount" className="px-2.5 py-2.5 font-medium text-blue-900">
+                          {request.serviceBillingType === "chargeable" ? formatINR(request.chargeableAmount || 0) : formatINR(0)}
+                        </td>
+                        <td data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-blue-900">{request.assignedTo?.name ?? "Unassigned"}</td>
+                        <td data-call-history-column="status" className="px-2.5 py-2.5">
+                          <span
+                            className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
+                              status,
+                            )}`}
+                          >
+                            {getStatusLabel(status)}
+                          </span>
+                        </td>
+                        <td data-call-history-column="created" className="px-2.5 py-2.5 text-blue-900">{formatDateTime(request.createdAt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CallHistoryColumnToggle>
         )}
       </section>
     </main>

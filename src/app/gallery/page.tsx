@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { deleteGalleryMedia } from "../actions";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { getDashboardGalleryItemsByCompany } from "@/lib/gallery";
@@ -29,40 +28,9 @@ export default async function GalleryPage() {
   }
 
   const groups = await getDashboardGalleryItemsByCompany();
-  const totalFiles = groups.reduce((total, group) => total + group.items.length, 0);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
-      <header className="mb-5 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_60px_rgba(15,23,42,0.08)] sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-blue-500">Media Gallery</p>
-            <h1 className="mt-1 text-2xl font-semibold text-blue-950 sm:text-3xl">Uploaded Site Media</h1>
-            <p className="mt-1 text-sm text-blue-700">{groups.length} companies / {totalFiles} files</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/report"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Reports
-            </Link>
-            <Link
-              href="/call-history"
-              className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-            >
-              Call History
-            </Link>
-          </div>
-        </div>
-      </header>
-
       {groups.length === 0 ? (
         <section className="rounded-2xl border border-blue-200 bg-white p-8 text-center shadow-[0_16px_60px_rgba(15,23,42,0.08)]">
           <p className="text-lg font-semibold text-blue-950">No media available yet</p>

@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { createServiceRequest, logout } from "../actions";
-import { BrandLogo } from "../brand-logo";
+import { createServiceRequest } from "../actions";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -25,53 +23,6 @@ export default async function FormPage() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-[#004b8d]/90 px-4 py-4 text-white shadow-2xl shadow-blue-900/30 backdrop-blur sm:px-6 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-2">
-          <div className="inline-flex rounded-xl border border-white/20 bg-[#003d73] p-2">
-            <BrandLogo width={175} className="h-auto w-auto" />
-          </div>
-          <p className="text-sm uppercase tracking-[0.3em] text-blue-100">SRS Service Desk</p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Create a new service call</h1>
-          <p className="max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
-            Admin can create service requests and assign them later from dashboard.
-          </p>
-        </div>
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center md:w-auto md:justify-end">
-          <Link
-            href="/dashboard"
-            className="inline-flex w-full items-center justify-center rounded-full border border-blue-300/40 bg-blue-300/10 px-5 py-3 text-center text-sm font-medium text-blue-100 transition hover:bg-blue-300/20 sm:w-auto"
-          >
-            View dashboard
-          </Link>
-          <Link
-            href="/report"
-            className="inline-flex w-full items-center justify-center rounded-full border border-blue-300/40 bg-blue-300/10 px-5 py-3 text-center text-sm font-medium text-blue-100 transition hover:bg-blue-300/20 sm:w-auto"
-          >
-            Reports
-          </Link>
-          <Link
-            href="/call-history"
-            className="inline-flex w-full items-center justify-center rounded-full border border-blue-300/40 bg-blue-300/10 px-5 py-3 text-center text-sm font-medium text-blue-100 transition hover:bg-blue-300/20 sm:w-auto"
-          >
-            Call History
-          </Link>
-          <Link
-            href="/admin"
-            className="inline-flex w-full items-center justify-center rounded-full border border-blue-300/40 bg-blue-300/10 px-5 py-3 text-center text-sm font-medium text-blue-100 transition hover:bg-blue-300/20 sm:w-auto"
-          >
-            Admin panel
-          </Link>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="danger-btn inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-medium sm:w-auto"
-            >
-              Logout
-            </button>
-          </form>
-        </div>
-      </header>
-
       <section>
         <form
           action={createServiceRequest}

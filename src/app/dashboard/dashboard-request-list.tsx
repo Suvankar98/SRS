@@ -262,8 +262,19 @@ export function DashboardRequestList({
         })}
       </div>
 
-      <div className="hidden md:block overflow-x-auto">
-        <table className="min-w-[900px] w-full table-auto divide-y divide-blue-300 text-left text-xs">
+      <div className="hidden overflow-hidden md:block">
+        <table className="w-full table-fixed divide-y divide-blue-300 text-left text-xs">
+          <colgroup>
+            <col className="w-[14%]" />
+            <col className="w-[13%]" />
+            <col className="w-[10%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[7%]" />
+            <col className="w-[11%]" />
+            {canAssign ? <col className="w-[18%]" /> : null}
+          </colgroup>
           <thead className="bg-blue-50 text-blue-700">
             <tr>
               <Th>Docket</Th>
@@ -447,7 +458,7 @@ function OpenDocketIcon() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="break-words px-2.5 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-blue-900 border-b-2 border-blue-200">
+    <th className="break-words border-b-2 border-blue-200 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900">
       {children}
     </th>
   );
