@@ -46,6 +46,7 @@ model ServiceRequest {
   docketNumber String   @unique
   name         String
   company      String
+  contactPerson2 String?
   phoneNumber1 String
   phoneNumber2 String?
   fullAddress  String

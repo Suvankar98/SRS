@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type CallHistoryColumnToggleItem = {
   id: string;
@@ -12,16 +12,39 @@ type CallHistoryColumnToggleProps = {
   columns: CallHistoryColumnToggleItem[];
 };
 
+export const CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY = "srs-call-history-visible-columns";
+export const CALL_HISTORY_VISIBLE_COLUMNS_EVENT = "srs-call-history-visible-columns-change";
+
 export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryColumnToggleProps) {
   const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
   const visibleCount = columns.length - hiddenColumnIds.length;
+  const columnIds = columns.map((column) => column.id);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY);
+    if (!stored) {
+      dispatchVisibleColumns(columnIds);
+      return;
+    }
+
+    const visibleIds = stored
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => columnIds.includes(id));
+    setHiddenColumnIds(columnIds.filter((id) => !visibleIds.includes(id)));
+    dispatchVisibleColumns(visibleIds.length > 0 ? visibleIds : columnIds);
+  }, [columns]);
 
   function toggleColumn(columnId: string) {
-    setHiddenColumnIds((current) =>
-      current.includes(columnId)
+    setHiddenColumnIds((current) => {
+      const nextHidden = current.includes(columnId)
         ? current.filter((id) => id !== columnId)
-        : [...current, columnId],
-    );
+        : [...current, columnId];
+      const visibleIds = columnIds.filter((id) => !nextHidden.includes(id));
+      window.localStorage.setItem(CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY, visibleIds.join(","));
+      dispatchVisibleColumns(visibleIds);
+      return nextHidden;
+    });
   }
 
   return (
@@ -75,6 +98,14 @@ export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryC
         </div>
       )}
     </>
+  );
+}
+
+function dispatchVisibleColumns(visibleIds: string[]) {
+  window.dispatchEvent(
+    new CustomEvent(CALL_HISTORY_VISIBLE_COLUMNS_EVENT, {
+      detail: { visibleIds },
+    }),
   );
 }
 

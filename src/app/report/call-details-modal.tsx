@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { normalizeStatus } from "../status-utils";
 
 type Activity = {
@@ -22,6 +22,7 @@ type CallDetailsModalProps = {
     docketNumber: string;
     name: string;
     company: string;
+    contactPerson2: string | null;
     phoneNumber1: string;
     phoneNumber2: string | null;
     fullAddress: string;
@@ -45,6 +46,7 @@ type CallDetailsModalProps = {
     } | null;
     activities?: Activity[];
   } | null;
+  triggerContent?: ReactNode;
 };
 
 type TimelineRequest = NonNullable<CallDetailsModalProps["request"]>;
@@ -58,7 +60,7 @@ type TimelineEvent = {
   color: string;
 };
 
-export function ReportCallDetailsModal({ request }: CallDetailsModalProps) {
+export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsModalProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   if (!request) return null;
@@ -72,7 +74,7 @@ export function ReportCallDetailsModal({ request }: CallDetailsModalProps) {
         onClick={() => setIsOpen(true)}
         className="cursor-pointer text-blue-600 font-medium hover:text-blue-800 hover:underline transition"
       >
-        {request.name}
+        {triggerContent ?? request.name}
       </button>
 
       {isOpen && (

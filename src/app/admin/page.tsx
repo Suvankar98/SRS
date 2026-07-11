@@ -9,9 +9,10 @@ import {
 } from "../actions";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { FixedCallTypesSection } from "./fixed-call-types-section";
+import { SavedCustomerDetailsPanel, type SavedCustomerCompany } from "./saved-customer-details-panel";
 import { StaffEditModal } from "./staff-edit-modal";
 import { APP_ROLES } from "@/lib/auth-constants";
-import { getSession } from "@/lib/auth";
+import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SRTEC_PRODUCT_NAMES } from "@/lib/product-options";
 
@@ -30,10 +31,11 @@ type AdminPageProps = {
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getSession();
 
-  if (!session || session.role !== APP_ROLES.ADMIN) {
+  if (!session || !roleCanAssign(session.role)) {
     redirect("/dashboard");
   }
 
+  const isAdmin = session.role === APP_ROLES.ADMIN;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const duplicateParam = resolvedSearchParams.duplicate;
   const showDuplicateWarning = (Array.isArray(duplicateParam) ? duplicateParam[0] : duplicateParam) === "1";
@@ -48,14 +50,30 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     });
   }
 
-  const [staffMembers, products, callTypes] = await Promise.all([
+  const [staffMembers, products, callTypes, savedCustomerDetails] = await Promise.all([
     prisma.user.findMany({
       where: { role: { in: [APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE] } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.product.findMany({ orderBy: { name: "asc" } }),
     prisma.callType.findMany({ orderBy: { name: "asc" } }),
+    prisma.serviceRequest.findMany({
+      orderBy: { createdAt: "asc" },
+      take: 100,
+      select: {
+        id: true,
+        company: true,
+        name: true,
+        contactPerson2: true,
+        phoneNumber1: true,
+        phoneNumber2: true,
+        area: true,
+        fullAddress: true,
+        createdAt: true,
+      },
+    }),
   ]);
+  const savedCustomerCompanies = buildSavedCustomerCompanies(savedCustomerDetails);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_#f8fbff_0%,_#eef6ff_100%)]">
@@ -84,6 +102,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         ) : null}
 
         <section className="space-y-6">
+          {isAdmin ? (
           <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -153,8 +172,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </button>
             </form>
           </article>
+          ) : null}
 
-          <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+          <div className={`grid gap-6 ${isAdmin ? "xl:grid-cols-[1.08fr_0.92fr]" : ""}`}>
+            {isAdmin ? (
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -211,6 +232,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 ))}
               </div>
             </article>
+            ) : null}
 
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -275,7 +297,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </article>
           </div>
 
-          <FixedCallTypesSection initialCallTypes={callTypes.map((callType) => ({ id: callType.id, name: callType.name }))} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <FixedCallTypesSection initialCallTypes={callTypes.map((callType) => ({ id: callType.id, name: callType.name }))} />
+            <SavedCustomerDetailsPanel companies={savedCustomerCompanies} totalRequests={savedCustomerCompanies.length} />
+          </div>
         </section>
       </div>
     </main>
@@ -312,6 +337,59 @@ function EditIcon() {
 
 function formatStaffDepartment(department: string | null) {
   return STAFF_DEPARTMENT_OPTIONS.find((option) => option.value === department)?.label ?? "Not selected";
+}
+
+function formatAdminDate(value: Date) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  }).format(value);
+}
+
+type AdminSavedCustomerRequest = {
+  id: string;
+  company: string;
+  name: string;
+  contactPerson2: string | null;
+  phoneNumber1: string;
+  phoneNumber2: string | null;
+  area: string;
+  fullAddress: string;
+  createdAt: Date;
+};
+
+function buildSavedCustomerCompanies(requests: AdminSavedCustomerRequest[]): SavedCustomerCompany[] {
+  const companies = new Map<string, SavedCustomerCompany>();
+
+  requests.forEach((request) => {
+    const companyKey = request.company.trim().toLowerCase() || "unknown";
+    const existing = companies.get(companyKey);
+
+    if (existing) {
+      return;
+    }
+
+    companies.set(companyKey, {
+      company: request.company,
+      detail: formatSavedCustomerRequest(request),
+    });
+  });
+
+  return Array.from(companies.values());
+}
+
+function formatSavedCustomerRequest(request: AdminSavedCustomerRequest) {
+  return {
+    id: request.id,
+    name: request.name,
+    contactPerson2: request.contactPerson2,
+    phoneNumber1: request.phoneNumber1,
+    phoneNumber2: request.phoneNumber2,
+    area: request.area,
+    fullAddress: request.fullAddress,
+    createdAtLabel: formatAdminDate(request.createdAt),
+  };
 }
 
 

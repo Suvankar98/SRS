@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 import ReportFilters from "../report/report-filters";
 import { ReportCallDetailsModal } from "../report/call-details-modal";
+import { CallHistoryExportLinks } from "./export-links";
 import { CallHistoryColumnToggle } from "./row-toggle";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
@@ -89,6 +90,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       docketNumber: true,
       name: true,
       company: true,
+      contactPerson2: true,
       phoneNumber1: true,
       phoneNumber2: true,
       fullAddress: true,
@@ -152,8 +154,10 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   if (fromDate !== "") exportParams.set("from", fromDate);
   if (toDate !== "") exportParams.set("to", toDate);
   const exportQuery = exportParams.toString();
-  const csvExportHref = `/api/report/export?format=csv${exportQuery ? `&${exportQuery}` : ""}`;
-  const pdfExportHref = `/api/report/export?format=pdf${exportQuery ? `&${exportQuery}` : ""}`;
+  const isChargeableServiceFilter = selectedCallType === "Service" && selectedServiceBillingType === "chargeable";
+  const chargeableTotal = isChargeableServiceFilter
+    ? calls.reduce((total, request) => total + (request.chargeableAmount ?? 0), 0)
+    : 0;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -170,8 +174,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
               {activeFilters} active
             </span>
-            <a href={csvExportHref} className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50">Download CSV</a>
-            <a href={pdfExportHref} className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50">Download PDF</a>
+            <CallHistoryExportLinks baseQuery={exportQuery} columns={CALL_HISTORY_COLUMNS} />
             <a href="/call-history" className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50">Reset</a>
           </div>
         </div>
@@ -191,6 +194,18 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           areaOptions={areaOptions}
         />
       </section>
+
+      {isChargeableServiceFilter ? (
+        <section className="mb-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Chargeable Service Total</p>
+              <p className="mt-1 text-sm text-emerald-800">{calls.length} chargeable service calls in current filter.</p>
+            </div>
+            <p className="text-2xl font-semibold text-emerald-950">{formatINR(chargeableTotal)}</p>
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
         <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
@@ -221,8 +236,8 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                         <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
                         <td data-call-history-column="customer" className="px-2.5 py-2.5 text-blue-900">
                           <div>
-                            <ReportCallDetailsModal request={request} />
-                            <p className="text-[11px] text-blue-600">{request.company}</p>
+                            <ReportCallDetailsModal request={request} triggerContent={request.company} />
+                            <p className="text-[11px] text-blue-600">{request.name}</p>
                           </div>
                         </td>
                         <td data-call-history-column="area" className="px-2.5 py-2.5 text-blue-900">{request.area}</td>

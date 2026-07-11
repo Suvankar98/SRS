@@ -17,6 +17,7 @@ export type DashboardListRequest = {
   createdAt: Date;
   name: string;
   company: string;
+  contactPerson2: string | null;
   phoneNumber1: string;
   phoneNumber2: string | null;
   fullAddress: string;
@@ -180,8 +181,8 @@ export function DashboardRequestList({
               </div>
 
               <div className="min-w-0">
-                <p className="break-words text-base font-bold leading-snug text-blue-950">{request.name}</p>
-                <p className="mt-2 border-t border-blue-100 pt-2 break-words text-xs font-medium leading-snug text-slate-600">{request.company}</p>
+                <p className="break-words text-base font-bold leading-snug text-blue-950">{request.company}</p>
+                <p className="mt-2 border-t border-blue-100 pt-2 break-words text-xs font-medium leading-snug text-slate-600">{request.name}</p>
                 {!isEmployee ? (
                   <div className="mt-2 flex flex-col items-start">
                     <AdminManagerStatusSelect request={request} />

@@ -2,8 +2,13 @@
 
 import React from "react";
 
-export function AreaAutocomplete() {
-  const [query, setQuery] = React.useState("");
+type AreaAutocompleteProps = {
+  value?: string;
+  onChange?: (value: string) => void;
+};
+
+export function AreaAutocomplete({ value, onChange }: AreaAutocompleteProps = {}) {
+  const [internalQuery, setInternalQuery] = React.useState("");
   const [suggestions, setSuggestions] = React.useState<string[]>([]);
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const [loading, setLoading] = React.useState(false);
@@ -11,6 +16,7 @@ export function AreaAutocomplete() {
   const [noResults, setNoResults] = React.useState(false);
   const timeoutRef = React.useRef<number | null>(null);
   const latestQueryRef = React.useRef("");
+  const query = value ?? internalQuery;
 
   React.useEffect(() => {
     return () => {
@@ -74,7 +80,8 @@ export function AreaAutocomplete() {
 
   const handleSelect = (value: string) => {
     latestQueryRef.current = value;
-    setQuery(value);
+    setInternalQuery(value);
+    onChange?.(value);
     setSuggestions([]);
     setActiveIndex(-1);
   };
@@ -107,7 +114,8 @@ export function AreaAutocomplete() {
           value={query}
           onChange={(event) => {
             const nextQuery = event.target.value;
-            setQuery(nextQuery);
+            setInternalQuery(nextQuery);
+            onChange?.(nextQuery);
             setActiveIndex(-1);
             scheduleSearch(nextQuery);
           }}

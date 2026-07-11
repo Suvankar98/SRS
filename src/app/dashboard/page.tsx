@@ -34,6 +34,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
   const selectedStatuses = getSelectedStatuses(resolvedSearchParams.status);
   const createdDocket = typeof resolvedSearchParams.created === 'string' ? resolvedSearchParams.created : null;
+  const newCompanyStored = getSearchParamValue(resolvedSearchParams.newCompany) === "1";
   const reportFromDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.reportFrom));
   const reportToDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.reportTo));
   const reportDateRange = getDateRange(reportFromDate, reportToDate);
@@ -216,7 +217,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-2 py-4 sm:px-6 sm:py-6 lg:px-8"> 
       {/* show created toast client-side when a new service is created */}
-      <CreatedToast docket={createdDocket} />
+      <CreatedToast docket={createdDocket} newCompanyStored={newCompanyStored} />
       <section className="min-h-[calc(100vh-3rem)]">
 
         <div className="rounded-2xl border border-blue-200 bg-white p-2 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:rounded-[2rem] sm:p-6">
@@ -942,6 +943,7 @@ function filterRequests<
     docketNumber: string;
     name: string;
     company: string;
+    contactPerson2: string | null;
     area: string;
     product: string;
     callType: string;
@@ -964,6 +966,7 @@ function filterRequests<
         request.docketNumber,
         request.name,
         request.company,
+        request.contactPerson2 || "",
         request.area,
         request.product,
         request.callType,

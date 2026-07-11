@@ -19,6 +19,7 @@ type DashboardRequestRowRequest = {
   createdAt: Date | string;
   name: string;
   company: string;
+  contactPerson2: string | null;
   phoneNumber1: string;
   phoneNumber2: string | null;
   fullAddress: string;
@@ -378,8 +379,8 @@ export function DashboardRequestRow({
         </div>
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
-        <p className="font-semibold text-blue-950">{request.name}</p>
-        <p className="mt-1 border-t border-blue-100 pt-1 text-[11px] font-medium leading-snug text-slate-500">{request.company}</p>
+        <p className="font-semibold text-blue-950">{request.company}</p>
+        <p className="mt-1 border-t border-blue-100 pt-1 text-[11px] font-medium leading-snug text-slate-500">{request.name}</p>
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>

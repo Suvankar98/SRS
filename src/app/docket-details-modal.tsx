@@ -22,6 +22,7 @@ type RequestDetails = {
   createdAt: Date | string;
   name: string;
   company: string;
+  contactPerson2: string | null;
   phoneNumber1: string;
   phoneNumber2: string | null;
   fullAddress: string;
@@ -104,6 +105,7 @@ export function DocketDetailsModal({
   }, [onReady]);
   const [name, setName] = React.useState(request.name);
   const [company] = React.useState(request.company);
+  const [contactPerson2, setContactPerson2] = React.useState(request.contactPerson2 || "");
   const [phoneNumber1, setPhoneNumber1] = React.useState(request.phoneNumber1);
   const [phoneNumber2, setPhoneNumber2] = React.useState(request.phoneNumber2 || "");
   const [fullAddress, setFullAddress] = React.useState(request.fullAddress);
@@ -165,6 +167,7 @@ export function DocketDetailsModal({
     formData.append("requestId", String(request.id));
     formData.append("name", name);
     formData.append("company", company);
+    formData.append("contactPerson2", contactPerson2);
     formData.append("phoneNumber1", phoneNumber1);
     formData.append("phoneNumber2", phoneNumber2);
     formData.append("fullAddress", fullAddress);
@@ -268,11 +271,15 @@ export function DocketDetailsModal({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
               <div className="space-y-4">
-                <GridField label="Customer name">
+                <GridField label="Customer">
                   {canEdit ? (
-                    <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" />
+                    <div className="grid gap-2">
+                      <input value={company} readOnly className="w-full rounded border bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:text-base" />
+                      <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 1" />
+                      <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 2" />
+                    </div>
                   ) : (
-                    <CustomerNameField name={name} company={company} />
+                    <CustomerNameField name={name} company={company} contactPerson2={contactPerson2} />
                   )}
                 </GridField>
 
@@ -284,8 +291,8 @@ export function DocketDetailsModal({
                     </div>
                   ) : (
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <PhoneInfoField label="Primary phone" value={phoneNumber1} />
-                      {phoneNumber2.trim() ? <PhoneInfoField label="Alternate phone" value={phoneNumber2} /> : null}
+                      <PhoneInfoField label="Contact 1 phone" value={phoneNumber1} />
+                      {phoneNumber2.trim() ? <PhoneInfoField label="Contact 2 phone" value={phoneNumber2} /> : null}
                     </div>
                   )}
                 </GridField>
@@ -501,13 +508,26 @@ function InfoField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CustomerNameField({ name, company }: { name: string; company: string }) {
+function CustomerNameField({
+  name,
+  company,
+  contactPerson2,
+}: {
+  name: string;
+  company: string;
+  contactPerson2: string;
+}) {
   return (
     <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-      <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">Name</p>
-      <p className="mt-1 break-words font-semibold">{name}</p>
-      {company.trim() ? (
-        <p className="mt-2 border-t border-blue-200 pt-2 break-words font-semibold text-blue-900">{company}</p>
+      <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">Company</p>
+      <p className="mt-1 break-words font-semibold">{company}</p>
+      <p className="mt-2 border-t border-blue-200 pt-2 text-[10px] uppercase tracking-[0.12em] text-blue-600">Contact 1</p>
+      <p className="mt-1 break-words font-semibold text-blue-900">{name}</p>
+      {contactPerson2.trim() ? (
+        <>
+          <p className="mt-2 border-t border-blue-200 pt-2 text-[10px] uppercase tracking-[0.12em] text-blue-600">Contact 2</p>
+          <p className="mt-1 break-words font-semibold text-blue-900">{contactPerson2}</p>
+        </>
       ) : null}
     </div>
   );

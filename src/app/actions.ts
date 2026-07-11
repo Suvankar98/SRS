@@ -38,6 +38,16 @@ function getOptionalField(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getOptionalNullableField(formData: FormData, key: string) {
+  const value = formData.get(key);
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 const STATUS_SCORING_TIME_ZONE = "Asia/Kolkata";
 const PERFORMANCE_TIME_ZONE = "Asia/Kolkata";
 
@@ -431,6 +441,7 @@ export async function createServiceRequest(formData: FormData) {
 
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
+  const contactPerson2 = getOptionalNullableField(formData, "contactPerson2");
   const phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number 1");
   const fullAddress = getRequiredField(formData, "fullAddress");
   const complaintDetails = getRequiredField(formData, "complaintDetails");
@@ -439,10 +450,17 @@ export async function createServiceRequest(formData: FormData) {
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
   const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
-  const creator = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { name: true },
-  });
+  const [creator, existingCompany] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    }),
+    prisma.serviceRequest.findFirst({
+      where: { company: { equals: company, mode: "insensitive" } },
+      select: { id: true },
+    }),
+  ]);
+  const isNewSavedCompany = !existingCompany;
 
   const request = await prisma.$transaction(async (transaction) => {
     const existingDockets = await transaction.serviceRequest.findMany({
@@ -455,6 +473,7 @@ export async function createServiceRequest(formData: FormData) {
         docketNumber: `srs-${nextSequence}`,
         name,
         company,
+        contactPerson2,
         phoneNumber1,
         phoneNumber2,
         fullAddress,
@@ -503,7 +522,14 @@ export async function createServiceRequest(formData: FormData) {
 
   revalidatePath("/form");
   revalidatePath("/dashboard");
-  redirect(`/dashboard?created=${request.docketNumber}`);
+  revalidatePath("/admin");
+
+  const redirectParams = new URLSearchParams({ created: request.docketNumber });
+  if (isNewSavedCompany) {
+    redirectParams.set("newCompany", "1");
+  }
+
+  redirect(`/dashboard?${redirectParams.toString()}`);
 }
 
 export async function updateServiceRequestDetails(formData: FormData) {
@@ -512,6 +538,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
   const requestId = getRequiredField(formData, "requestId");
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
+  const contactPerson2 = getOptionalNullableField(formData, "contactPerson2");
   const phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number 1");
   const fullAddress = getRequiredField(formData, "fullAddress");
   const complaintDetails = getRequiredField(formData, "complaintDetails");
@@ -526,6 +553,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
     data: {
       name,
       company,
+      contactPerson2,
       phoneNumber1,
       phoneNumber2,
       fullAddress,

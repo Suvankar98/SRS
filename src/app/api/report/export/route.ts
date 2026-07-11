@@ -12,6 +12,31 @@ export const runtime = "nodejs";
 type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
 const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
+const CALL_HISTORY_EXPORT_COLUMNS = [
+  { id: "docket", label: "Docket" },
+  { id: "customer", label: "Customer" },
+  { id: "area", label: "Area" },
+  { id: "call-type", label: "Call Type" },
+  { id: "amount", label: "Amount" },
+  { id: "assigned-to", label: "Assigned To" },
+  { id: "status", label: "Status" },
+  { id: "created", label: "Created" },
+] as const;
+
+type ExportColumnId = (typeof CALL_HISTORY_EXPORT_COLUMNS)[number]["id"];
+type ExportColumn = (typeof CALL_HISTORY_EXPORT_COLUMNS)[number];
+type ExportRequestRow = {
+  docketNumber: string;
+  name: string;
+  company: string;
+  area: string;
+  callType: string;
+  serviceBillingType: string | null;
+  chargeableAmount: number | null;
+  status: string | null;
+  createdAt: Date;
+  assignedTo: { name: string } | null;
+};
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -31,6 +56,8 @@ export async function GET(request: Request) {
   const selectedArea = (url.searchParams.get("area") || "").trim();
   const fromDate = (url.searchParams.get("from") || "").trim();
   const toDate = (url.searchParams.get("to") || "").trim();
+  const visibleColumns = getVisibleExportColumns(url.searchParams.get("columns"));
+  const isChargeableServiceExport = selectedCallType === "Service" && selectedServiceBillingType === "chargeable";
 
   const employees = await prisma.user.findMany({
     where: { role: APP_ROLES.EMPLOYEE },
@@ -58,6 +85,8 @@ export async function GET(request: Request) {
       company: true,
       area: true,
       callType: true,
+      serviceBillingType: true,
+      chargeableAmount: true,
       status: true,
       createdAt: true,
       assignedTo: { select: { name: true } },
@@ -66,7 +95,7 @@ export async function GET(request: Request) {
   });
 
   if (format === "pdf") {
-    const pdfBuffer = await generatePdf(requests);
+    const pdfBuffer = await generatePdf(requests, visibleColumns, isChargeableServiceExport);
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
@@ -76,7 +105,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const csv = generateCsv(requests);
+  const csv = generateCsv(requests, visibleColumns, isChargeableServiceExport);
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
@@ -86,33 +115,28 @@ export async function GET(request: Request) {
   });
 }
 
-function generateCsv(
-  requests: Array<{
-    docketNumber: string;
-    name: string;
-    company: string;
-    area: string;
-    callType: string;
-    status: string | null;
-    createdAt: Date;
-    assignedTo: { name: string } | null;
-  }>,
-) {
-  const header = ["Docket", "Customer", "Company", "Area", "Call Type", "Assigned To", "Status", "Created At IST"];
+function generateCsv(requests: ExportRequestRow[], columns: ExportColumn[], includeChargeableTotal: boolean) {
+  const header = columns.map((column) => column.label);
   const lines = [header.map(csvEscape).join(",")];
 
   for (const row of requests) {
-    const line = [
-      row.docketNumber,
-      row.name,
-      row.company,
-      row.area,
-      row.callType,
-      row.assignedTo?.name ?? "Unassigned",
-      normalizeStatus(row.status),
-      formatDateTime(row.createdAt),
-    ];
+    const line = columns.map((column) => getExportCellValue(row, column.id));
     lines.push(line.map(csvEscape).join(","));
+  }
+
+  if (includeChargeableTotal && columns.some((column) => column.id === "amount")) {
+    const totalLine = columns.map((column, index) => {
+      if (index === 0) {
+        return "Total Amount";
+      }
+
+      if (column.id === "amount") {
+        return formatINR(getChargeableTotal(requests));
+      }
+
+      return "";
+    });
+    lines.push(totalLine.map(csvEscape).join(","));
   }
 
   return `\uFEFF${lines.join("\n")}`;
@@ -123,18 +147,7 @@ function csvEscape(value: string) {
   return `"${sanitized}"`;
 }
 
-async function generatePdf(
-  requests: Array<{
-    docketNumber: string;
-    name: string;
-    company: string;
-    area: string;
-    callType: string;
-    status: string | null;
-    createdAt: Date;
-    assignedTo: { name: string } | null;
-  }>,
-) {
+async function generatePdf(requests: ExportRequestRow[], columns: ExportColumn[], includeChargeableTotal: boolean) {
   const pdfDoc = await PDFDocument.create();
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -163,19 +176,15 @@ async function generatePdf(
   drawLine("SRS Service Report", 18, true);
   drawLine(`Generated at: ${formatDateTime(new Date())}`, 10);
   drawLine(`Total rows: ${requests.length}`, 10);
+  if (includeChargeableTotal && columns.some((column) => column.id === "amount")) {
+    drawLine(`Total Amount: ${formatINR(getChargeableTotal(requests))}`, 11, true);
+  }
   y -= 6;
 
   for (const row of requests) {
-    const line = [
-      row.docketNumber,
-      row.name,
-      row.company,
-      row.area,
-      row.callType,
-      row.assignedTo?.name ?? "Unassigned",
-      normalizeStatus(row.status),
-      formatDateTime(row.createdAt),
-    ].join(" | ");
+    const line = columns
+      .map((column) => `${column.label}: ${getExportCellValue(row, column.id)}`)
+      .join(" | ");
 
     const wrapped = wrapTextToWidth(line, regularFont, 9, contentWidth);
     const blockHeight = wrapped.length * (9 + 4) + 3;
@@ -246,6 +255,14 @@ function formatDateTime(value: Date) {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "Asia/Kolkata",
+  }).format(value);
+}
+
+function formatINR(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
@@ -385,6 +402,46 @@ function getCanonicalStatus(value: string): CanonicalStatus | "" {
   }
 
   return "";
+}
+
+function getVisibleExportColumns(value: string | null): ExportColumn[] {
+  if (!value) {
+    return [...CALL_HISTORY_EXPORT_COLUMNS];
+  }
+
+  const requestedIds = value
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id): id is ExportColumnId =>
+      CALL_HISTORY_EXPORT_COLUMNS.some((column) => column.id === id),
+    );
+
+  if (requestedIds.length === 0) {
+    return [...CALL_HISTORY_EXPORT_COLUMNS];
+  }
+
+  return CALL_HISTORY_EXPORT_COLUMNS.filter((column) => requestedIds.includes(column.id));
+}
+
+function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId) {
+  if (columnId === "docket") return row.docketNumber;
+  if (columnId === "customer") return `${row.company} / ${row.name}`;
+  if (columnId === "area") return row.area;
+  if (columnId === "call-type") {
+    return row.serviceBillingType
+      ? `${row.callType} ${row.serviceBillingType.toUpperCase()}`
+      : row.callType;
+  }
+  if (columnId === "amount") {
+    return row.serviceBillingType === "chargeable" ? formatINR(row.chargeableAmount ?? 0) : formatINR(0);
+  }
+  if (columnId === "assigned-to") return row.assignedTo?.name ?? "Unassigned";
+  if (columnId === "status") return normalizeStatus(row.status);
+  return formatDateTime(row.createdAt);
+}
+
+function getChargeableTotal(requests: ExportRequestRow[]) {
+  return requests.reduce((total, request) => total + (request.chargeableAmount ?? 0), 0);
 }
 
 function getServiceBillingType(value: string) {

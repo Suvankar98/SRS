@@ -62,7 +62,7 @@ const navItems: NavItem[] = [
     href: "/admin",
     label: "Admin Panel",
     icon: "admin",
-    roles: [APP_ROLES.ADMIN],
+    roles: [APP_ROLES.ADMIN, APP_ROLES.MANAGER],
   },
 ];
 
