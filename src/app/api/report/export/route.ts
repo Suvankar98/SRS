@@ -1,4 +1,4 @@
-import { PDFDocument, PDFFont, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFFont, StandardFonts, rgb } from "pdf-lib";
 import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
@@ -14,7 +14,7 @@ type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
 const CALL_HISTORY_EXPORT_COLUMNS = [
   { id: "docket", label: "Docket" },
-  { id: "customer", label: "Customer" },
+  { id: "customer", label: "Company" },
   { id: "area", label: "Area" },
   { id: "call-type", label: "Call Type" },
   { id: "amount", label: "Amount" },
@@ -152,59 +152,219 @@ async function generatePdf(requests: ExportRequestRow[], columns: ExportColumn[]
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const pageWidth = 595.28;
-  const pageHeight = 841.89;
-  const margin = 36;
+  const pageWidth = 841.89;
+  const pageHeight = 595.28;
+  const margin = 28;
   const contentWidth = pageWidth - margin * 2;
+  const headerFontSize = 7.4;
+  const bodyFontSize = 7.2;
+  const lineHeight = 9.6;
+  const cellPadding = 4.5;
+  const tableHeaderHeight = 22;
+  const tableColumns = getPdfTableColumns(columns, contentWidth);
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
-  const drawLine = (text: string, size: number, isBold = false) => {
-    const font = isBold ? boldFont : regularFont;
-    page.drawText(text, { x: margin, y, size, font });
-    y -= size + 4;
-  };
+  const drawDocumentHeader = () => {
+    page.drawText("SRS Service Report", {
+      x: margin,
+      y,
+      size: 18,
+      font: boldFont,
+      color: rgb(0.02, 0.08, 0.22),
+    });
 
-  const ensureSpace = (neededHeight: number) => {
-    if (y - neededHeight < margin) {
-      page = pdfDoc.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
-    }
-  };
+    page.drawText(`Generated: ${formatDateTime(new Date())}`, {
+      x: margin,
+      y: y - 18,
+      size: 8.4,
+      font: regularFont,
+      color: rgb(0.25, 0.32, 0.45),
+    });
 
-  drawLine("SRS Service Report", 18, true);
-  drawLine(`Generated at: ${formatDateTime(new Date())}`, 10);
-  drawLine(`Total rows: ${requests.length}`, 10);
-  if (includeChargeableTotal && columns.some((column) => column.id === "amount")) {
-    drawLine(`Total Amount: ${formatINR(getChargeableTotal(requests))}`, 11, true);
-  }
-  y -= 6;
+    page.drawText(`Rows: ${requests.length}`, {
+      x: margin + 180,
+      y: y - 18,
+      size: 8.4,
+      font: regularFont,
+      color: rgb(0.25, 0.32, 0.45),
+    });
 
-  for (const row of requests) {
-    const line = columns
-      .map((column) => `${column.label}: ${getExportCellValue(row, column.id)}`)
-      .join(" | ");
-
-    const wrapped = wrapTextToWidth(line, regularFont, 9, contentWidth);
-    const blockHeight = wrapped.length * (9 + 4) + 3;
-    ensureSpace(blockHeight);
-
-    for (const segment of wrapped) {
-      page.drawText(segment, {
-        x: margin,
-        y,
-        size: 9,
-        font: regularFont,
+    if (includeChargeableTotal && columns.some((column) => column.id === "amount")) {
+      page.drawText(`Total Amount: ${formatINRPlain(getChargeableTotal(requests))}`, {
+        x: margin + 250,
+        y: y - 18,
+        size: 8.4,
+        font: boldFont,
+        color: rgb(0.02, 0.08, 0.22),
       });
-      y -= 13;
     }
 
-    y -= 3;
+    y -= 40;
+  };
+
+  const drawTableHeader = () => {
+    page.drawRectangle({
+      x: margin,
+      y: y - tableHeaderHeight,
+      width: contentWidth,
+      height: tableHeaderHeight,
+      color: rgb(0.9, 0.95, 1),
+      borderColor: rgb(0.63, 0.78, 1),
+      borderWidth: 0.8,
+    });
+
+    let x = margin;
+    for (const column of tableColumns) {
+      page.drawText(toPdfText(column.label.toUpperCase()), {
+        x: x + cellPadding,
+        y: y - 14,
+        size: headerFontSize,
+        font: boldFont,
+        color: rgb(0.02, 0.22, 0.68),
+      });
+      x += column.width;
+      page.drawLine({
+        start: { x, y },
+        end: { x, y: y - tableHeaderHeight },
+        thickness: 0.5,
+        color: rgb(0.75, 0.84, 0.96),
+      });
+    }
+
+    y -= tableHeaderHeight;
+  };
+
+  const addPageWithTableHeader = () => {
+    page = pdfDoc.addPage([pageWidth, pageHeight]);
+    y = pageHeight - margin;
+    drawTableHeader();
+  };
+
+  drawDocumentHeader();
+  drawTableHeader();
+
+  if (requests.length === 0) {
+    drawPdfTableRow(["No records found."], [contentWidth], {
+      page,
+      x: margin,
+      y,
+      regularFont,
+      bodyFontSize,
+      lineHeight,
+      cellPadding,
+    });
+  }
+
+  for (const [index, row] of requests.entries()) {
+    const cellLines = tableColumns.map((column) =>
+      wrapTextToWidth(getPdfCellValue(row, column.id), regularFont, bodyFontSize, column.width - cellPadding * 2),
+    );
+    const rowHeight = Math.max(24, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
+
+    if (y - rowHeight < margin) {
+      addPageWithTableHeader();
+    }
+
+    page.drawRectangle({
+      x: margin,
+      y: y - rowHeight,
+      width: contentWidth,
+      height: rowHeight,
+      color: index % 2 === 0 ? rgb(1, 1, 1) : rgb(0.97, 0.99, 1),
+      borderColor: rgb(0.78, 0.86, 0.96),
+      borderWidth: 0.5,
+    });
+
+    let x = margin;
+    for (const [cellIndex, column] of tableColumns.entries()) {
+      for (const [lineIndex, line] of cellLines[cellIndex].entries()) {
+        page.drawText(line, {
+          x: x + cellPadding,
+          y: y - cellPadding - bodyFontSize - lineIndex * lineHeight,
+          size: bodyFontSize,
+          font: regularFont,
+          color: rgb(0.02, 0.08, 0.22),
+        });
+      }
+      x += column.width;
+      page.drawLine({
+        start: { x, y },
+        end: { x, y: y - rowHeight },
+        thickness: 0.4,
+        color: rgb(0.84, 0.9, 0.98),
+      });
+    }
+
+    y -= rowHeight;
   }
 
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);
+}
+
+function drawPdfTableRow(
+  values: string[],
+  widths: number[],
+  options: {
+    page: ReturnType<PDFDocument["addPage"]>;
+    x: number;
+    y: number;
+    regularFont: PDFFont;
+    bodyFontSize: number;
+    lineHeight: number;
+    cellPadding: number;
+  },
+) {
+  const rowHeight = 24;
+  options.page.drawRectangle({
+    x: options.x,
+    y: options.y - rowHeight,
+    width: widths.reduce((total, width) => total + width, 0),
+    height: rowHeight,
+    color: rgb(1, 1, 1),
+    borderColor: rgb(0.78, 0.86, 0.96),
+    borderWidth: 0.5,
+  });
+  options.page.drawText(toPdfText(values.join(" ")), {
+    x: options.x + options.cellPadding,
+    y: options.y - options.cellPadding - options.bodyFontSize,
+    size: options.bodyFontSize,
+    font: options.regularFont,
+    color: rgb(0.02, 0.08, 0.22),
+  });
+}
+
+function getPdfTableColumns(columns: ExportColumn[], contentWidth: number) {
+  const weights: Record<ExportColumnId, number> = {
+    docket: 0.85,
+    customer: 2.05,
+    area: 1,
+    "call-type": 1.25,
+    amount: 0.9,
+    "assigned-to": 1.1,
+    status: 0.95,
+    created: 1.35,
+  };
+  const totalWeight = columns.reduce((total, column) => total + weights[column.id], 0);
+
+  return columns.map((column) => ({
+    ...column,
+    width: (contentWidth * weights[column.id]) / totalWeight,
+  }));
+}
+
+function getPdfCellValue(row: ExportRequestRow, columnId: ExportColumnId) {
+  if (columnId === "customer") {
+    return `${row.company}\n${row.name}`;
+  }
+
+  if (columnId === "call-type" && row.serviceBillingType) {
+    return `${row.callType}\n${row.serviceBillingType.toUpperCase()}`;
+  }
+
+  return getExportCellValue(row, columnId, "pdf");
 }
 
 function wrapTextToWidth(
@@ -213,28 +373,36 @@ function wrapTextToWidth(
   size: number,
   maxWidth: number,
 ) {
-  const words = text.split(/\s+/).filter(Boolean);
+  const paragraphs = toPdfText(text).split(/\r?\n/);
   const lines: string[] = [];
-  let current = "";
 
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    const width = font.widthOfTextAtSize(candidate, size);
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let current = "";
 
-    if (width <= maxWidth) {
-      current = candidate;
-      continue;
+    for (const word of words) {
+      const chunks = splitLongWord(word, font, size, maxWidth);
+
+      for (const chunk of chunks) {
+        const candidate = current ? `${current} ${chunk}` : chunk;
+        const width = font.widthOfTextAtSize(candidate, size);
+
+        if (width <= maxWidth) {
+          current = candidate;
+          continue;
+        }
+
+        if (current) {
+          lines.push(current);
+        }
+
+        current = chunk;
+      }
     }
 
     if (current) {
       lines.push(current);
     }
-
-    current = word;
-  }
-
-  if (current) {
-    lines.push(current);
   }
 
   if (lines.length === 0) {
@@ -242,6 +410,32 @@ function wrapTextToWidth(
   }
 
   return lines;
+}
+
+function splitLongWord(word: string, font: PDFFont, size: number, maxWidth: number) {
+  if (font.widthOfTextAtSize(word, size) <= maxWidth) {
+    return [word];
+  }
+
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const char of word) {
+    const candidate = `${current}${char}`;
+    if (current && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+      chunks.push(current);
+      current = char;
+      continue;
+    }
+
+    current = candidate;
+  }
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
 }
 
 function getFileStamp() {
@@ -264,6 +458,16 @@ function formatINR(value: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatINRPlain(value: number) {
+  return `Rs. ${new Intl.NumberFormat("en-IN", {
+    maximumFractionDigits: 0,
+  }).format(value)}`;
+}
+
+function toPdfText(value: string) {
+  return value.replace(/[^\x20-\x7E]/g, " ");
 }
 
 function buildReportWhere({
@@ -423,7 +627,7 @@ function getVisibleExportColumns(value: string | null): ExportColumn[] {
   return CALL_HISTORY_EXPORT_COLUMNS.filter((column) => requestedIds.includes(column.id));
 }
 
-function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId) {
+function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId, target: "csv" | "pdf" = "csv") {
   if (columnId === "docket") return row.docketNumber;
   if (columnId === "customer") return `${row.company} / ${row.name}`;
   if (columnId === "area") return row.area;
@@ -433,7 +637,8 @@ function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId) {
       : row.callType;
   }
   if (columnId === "amount") {
-    return row.serviceBillingType === "chargeable" ? formatINR(row.chargeableAmount ?? 0) : formatINR(0);
+    const amount = row.serviceBillingType === "chargeable" ? row.chargeableAmount ?? 0 : 0;
+    return target === "pdf" ? formatINRPlain(amount) : formatINR(amount);
   }
   if (columnId === "assigned-to") return row.assignedTo?.name ?? "Unassigned";
   if (columnId === "status") return normalizeStatus(row.status);

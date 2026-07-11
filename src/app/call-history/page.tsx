@@ -17,7 +17,7 @@ type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
 const CALL_HISTORY_COLUMNS = [
   { id: "docket", label: "Docket" },
-  { id: "customer", label: "Customer" },
+  { id: "customer", label: "Company" },
   { id: "area", label: "Area" },
   { id: "call-type", label: "Call Type" },
   { id: "amount", label: "Amount" },
@@ -218,7 +218,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                 <thead className="bg-blue-50 text-blue-700">
                   <tr>
                     <th data-call-history-column="docket" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Docket</th>
-                    <th data-call-history-column="customer" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Customer</th>
+                    <th data-call-history-column="customer" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Company</th>
                     <th data-call-history-column="area" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Area</th>
                     <th data-call-history-column="call-type" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
                     <th data-call-history-column="amount" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
