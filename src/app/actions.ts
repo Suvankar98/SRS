@@ -833,25 +833,42 @@ function mapSavedCustomerRows(rows: string[][]): SavedCustomerUploadRow[] {
     return [];
   }
 
-  const header = cleanRows[0].map(normalizeSavedCustomerHeader);
+  const headerRowIndex = findSavedCustomerHeaderRowIndex(cleanRows);
+  const header = headerRowIndex >= 0 ? cleanRows[headerRowIndex].map(normalizeSavedCustomerHeader) : [];
   const companyIndex = findSavedCustomerHeaderIndex(header, ["companyname", "company", "customername", "customer"]);
   const nameIndex = findSavedCustomerHeaderIndex(header, ["name", "contactname", "contactperson", "contactperson1", "contact1"]);
   const phoneIndex = findSavedCustomerHeaderIndex(header, ["phonenumber", "phone", "mobile", "contactnumber", "contactno", "contactno1", "phone1", "phonenumber1"]);
   const areaIndex = findSavedCustomerHeaderIndex(header, ["area", "location"]);
   const addressIndex = findSavedCustomerHeaderIndex(header, ["fulladdress", "address"]);
   const hasKnownHeader = [companyIndex, nameIndex, phoneIndex, areaIndex, addressIndex].some((index) => index >= 0);
+  const dataRows = hasKnownHeader ? cleanRows.slice(headerRowIndex + 1) : cleanRows;
 
-  return cleanRows.slice(1).map((row) => ({
-    company: getDelimitedCell(row, hasKnownHeader ? companyIndex : 0),
-    name: getDelimitedCell(row, hasKnownHeader ? nameIndex : 1),
-    phoneNumber: getDelimitedCell(row, hasKnownHeader ? phoneIndex : 2),
-    area: getDelimitedCell(row, hasKnownHeader ? areaIndex : 3),
-    fullAddress: getDelimitedCell(row, hasKnownHeader ? addressIndex : 4),
-  }));
+  return dataRows
+    .map((row) => ({
+      company: getDelimitedCell(row, hasKnownHeader ? companyIndex : 0),
+      name: getDelimitedCell(row, hasKnownHeader ? nameIndex : 1),
+      phoneNumber: getDelimitedCell(row, hasKnownHeader ? phoneIndex : 2),
+      area: getDelimitedCell(row, hasKnownHeader ? areaIndex : 3),
+      fullAddress: getDelimitedCell(row, hasKnownHeader ? addressIndex : 4),
+    }))
+    .filter((row) => getCompanyMatchKey(row.company) !== "" && !isSavedCustomerMetadataRow(row.company));
 }
 
 function normalizeSavedCustomerHeader(value: string) {
   return value.replace(/^\uFEFF/, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function findSavedCustomerHeaderRowIndex(rows: string[][]) {
+  return rows.findIndex((row) => {
+    const normalizedCells = row.map(normalizeSavedCustomerHeader);
+    const hasCustomerName = normalizedCells.some((cell) => ["customername", "companyname", "company"].includes(cell));
+    const hasContactOrPhone = normalizedCells.some((cell) =>
+      ["contactperson1", "contactperson", "contactno1", "contactno", "phonenumber", "phone"].includes(cell),
+    );
+    const hasAddress = normalizedCells.some((cell) => ["address", "fulladdress"].includes(cell));
+
+    return hasCustomerName && (hasContactOrPhone || hasAddress);
+  });
 }
 
 function findSavedCustomerHeaderIndex(headers: string[], names: string[]) {
@@ -868,6 +885,11 @@ function normalizeCompanyLookup(value: string) {
 
 function getCompanyMatchKey(value: string) {
   return normalizeCompanyLookup(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isSavedCustomerMetadataRow(value: string) {
+  const key = getCompanyMatchKey(value);
+  return ["listofaccounts", "groupsundrydebtors", "customername"].includes(key);
 }
 
 function parseDelimitedRows(content: string) {
