@@ -35,9 +35,14 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
       return [];
     }
 
+    const compactQuery = getSavedCompanySearchKey(query);
+
     return savedCompanies
-      .filter((option) => option.company.toLowerCase().startsWith(query))
-      .slice(0, 8);
+      .filter((option) => {
+        const searchText = getSavedCompanySearchText(option);
+        return searchText.includes(query) || getSavedCompanySearchKey(searchText).includes(compactQuery);
+      })
+      .slice(0, 10);
   }, [company, savedCompanies]);
 
   const handleSelectCompany = (option: SavedCompanyOption) => {
@@ -74,18 +79,21 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
         </label>
 
         {showCompanyOptions && filteredCompanies.length > 0 ? (
-          <div className="absolute left-0 right-0 z-20 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-blue-200 bg-white p-2 shadow-xl">
+          <div className="absolute left-0 right-0 z-20 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-blue-200 bg-white p-2 shadow-xl">
             {filteredCompanies.map((option) => (
               <button
                 key={option.company}
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => handleSelectCompany(option)}
-                className="block w-full rounded-xl px-3 py-2 text-left transition hover:bg-blue-50"
+                className="block w-full rounded-xl px-3 py-2.5 text-left transition hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
               >
-                <span className="block truncate text-sm font-semibold text-blue-950">{option.company}</span>
-                <span className="mt-0.5 block truncate text-xs text-blue-600">
-                  {option.name} / {option.area}
+                <span className="block break-words text-sm font-semibold leading-5 text-blue-950">{option.company}</span>
+                <span className="mt-1 block break-words text-xs font-semibold leading-5 text-slate-950">
+                  {formatSavedCustomerContact(option)}
+                </span>
+                <span className="mt-1 block break-words text-xs leading-5 text-blue-700">
+                  {formatSavedCustomerLocation(option)}
                 </span>
               </button>
             ))}
@@ -133,6 +141,36 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
       </label>
     </>
   );
+}
+
+function getSavedCompanySearchText(option: SavedCompanyOption) {
+  return [
+    option.company,
+    option.name,
+    option.contactPerson2,
+    option.phoneNumber1,
+    option.phoneNumber2,
+    option.area,
+    option.fullAddress,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getSavedCompanySearchKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function formatSavedCustomerContact(option: SavedCompanyOption) {
+  const primaryContact = [option.name, option.phoneNumber1].filter(Boolean).join(" -> ");
+  const secondaryContact = [option.contactPerson2, option.phoneNumber2].filter(Boolean).join(" -> ");
+  return [primaryContact, secondaryContact].filter(Boolean).join(" | ") || "No contact details saved";
+}
+
+function formatSavedCustomerLocation(option: SavedCompanyOption) {
+  const area = option.area ? `Area: ${option.area}` : "";
+  return [area, option.fullAddress].filter(Boolean).join(" | ") || "No address saved";
 }
 
 type FieldProps = {

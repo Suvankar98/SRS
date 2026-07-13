@@ -18,7 +18,7 @@ export default async function FormPage() {
     redirect("/dashboard");
   }
 
-  const [databaseProducts, savedRequests] = await Promise.all([
+  const [databaseProducts, savedRequests, importedSavedCustomers] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.serviceRequest.findMany({
       where: { deletedAt: null },
@@ -34,9 +34,19 @@ export default async function FormPage() {
         fullAddress: true,
       },
     }),
+    prisma.savedCustomer.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        company: true,
+        name: true,
+        phoneNumber1: true,
+        area: true,
+        fullAddress: true,
+      },
+    }),
   ]);
   const products = getProductOptions(databaseProducts);
-  const savedCompanies = buildSavedCompanyOptions(savedRequests);
+  const savedCompanies = buildSavedCompanyOptions(savedRequests, importedSavedCustomers);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
@@ -82,11 +92,19 @@ export default async function FormPage() {
   );
 }
 
-function buildSavedCompanyOptions(requests: SavedCompanyOption[]) {
+type ImportedSavedCompany = {
+  company: string;
+  name: string;
+  phoneNumber1: string;
+  area: string;
+  fullAddress: string;
+};
+
+function buildSavedCompanyOptions(requests: SavedCompanyOption[], importedCustomers: ImportedSavedCompany[]) {
   const options = new Map<string, SavedCompanyOption>();
 
   requests.forEach((request) => {
-    const key = request.company.trim().toLowerCase();
+    const key = getSavedCompanyKey(request.company);
     if (!key || options.has(key)) {
       return;
     }
@@ -94,5 +112,26 @@ function buildSavedCompanyOptions(requests: SavedCompanyOption[]) {
     options.set(key, request);
   });
 
+  importedCustomers.forEach((customer) => {
+    const key = getSavedCompanyKey(customer.company);
+    if (!key || options.has(key)) {
+      return;
+    }
+
+    options.set(key, {
+      company: customer.company,
+      name: customer.name,
+      contactPerson2: null,
+      phoneNumber1: customer.phoneNumber1,
+      phoneNumber2: null,
+      area: customer.area,
+      fullAddress: customer.fullAddress,
+    });
+  });
+
   return Array.from(options.values());
+}
+
+function getSavedCompanyKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }

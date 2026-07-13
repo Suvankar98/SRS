@@ -450,7 +450,8 @@ export async function createServiceRequest(formData: FormData) {
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
   const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
-  const [creator, existingCompany] = await Promise.all([
+  const companyKey = getCompanyMatchKey(company);
+  const [creator, existingRequestCompany, existingSavedCustomerCompany] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { name: true },
@@ -459,8 +460,12 @@ export async function createServiceRequest(formData: FormData) {
       where: { company: { equals: company, mode: "insensitive" } },
       select: { id: true },
     }),
+    prisma.savedCustomer.findFirst({
+      where: { companyKey },
+      select: { id: true },
+    }),
   ]);
-  const isNewSavedCompany = !existingCompany;
+  const isNewSavedCompany = !existingRequestCompany && !existingSavedCustomerCompany;
 
   const request = await prisma.$transaction(async (transaction) => {
     const existingDockets = await transaction.serviceRequest.findMany({
