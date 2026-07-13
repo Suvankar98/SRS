@@ -7,6 +7,7 @@ import { importSavedCustomerDetails, updateSavedCustomerDetails } from "../actio
 
 export type SavedCustomerRequest = {
   id: string;
+  source: "serviceRequest" | "savedCustomer";
   name: string;
   contactPerson2: string | null;
   phoneNumber1: string;
@@ -24,14 +25,6 @@ export type SavedCustomerCompany = {
 type SavedCustomerDetailsPanelProps = {
   companies: SavedCustomerCompany[];
   totalRequests: number;
-};
-
-type CustomerImportRow = {
-  company: string;
-  name: string;
-  phoneNumber: string;
-  area: string;
-  fullAddress: string;
 };
 
 const CSV_HEADERS = ["Company Name", "Name", "Phone Number", "Area", "Full Address"] as const;
@@ -81,16 +74,8 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
       return;
     }
 
-    const content = await file.text();
-    const rows = parseCustomerFile(content);
-    if (rows.length === 0) {
-      setImportMessage("No customer rows were found in the file.");
-      event.target.value = "";
-      return;
-    }
-
     const formData = new FormData();
-    formData.set("rows", JSON.stringify(rows));
+    formData.set("file", file);
 
     startImportTransition(async () => {
       const result = await importSavedCustomerDetails(formData);
@@ -166,7 +151,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,text/csv,.txt"
+        accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="hidden"
         onChange={handleFileUpload}
       />
@@ -239,6 +224,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
               {isEditing ? (
                 <form action={saveSelectedCustomer} className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
                   <input type="hidden" name="requestId" value={selectedDetail.id} />
+                  <input type="hidden" name="source" value={selectedDetail.source} />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <CustomerInput label="Company Name" name="company" defaultValue={selectedCompany.company} />
                     <CustomerInput label="Name" name="name" defaultValue={selectedDetail.name} />
@@ -345,86 +331,6 @@ function getMissingFieldCount(company: SavedCustomerCompany) {
 
 function escapeCsvValue(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
-}
-
-function parseCustomerFile(content: string): CustomerImportRow[] {
-  const lines = parseCsvRows(content).filter((row) => row.some((cell) => cell.trim() !== ""));
-  if (lines.length <= 1) {
-    return [];
-  }
-
-  const header = lines[0].map(normalizeHeader);
-  const companyIndex = findHeaderIndex(header, ["company name", "company"]);
-  const nameIndex = findHeaderIndex(header, ["name", "contact name", "contact person"]);
-  const phoneIndex = findHeaderIndex(header, ["phone number", "phone", "mobile"]);
-  const areaIndex = findHeaderIndex(header, ["area", "location"]);
-  const addressIndex = findHeaderIndex(header, ["full address", "address"]);
-
-  return lines.slice(1).map((row) => ({
-    company: getCell(row, companyIndex),
-    name: getCell(row, nameIndex),
-    phoneNumber: getCell(row, phoneIndex),
-    area: getCell(row, areaIndex),
-    fullAddress: getCell(row, addressIndex),
-  }));
-}
-
-function parseCsvRows(content: string) {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let inQuotes = false;
-
-  for (let index = 0; index < content.length; index += 1) {
-    const char = content[index];
-    const nextChar = content[index + 1];
-
-    if (char === '"' && inQuotes && nextChar === '"') {
-      cell += '"';
-      index += 1;
-      continue;
-    }
-
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-
-    if (char === "," && !inQuotes) {
-      row.push(cell.trim());
-      cell = "";
-      continue;
-    }
-
-    if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && nextChar === "\n") {
-        index += 1;
-      }
-      row.push(cell.trim());
-      rows.push(row);
-      row = [];
-      cell = "";
-      continue;
-    }
-
-    cell += char;
-  }
-
-  row.push(cell.trim());
-  rows.push(row);
-  return rows;
-}
-
-function normalizeHeader(value: string) {
-  return value.replace(/^\uFEFF/, "").trim().toLowerCase();
-}
-
-function findHeaderIndex(headers: string[], names: string[]) {
-  return headers.findIndex((header) => names.includes(header));
-}
-
-function getCell(row: string[], index: number) {
-  return index >= 0 ? row[index]?.trim() ?? "" : "";
 }
 
 function UploadIcon() {

@@ -5,6 +5,8 @@ import type {
 } from "@/lib/employee-report";
 import { EmployeeReportDownloadButton } from "./employee-report-download-button";
 
+const DAY_WISE_MAX_POINTS = 20;
+
 export function EmployeeReportTable({
   employeeName,
   rows,
@@ -62,7 +64,7 @@ export function EmployeeReportTable({
                   <EmployeeReportPointField label="Review" value={row.review} />
                   <EmployeeReportPointField label="Documents Submission" value={row.documentSubmission} />
                   <EmployeeReportPointField label="Material Handover" value={row.materialHandover} />
-                  <EmployeeReportMobileField label="Day Wise Total" value={formatPointDelta(getEmployeeReportDayTotal(row))} />
+                  <EmployeeReportDayWiseField value={getEmployeeReportDayTotal(row)} />
                 </div>
               </article>
             ))}
@@ -94,8 +96,8 @@ export function EmployeeReportTable({
                     <EmployeeReportPointTd value={row.review} />
                     <EmployeeReportPointTd value={row.documentSubmission} />
                     <EmployeeReportPointTd value={row.materialHandover} />
-                    <td className="px-3 py-3 font-semibold text-blue-950">
-                      {formatPointDelta(getEmployeeReportDayTotal(row))}
+                    <td className="px-3 py-3">
+                      <EmployeeReportDayWiseBadge value={getEmployeeReportDayTotal(row)} />
                     </td>
                   </tr>
                 ))}
@@ -148,6 +150,27 @@ function EmployeeReportPointField({ label, value }: { label: string; value: Empl
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">{label}</p>
       <p className="mt-1 break-words font-semibold text-blue-950">{formatEmployeeReportPoint(value)}</p>
     </div>
+  );
+}
+
+function EmployeeReportDayWiseField({ value }: { value: number }) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Day Wise Total</p>
+      <div className="mt-1">
+        <EmployeeReportDayWiseBadge value={value} />
+      </div>
+    </div>
+  );
+}
+
+function EmployeeReportDayWiseBadge({ value }: { value: number }) {
+  const grade = getDayWiseGrade(value);
+
+  return (
+    <span className={`inline-flex min-w-20 items-center justify-center rounded-full border px-3 py-1 text-xs font-extrabold ${grade.className}`}>
+      {formatPointDelta(value)}
+    </span>
   );
 }
 
@@ -255,4 +278,22 @@ function formatPointDelta(value: number | null) {
 
 function formatEmployeeReportPoint(value: EmployeeReportPointCell) {
   return formatPointDelta(value.points);
+}
+
+function getDayWiseGrade(value: number) {
+  const percentage = Math.max(0, Math.min(100, (value / DAY_WISE_MAX_POINTS) * 100));
+
+  if (percentage >= 91) {
+    return { className: "border-emerald-200 bg-emerald-100 text-emerald-800" };
+  }
+
+  if (percentage >= 81) {
+    return { className: "border-amber-200 bg-amber-100 text-amber-800" };
+  }
+
+  if (percentage >= 71) {
+    return { className: "border-red-200 bg-red-100 text-red-800" };
+  }
+
+  return { className: "border-slate-200 bg-slate-100 text-slate-700" };
 }

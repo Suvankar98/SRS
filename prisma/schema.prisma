@@ -41,6 +41,18 @@ model CallType {
   createdAt DateTime @default(now())
 }
 
+model SavedCustomer {
+  id           String   @id @default(uuid()) @db.Uuid
+  company      String
+  companyKey   String   @unique
+  name         String   @default("")
+  phoneNumber1 String   @default("")
+  area         String   @default("")
+  fullAddress  String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model ServiceRequest {
   id           String   @id @default(uuid()) @db.Uuid
   docketNumber String   @unique

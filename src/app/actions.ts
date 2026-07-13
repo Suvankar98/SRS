@@ -575,33 +575,44 @@ function normalizeSavedCustomerPhone(value: string) {
   }
 
   const normalized = normalizeIndianPhoneNumber(value);
-  if (!normalized) {
-    throw new Error("Phone Number must be a valid 10-digit Indian mobile number.");
-  }
-
-  return normalized;
+  return normalized ?? value.trim();
 }
 
 export async function updateSavedCustomerDetails(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
 
   const requestId = getRequiredField(formData, "requestId");
+  const source = getOptionalField(formData, "source") || "serviceRequest";
   const company = getRequiredField(formData, "company");
   const name = getRequiredField(formData, "name");
   const phoneNumber1 = normalizeSavedCustomerPhone(getRequiredField(formData, "phoneNumber1"));
   const area = getRequiredField(formData, "area");
   const fullAddress = getRequiredField(formData, "fullAddress");
 
-  await prisma.serviceRequest.update({
-    where: { id: requestId },
-    data: {
-      company,
-      name,
-      phoneNumber1,
-      area,
-      fullAddress,
-    },
-  });
+  if (source === "savedCustomer") {
+    await prisma.savedCustomer.update({
+      where: { id: requestId },
+      data: {
+        company,
+        companyKey: getCompanyMatchKey(company),
+        name,
+        phoneNumber1,
+        area,
+        fullAddress,
+      },
+    });
+  } else {
+    await prisma.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        company,
+        name,
+        phoneNumber1,
+        area,
+        fullAddress,
+      },
+    });
+  }
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
@@ -618,86 +629,134 @@ type SavedCustomerUploadRow = {
 };
 
 function getUploadString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+
+  return "";
 }
 
 export async function importSavedCustomerDetails(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
 
-  const rowsRaw = formData.get("rows");
-  if (typeof rowsRaw !== "string") {
-    return { ok: false, message: "No customer rows were uploaded.", updated: 0, skipped: 0 };
-  }
-
   let rows: SavedCustomerUploadRow[];
   try {
-    const parsed = JSON.parse(rowsRaw);
-    rows = Array.isArray(parsed) ? parsed : [];
-  } catch {
+    rows = await parseSavedCustomerUploadRows(formData);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "The uploaded file could not be read.",
+      updated: 0,
+      skipped: 0,
+    };
+  }
+
+  if (rows.length === 0) {
     return { ok: false, message: "The uploaded file could not be read.", updated: 0, skipped: 0 };
   }
 
   let updated = 0;
+  let created = 0;
   let skipped = 0;
+  const [existingRequests, existingSavedCustomers] = await Promise.all([
+    prisma.serviceRequest.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, company: true },
+    }),
+    prisma.savedCustomer.findMany({
+      orderBy: { createdAt: "asc" },
+      select: { id: true, company: true, companyKey: true },
+    }),
+  ]);
+  const existingCompanyByKey = new Map<string, { id: string; source: "serviceRequest" | "savedCustomer" }>();
+
+  for (const customer of existingRequests) {
+    const key = getCompanyMatchKey(customer.company);
+    if (key && !existingCompanyByKey.has(key)) {
+      existingCompanyByKey.set(key, { id: customer.id, source: "serviceRequest" });
+    }
+  }
+
+  for (const customer of existingSavedCustomers) {
+    const key = customer.companyKey || getCompanyMatchKey(customer.company);
+    if (key && !existingCompanyByKey.has(key)) {
+      existingCompanyByKey.set(key, { id: customer.id, source: "savedCustomer" });
+    }
+  }
 
   for (const row of rows.slice(0, 500)) {
-    const company = getUploadString(row.company);
+    const company = normalizeCompanyLookup(getUploadString(row.company));
     if (!company) {
       skipped += 1;
       continue;
     }
 
-    const updateData: Prisma.ServiceRequestUpdateInput = {};
     const name = getUploadString(row.name);
     const phoneNumberRaw = getUploadString(row.phoneNumber);
     const area = getUploadString(row.area);
     const fullAddress = getUploadString(row.fullAddress);
+    const updateData = {
+      name,
+      phoneNumber1: phoneNumberRaw ? normalizeSavedCustomerPhone(phoneNumberRaw) : "",
+      area,
+      fullAddress,
+    };
 
-    if (name) {
-      updateData.name = name;
-    }
+    const existing = existingCompanyByKey.get(getCompanyMatchKey(company));
 
-    if (phoneNumberRaw) {
-      const normalizedPhone = normalizeIndianPhoneNumber(phoneNumberRaw);
-      if (!normalizedPhone) {
+    if (existing?.source === "serviceRequest") {
+      const serviceRequestUpdateData: Prisma.ServiceRequestUpdateInput = {};
+      if (updateData.name) {
+        serviceRequestUpdateData.name = updateData.name;
+      }
+      if (updateData.phoneNumber1) {
+        serviceRequestUpdateData.phoneNumber1 = updateData.phoneNumber1;
+      }
+      if (updateData.area) {
+        serviceRequestUpdateData.area = updateData.area;
+      }
+      if (updateData.fullAddress) {
+        serviceRequestUpdateData.fullAddress = updateData.fullAddress;
+      }
+
+      if (Object.keys(serviceRequestUpdateData).length === 0) {
         skipped += 1;
         continue;
       }
-      updateData.phoneNumber1 = normalizedPhone;
-    }
 
-    if (area) {
-      updateData.area = area;
-    }
-
-    if (fullAddress) {
-      updateData.fullAddress = fullAddress;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      skipped += 1;
+      await prisma.serviceRequest.update({
+        where: { id: existing.id },
+        data: serviceRequestUpdateData,
+      });
+      updated += 1;
       continue;
     }
 
-    const existing = await prisma.serviceRequest.findFirst({
-      where: {
-        deletedAt: null,
-        company: { equals: company, mode: "insensitive" },
+    if (existing?.source === "savedCustomer") {
+      await prisma.savedCustomer.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
+      updated += 1;
+      continue;
+    }
+
+    const companyKey = getCompanyMatchKey(company);
+    const createdCustomer = await prisma.savedCustomer.create({
+      data: {
+        company,
+        companyKey,
+        ...updateData,
       },
-      orderBy: { createdAt: "asc" },
       select: { id: true },
     });
-
-    if (!existing) {
-      skipped += 1;
-      continue;
-    }
-
-    await prisma.serviceRequest.update({
-      where: { id: existing.id },
-      data: updateData,
-    });
-    updated += 1;
+    existingCompanyByKey.set(companyKey, { id: createdCustomer.id, source: "savedCustomer" });
+    created += 1;
   }
 
   revalidatePath("/admin");
@@ -706,11 +765,167 @@ export async function importSavedCustomerDetails(formData: FormData) {
   revalidatePath("/report");
 
   return {
-    ok: true,
-    message: updated > 0 ? `Updated ${updated} saved customer record${updated === 1 ? "" : "s"}.` : "No saved customer records were updated.",
+    ok: updated > 0 || created > 0,
+    message:
+      updated > 0 || created > 0
+        ? `${updated ? `Updated ${updated}` : ""}${updated && created ? " and " : ""}${created ? `created ${created}` : ""} saved customer record${updated + created === 1 ? "" : "s"}.`
+        : "No saved customer records were imported.",
     updated,
     skipped,
   };
+}
+
+async function parseSavedCustomerUploadRows(formData: FormData): Promise<SavedCustomerUploadRow[]> {
+  const uploadedFile = formData.get("file");
+
+  if (isUploadedFile(uploadedFile) && uploadedFile.size > 0) {
+    const fileName = uploadedFile.name.toLowerCase();
+
+    if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+      const workbookRows = await parseSavedCustomerWorkbook(uploadedFile);
+      return mapSavedCustomerRows(workbookRows);
+    }
+
+    const text = await uploadedFile.text();
+    return mapSavedCustomerRows(parseDelimitedRows(text));
+  }
+
+  const rowsRaw = formData.get("rows");
+  if (typeof rowsRaw === "string") {
+    const parsed = JSON.parse(rowsRaw);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  return [];
+}
+
+function isUploadedFile(value: FormDataEntryValue | null): value is File {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "arrayBuffer" in value &&
+    typeof value.arrayBuffer === "function" &&
+    "size" in value
+  );
+}
+
+async function parseSavedCustomerWorkbook(file: File) {
+  const XLSX = await import("xlsx");
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const firstSheetName = workbook.SheetNames[0];
+
+  if (!firstSheetName) {
+    return [];
+  }
+
+  const worksheet = workbook.Sheets[firstSheetName];
+  return XLSX.utils.sheet_to_json<Array<string | number | boolean | null>>(worksheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  }).map((row) => row.map((cell) => getUploadString(cell)));
+}
+
+function mapSavedCustomerRows(rows: string[][]): SavedCustomerUploadRow[] {
+  const cleanRows = rows.filter((row) => row.some((cell) => cell.trim() !== ""));
+  if (cleanRows.length <= 1) {
+    return [];
+  }
+
+  const header = cleanRows[0].map(normalizeSavedCustomerHeader);
+  const companyIndex = findSavedCustomerHeaderIndex(header, ["companyname", "company", "customername", "customer"]);
+  const nameIndex = findSavedCustomerHeaderIndex(header, ["name", "contactname", "contactperson", "contactperson1", "contact1"]);
+  const phoneIndex = findSavedCustomerHeaderIndex(header, ["phonenumber", "phone", "mobile", "contactnumber", "contactno", "contactno1", "phone1", "phonenumber1"]);
+  const areaIndex = findSavedCustomerHeaderIndex(header, ["area", "location"]);
+  const addressIndex = findSavedCustomerHeaderIndex(header, ["fulladdress", "address"]);
+  const hasKnownHeader = [companyIndex, nameIndex, phoneIndex, areaIndex, addressIndex].some((index) => index >= 0);
+
+  return cleanRows.slice(1).map((row) => ({
+    company: getDelimitedCell(row, hasKnownHeader ? companyIndex : 0),
+    name: getDelimitedCell(row, hasKnownHeader ? nameIndex : 1),
+    phoneNumber: getDelimitedCell(row, hasKnownHeader ? phoneIndex : 2),
+    area: getDelimitedCell(row, hasKnownHeader ? areaIndex : 3),
+    fullAddress: getDelimitedCell(row, hasKnownHeader ? addressIndex : 4),
+  }));
+}
+
+function normalizeSavedCustomerHeader(value: string) {
+  return value.replace(/^\uFEFF/, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function findSavedCustomerHeaderIndex(headers: string[], names: string[]) {
+  return headers.findIndex((header) => names.includes(header));
+}
+
+function getDelimitedCell(row: string[], index: number) {
+  return index >= 0 ? row[index]?.trim() ?? "" : "";
+}
+
+function normalizeCompanyLookup(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function getCompanyMatchKey(value: string) {
+  return normalizeCompanyLookup(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function parseDelimitedRows(content: string) {
+  const delimiter = detectDelimiter(content);
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < content.length; index += 1) {
+    const char = content[index];
+    const nextChar = content[index + 1];
+
+    if (char === '"' && inQuotes && nextChar === '"') {
+      cell += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      row.push(cell.trim());
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        index += 1;
+      }
+      row.push(cell.trim());
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  row.push(cell.trim());
+  rows.push(row);
+  return rows;
+}
+
+function detectDelimiter(content: string) {
+  const headerLine = content.split(/\r?\n/, 1)[0] ?? "";
+  const candidates = [",", "\t", ";"] as const;
+
+  return candidates.reduce((best, candidate) => {
+    const bestCount = headerLine.split(best).length;
+    const candidateCount = headerLine.split(candidate).length;
+    return candidateCount > bestCount ? candidate : best;
+  }, "," as "," | "\t" | ";");
 }
 
 export async function deleteServiceRequest(formData: FormData) {

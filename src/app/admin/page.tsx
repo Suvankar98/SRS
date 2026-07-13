@@ -50,7 +50,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     });
   }
 
-  const [staffMembers, products, callTypes, savedCustomerDetails] = await Promise.all([
+  const [staffMembers, products, callTypes, savedCustomerDetails, importedSavedCustomers] = await Promise.all([
     prisma.user.findMany({
       where: { role: { in: [APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE] } },
       orderBy: { createdAt: "desc" },
@@ -73,8 +73,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         createdAt: true,
       },
     }),
+    prisma.savedCustomer.findMany({
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
-  const savedCustomerCompanies = buildSavedCustomerCompanies(savedCustomerDetails);
+  const savedCustomerCompanies = buildSavedCustomerCompanies(savedCustomerDetails, importedSavedCustomers);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_#f8fbff_0%,_#eef6ff_100%)]">
@@ -434,6 +437,7 @@ function formatAdminDate(value: Date) {
 
 type AdminSavedCustomerRequest = {
   id: string;
+  source?: "serviceRequest";
   company: string;
   name: string;
   contactPerson2: string | null;
@@ -444,11 +448,24 @@ type AdminSavedCustomerRequest = {
   createdAt: Date;
 };
 
-function buildSavedCustomerCompanies(requests: AdminSavedCustomerRequest[]): SavedCustomerCompany[] {
+type AdminImportedSavedCustomer = {
+  id: string;
+  company: string;
+  name: string;
+  phoneNumber1: string;
+  area: string;
+  fullAddress: string;
+  createdAt: Date;
+};
+
+function buildSavedCustomerCompanies(
+  requests: AdminSavedCustomerRequest[],
+  importedCustomers: AdminImportedSavedCustomer[],
+): SavedCustomerCompany[] {
   const companies = new Map<string, SavedCustomerCompany>();
 
   requests.forEach((request) => {
-    const companyKey = request.company.trim().toLowerCase() || "unknown";
+    const companyKey = getSavedCustomerCompanyKey(request.company) || "unknown";
     const existing = companies.get(companyKey);
 
     if (existing) {
@@ -457,7 +474,31 @@ function buildSavedCustomerCompanies(requests: AdminSavedCustomerRequest[]): Sav
 
     companies.set(companyKey, {
       company: request.company,
-      detail: formatSavedCustomerRequest(request),
+      detail: formatSavedCustomerRequest({ ...request, source: "serviceRequest" }),
+    });
+  });
+
+  importedCustomers.forEach((customer) => {
+    const companyKey = getSavedCustomerCompanyKey(customer.company) || "unknown";
+    const existing = companies.get(companyKey);
+
+    if (existing) {
+      return;
+    }
+
+    companies.set(companyKey, {
+      company: customer.company,
+      detail: {
+        id: customer.id,
+        source: "savedCustomer",
+        name: customer.name,
+        contactPerson2: null,
+        phoneNumber1: customer.phoneNumber1,
+        phoneNumber2: null,
+        area: customer.area,
+        fullAddress: customer.fullAddress,
+        createdAtLabel: formatAdminDate(customer.createdAt),
+      },
     });
   });
 
@@ -467,6 +508,7 @@ function buildSavedCustomerCompanies(requests: AdminSavedCustomerRequest[]): Sav
 function formatSavedCustomerRequest(request: AdminSavedCustomerRequest) {
   return {
     id: request.id,
+    source: request.source ?? "serviceRequest",
     name: request.name,
     contactPerson2: request.contactPerson2,
     phoneNumber1: request.phoneNumber1,
@@ -475,6 +517,10 @@ function formatSavedCustomerRequest(request: AdminSavedCustomerRequest) {
     fullAddress: request.fullAddress,
     createdAtLabel: formatAdminDate(request.createdAt),
   };
+}
+
+function getSavedCustomerCompanyKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 

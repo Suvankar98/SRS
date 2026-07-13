@@ -24,6 +24,7 @@ type DashboardPageProps = {
 type DashboardStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
 const COMPLETED_DASHBOARD_VISIBILITY_MS = 72 * 60 * 60 * 1000;
+const DAY_WISE_MAX_POINTS = 20;
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getSession();
@@ -39,6 +40,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const newCompanyStored = getSearchParamValue(resolvedSearchParams.newCompany) === "1";
   const reportFromDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.reportFrom));
   const reportToDate = getDateInputValue(getSearchParamValue(resolvedSearchParams.reportTo));
+  const shouldOpenEmployeeReport = getSearchParamValue(resolvedSearchParams.employeeReport) === "1";
   const reportDateRange = getDateRange(reportFromDate, reportToDate);
 
   const isEmployee = session.role === APP_ROLES.EMPLOYEE;
@@ -232,7 +234,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div>
               {isEmployee ? (
                 <div className="mb-3 flex justify-end">
-                  <EmployeeReportPopup buttonClassName="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50">
+                  <EmployeeReportPopup
+                    initialOpen={shouldOpenEmployeeReport}
+                    buttonClassName="inline-flex items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                  >
                     <EmployeeReportTable
                       rows={filteredEmployeeReportRows}
                       totalPoints={filteredEmployeeReportTotal}
@@ -365,6 +370,7 @@ function EmployeeReportTable({
         </div>
       </div>
       <form action="/dashboard" className="grid gap-3 border-b border-blue-100 bg-white px-4 py-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+        <input type="hidden" name="employeeReport" value="1" />
         <label className="block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em] text-blue-700">From Date</span>
           <input
@@ -393,7 +399,7 @@ function EmployeeReportTable({
         </div>
         <div className="flex items-end sm:col-span-1">
           <a
-            href="/dashboard"
+            href="/dashboard?employeeReport=1"
             className="inline-flex w-full items-center justify-center rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
           >
             Reset
@@ -418,7 +424,7 @@ function EmployeeReportTable({
                   <EmployeeReportPointField label="Review" value={row.review} />
                   <EmployeeReportPointField label="Documents Submission" value={row.documentSubmission} />
                   <EmployeeReportPointField label="Material Handover" value={row.materialHandover} />
-                  <EmployeeReportMobileField label="Day Wise Total" value={formatPointDelta(getEmployeeReportDayTotal(row))} />
+                  <EmployeeReportDayWiseField value={getEmployeeReportDayTotal(row)} />
                 </div>
               </article>
             ))}
@@ -450,8 +456,8 @@ function EmployeeReportTable({
                     <EmployeeReportPointTd value={row.review} />
                     <EmployeeReportPointTd value={row.documentSubmission} />
                     <EmployeeReportPointTd value={row.materialHandover} />
-                    <td className="px-3 py-3 font-semibold text-blue-950">
-                      {formatPointDelta(getEmployeeReportDayTotal(row))}
+                    <td className="px-3 py-3">
+                      <EmployeeReportDayWiseBadge value={getEmployeeReportDayTotal(row)} />
                     </td>
                   </tr>
                 ))}
@@ -814,6 +820,24 @@ function formatEmployeeReportPoint(value: EmployeeReportPointCell) {
   return formatPointDelta(value.points);
 }
 
+function getDayWiseGrade(value: number) {
+  const percentage = Math.max(0, Math.min(100, (value / DAY_WISE_MAX_POINTS) * 100));
+
+  if (percentage >= 91) {
+    return { className: "border-emerald-200 bg-emerald-100 text-emerald-800" };
+  }
+
+  if (percentage >= 81) {
+    return { className: "border-amber-200 bg-amber-100 text-amber-800" };
+  }
+
+  if (percentage >= 71) {
+    return { className: "border-red-200 bg-red-100 text-red-800" };
+  }
+
+  return { className: "border-slate-200 bg-slate-100 text-slate-700" };
+}
+
 function getComplaintAgeLabel(request: { createdAt: Date; status: string | null } & Record<string, unknown>) {
   const createdAt = request.createdAt;
   const closedAt = getClosedAt(request);
@@ -986,6 +1010,27 @@ function filterRequests<
 
     return matchesStatus && matchesSearch;
   });
+}
+
+function EmployeeReportDayWiseField({ value }: { value: number }) {
+  return (
+    <div className="min-h-20 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Day Wise Total</p>
+      <div className="mt-2">
+        <EmployeeReportDayWiseBadge value={value} />
+      </div>
+    </div>
+  );
+}
+
+function EmployeeReportDayWiseBadge({ value }: { value: number }) {
+  const grade = getDayWiseGrade(value);
+
+  return (
+    <span className={`inline-flex min-w-20 items-center justify-center rounded-full border px-3 py-1 text-xs font-extrabold ${grade.className}`}>
+      {formatPointDelta(value)}
+    </span>
+  );
 }
 
 function isVisibleOnAdminManagerDashboard(request: {
