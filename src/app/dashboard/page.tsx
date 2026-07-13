@@ -23,6 +23,8 @@ type DashboardPageProps = {
 
 type DashboardStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
+const COMPLETED_DASHBOARD_VISIBILITY_MS = 72 * 60 * 60 * 1000;
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getSession();
 
@@ -79,7 +81,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const allRequests = isEmployee
     ? [
         ...(await prisma.serviceAssignment.findMany({
-          where: { employeeId: session.userId },
+          where: {
+            employeeId: session.userId,
+            request: { deletedAt: null },
+          },
           orderBy: { assignedAt: "desc" },
           include: {
             employee: { select: { name: true } },
@@ -113,6 +118,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         })),
         ...(await prisma.serviceRequest.findMany({
           where: {
+            deletedAt: null,
             assignedToId: session.userId,
             assignments: {
               none: { employeeId: session.userId },
@@ -134,6 +140,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         })),
       ]
     : await prisma.serviceRequest.findMany({
+        where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         include: {
           assignedTo: {
@@ -153,6 +160,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     isEmployee && currentUser?.name
       ? await prisma.serviceRequest.findMany({
           where: {
+            deletedAt: null,
             OR: [
               { lastAttemptByName: { equals: currentUser.name, mode: "insensitive" } },
               { closedByName: { equals: currentUser.name, mode: "insensitive" } },
@@ -191,7 +199,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? filteredRequests.filter(
         (request) => !request.statusSubmittedAt && normalizeStatus(request.status) !== "Completed",
       )
-    : filteredRequests;
+    : filteredRequests.filter(isVisibleOnAdminManagerDashboard);
   const sortedFilteredRequests = isEmployee
     ? sortByEmployeeQueueOrder(visibleRequests)
     : sortByDashboardOrder(visibleRequests);
@@ -978,6 +986,28 @@ function filterRequests<
 
     return matchesStatus && matchesSearch;
   });
+}
+
+function isVisibleOnAdminManagerDashboard(request: {
+  status: string | null;
+  closedAt?: Date | string | null;
+  statusSubmittedAt?: Date | string | null;
+  lastAttemptAt?: Date | string | null;
+}) {
+  if (normalizeStatus(request.status) !== "Completed") {
+    return true;
+  }
+
+  const completedAt =
+    getDateValue(request.closedAt) ??
+    getDateValue(request.statusSubmittedAt) ??
+    getDateValue(request.lastAttemptAt);
+
+  if (!completedAt) {
+    return true;
+  }
+
+  return Date.now() - completedAt.getTime() <= COMPLETED_DASHBOARD_VISIBILITY_MS;
 }
 
 function getDocketSequence(docketNumber: string) {

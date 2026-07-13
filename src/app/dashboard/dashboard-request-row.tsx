@@ -56,6 +56,8 @@ type DashboardRequestRowProps = {
   onMoveDown?: () => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  onToggleStar?: (id: string) => void;
+  isStarred?: boolean;
 };
 
 export function DashboardRequestRow({
@@ -71,6 +73,8 @@ export function DashboardRequestRow({
   onDragOver,
   onDrop,
   onDragEnd,
+  onToggleStar,
+  isStarred = false,
 }: DashboardRequestRowProps & {
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
@@ -79,6 +83,7 @@ export function DashboardRequestRow({
   onDragEnd?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
 }) {
   const openModalRef = React.useRef<() => void>(() => {});
+  const showReorderControls = Boolean(canEditDocket && !isEmployee && draggable);
 
   const getComplaintAgeLabel = (request: DashboardRequestRowRequest) => {
     const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
@@ -315,11 +320,27 @@ export function DashboardRequestRow({
 
   return (
     <tr
-      draggable={draggable}
-      onDragStart={(e) => onDragStart?.(e, request.id)}
-      onDragOver={(e) => onDragOver?.(e, request.id)}
-      onDrop={(e) => onDrop?.(e, request.id)}
-      onDragEnd={(e) => onDragEnd?.(e, request.id)}
+      draggable={showReorderControls}
+      onDragStart={(e) => {
+        if (showReorderControls) {
+          onDragStart?.(e, request.id);
+        }
+      }}
+      onDragOver={(e) => {
+        if (showReorderControls) {
+          onDragOver?.(e, request.id);
+        }
+      }}
+      onDrop={(e) => {
+        if (showReorderControls) {
+          onDrop?.(e, request.id);
+        }
+      }}
+      onDragEnd={(e) => {
+        if (showReorderControls) {
+          onDragEnd?.(e, request.id);
+        }
+      }}
       onClick={() => {
         if (canEditDocket) {
           openModalRef.current();
@@ -330,11 +351,28 @@ export function DashboardRequestRow({
     >
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
         <div className="flex items-start gap-2">
-          {!isEmployee ? (
-            <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm" onClick={(e)=>e.stopPropagation()} title="Drag to reorder">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M10 6h6M10 12h6M10 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+          {showReorderControls ? (
+            <div className="mt-1 flex shrink-0 flex-col items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm" title="Drag to reorder">
+                <DragHandleIcon />
+              </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleStar?.(request.id);
+                }}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-amber-300 ${
+                  isStarred
+                    ? "border-amber-300 bg-amber-100 text-amber-600"
+                    : "border-blue-100 bg-white text-slate-400 hover:border-amber-300 hover:text-amber-500"
+                }`}
+                title={isStarred ? "Move back" : "Move to top"}
+                aria-label={isStarred ? `Move ${request.docketNumber} back` : `Move ${request.docketNumber} to top`}
+                aria-pressed={isStarred}
+              >
+                <StarIcon filled={isStarred} />
+              </button>
             </div>
           ) : null}
 
@@ -387,7 +425,7 @@ export function DashboardRequestRow({
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
         <p>{request.callType}</p>
         {request.callType === "Service" ? (
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+          <p className="mt-1 inline-block whitespace-nowrap text-[9px] font-semibold uppercase leading-3 tracking-normal text-blue-700">
             {request.serviceBillingType ? formatServiceBillingType(request.serviceBillingType) : "Not specified"}
           </p>
         ) : null}
@@ -429,6 +467,28 @@ export function DashboardRequestRow({
         </td>
       ) : null}
     </tr>
+  );
+}
+
+function DragHandleIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M10 6h6M10 12h6M10 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden="true">
+      <path
+        d="m12 3.8 2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 15.78l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76L12 3.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

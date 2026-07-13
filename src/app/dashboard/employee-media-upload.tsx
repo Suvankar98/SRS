@@ -137,7 +137,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
       {fileError ? <p className="text-xs text-red-600">{fileError}</p> : null}
       {uploadError ? <p className="text-xs font-medium text-red-600">{uploadError}</p> : null}
       {isPending ? <p className="text-xs font-medium text-blue-700">Uploading...</p> : null}
-      <p className="text-[10px] text-blue-600">Required to complete.</p>
+      <p className="text-[10px] text-blue-600">Optional for completion.</p>
     </form>
   );
 }

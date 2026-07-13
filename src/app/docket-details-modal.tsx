@@ -189,7 +189,7 @@ export function DocketDetailsModal({
     }
 
     const shouldDelete = window.confirm(
-      `Delete ${request.docketNumber}? This will permanently remove this service request.`,
+      `Delete ${request.docketNumber}? It will be removed from the dashboard but kept in call history.`,
     );
 
     if (!shouldDelete) {
@@ -273,27 +273,40 @@ export function DocketDetailsModal({
               <div className="space-y-4">
                 <GridField label="Customer">
                   {canEdit ? (
-                    <div className="grid gap-2">
-                      <input value={company} readOnly className="w-full rounded border bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:text-base" />
-                      <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 1" />
-                      <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 2" />
+                    <div className="grid gap-3">
+                      <EditFieldLabel label="Company">
+                        <input value={company} readOnly className="w-full rounded border bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:text-base" />
+                      </EditFieldLabel>
+                      <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-600">Name -&gt; contact number</p>
+                        <div className="grid gap-2">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <EditFieldLabel label="Name 1">
+                              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 1" />
+                            </EditFieldLabel>
+                            <EditFieldLabel label="Contact number 1">
+                              <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
+                            </EditFieldLabel>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <EditFieldLabel label="Name 2">
+                              <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 2" />
+                            </EditFieldLabel>
+                            <EditFieldLabel label="Contact number 2">
+                              <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
+                            </EditFieldLabel>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <CustomerNameField name={name} company={company} contactPerson2={contactPerson2} />
-                  )}
-                </GridField>
-
-                <GridField label="Phone numbers">
-                  {canEdit ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
-                      <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
-                    </div>
-                  ) : (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <PhoneInfoField label="Contact 1 phone" value={phoneNumber1} />
-                      {phoneNumber2.trim() ? <PhoneInfoField label="Contact 2 phone" value={phoneNumber2} /> : null}
-                    </div>
+                    <CustomerNameField
+                      name={name}
+                      company={company}
+                      contactPerson2={contactPerson2}
+                      phoneNumber1={phoneNumber1}
+                      phoneNumber2={phoneNumber2}
+                    />
                   )}
                 </GridField>
 
@@ -375,7 +388,9 @@ export function DocketDetailsModal({
 
                         {isChargeable && (
                           <div className="mt-2">
-                            <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Amount" />
+                            <EditFieldLabel label="Chargeable amount">
+                              <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Amount" />
+                            </EditFieldLabel>
                           </div>
                         )}
                       </>
@@ -479,6 +494,17 @@ export function DocketDetailsModal({
   );
 }
 
+function EditFieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-600">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
 function GridField({
   label,
   children,
@@ -512,38 +538,62 @@ function CustomerNameField({
   name,
   company,
   contactPerson2,
+  phoneNumber1,
+  phoneNumber2,
 }: {
   name: string;
   company: string;
   contactPerson2: string;
+  phoneNumber1: string;
+  phoneNumber2: string;
 }) {
   return (
     <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
       <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">Company</p>
       <p className="mt-1 break-words font-semibold">{company}</p>
-      <p className="mt-2 border-t border-blue-200 pt-2 text-[10px] uppercase tracking-[0.12em] text-blue-600">Contact 1</p>
-      <p className="mt-1 break-words font-semibold text-blue-900">{name}</p>
-      {contactPerson2.trim() ? (
-        <>
-          <p className="mt-2 border-t border-blue-200 pt-2 text-[10px] uppercase tracking-[0.12em] text-blue-600">Contact 2</p>
-          <p className="mt-1 break-words font-semibold text-blue-900">{contactPerson2}</p>
-        </>
-      ) : null}
+      <p className="mt-3 border-t border-blue-200 pt-2 text-[10px] uppercase tracking-[0.12em] text-blue-600">Name -&gt; contact number</p>
+      <div className="mt-2 grid gap-2">
+        <ContactPairField nameLabel="Name 1" name={name} phoneLabel="Contact number 1" phoneNumber={phoneNumber1} />
+        {contactPerson2.trim() || phoneNumber2.trim() ? (
+          <ContactPairField
+            nameLabel="Name 2"
+            name={contactPerson2 || "Not provided"}
+            phoneLabel="Contact number 2"
+            phoneNumber={phoneNumber2}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function PhoneInfoField({ label, value }: { label: string; value: string }) {
-  const displayValue = formatIndianPhoneNumber(value);
-  const copyValue = getIndianPhoneCopyValue(value);
+function ContactPairField({
+  nameLabel,
+  name,
+  phoneLabel,
+  phoneNumber,
+}: {
+  nameLabel: string;
+  name: string;
+  phoneLabel: string;
+  phoneNumber: string;
+}) {
+  const displayValue = phoneNumber.trim() ? formatIndianPhoneNumber(phoneNumber) : "Not provided";
+  const copyValue = getIndianPhoneCopyValue(phoneNumber);
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+    <div className="grid gap-2 rounded-xl border border-blue-100 bg-white px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{label}</p>
-        <p className="mt-1 break-words font-semibold">{displayValue}</p>
+        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500">{nameLabel}</p>
+        <p className="mt-1 break-words font-semibold text-blue-950">{name}</p>
       </div>
-      <CopyPhoneButton value={copyValue} />
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500">{phoneLabel}</p>
+          <p className="mt-1 break-words font-semibold text-blue-950">{displayValue}</p>
+        </div>
+        {phoneNumber.trim() ? <CopyPhoneButton value={copyValue} /> : null}
+      </div>
     </div>
   );
 }

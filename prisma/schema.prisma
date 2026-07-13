@@ -75,6 +75,10 @@ model ServiceRequest {
   lastAttemptAt DateTime?
   closedByName String?
   closedAt     DateTime?
+  deletedAt    DateTime?
+  deletedById  String?  @db.Uuid
+  deletedByName String?
+  deletedByRole String?
 }
 
 model ServiceAssignment {

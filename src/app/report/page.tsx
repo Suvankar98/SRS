@@ -96,7 +96,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const [employeeReportAssignments, employeeReportRequests] = await Promise.all([
     employeeIds.length > 0
       ? prisma.serviceAssignment.findMany({
-          where: { employeeId: { in: employeeIds } },
+          where: {
+            employeeId: { in: employeeIds },
+            request: { deletedAt: null },
+          },
           orderBy: { assignedAt: "desc" },
           select: {
             employeeId: true,
@@ -115,6 +118,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     employeeIds.length > 0
       ? prisma.serviceRequest.findMany({
           where: {
+            deletedAt: null,
             OR: [
               { assignedToId: { in: employeeIds } },
               ...employeeNameFilters,

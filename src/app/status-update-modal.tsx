@@ -74,8 +74,8 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       return;
     }
 
-    if (status === "Completed" && !hasUploadedMedia) {
-      setSubmitError("Upload media first.");
+    if (showCompletedRemarkInput && reason.trim() === "") {
+      setSubmitError("Remark is required when status is Completed.");
       return;
     }
 
@@ -180,7 +180,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                   {showCompletedRemarkInput ? (
                     <div>
                       <label className="block text-sm font-medium text-blue-700">
-                        Remark
+                        Remark <span className="text-red-500">*</span>
                       </label>
                       <textarea
                         value={reason}
@@ -194,7 +194,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
                   <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
                     <p className="break-words text-xs font-medium text-blue-700 sm:text-sm">
-                      {hasUploadedMedia ? "Media ready." : "Upload media to complete."}
+                      {hasUploadedMedia ? "Media uploaded." : "Media upload is optional."}
                     </p>
                     <EmployeeMediaUpload
                       requestId={request.id}

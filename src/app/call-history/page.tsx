@@ -23,6 +23,7 @@ const CALL_HISTORY_COLUMNS = [
   { id: "amount", label: "Amount" },
   { id: "assigned-to", label: "Assigned To" },
   { id: "status", label: "Status" },
+  { id: "deleted-by", label: "Deleted By" },
   { id: "created", label: "Created" },
 ];
 
@@ -105,6 +106,9 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       statusSubmittedAt: true,
       closedAt: true,
       closedByName: true,
+      deletedAt: true,
+      deletedByName: true,
+      deletedByRole: true,
       callType: true,
       area: true,
       serviceBillingType: true,
@@ -224,12 +228,14 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                     <th data-call-history-column="amount" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
                     <th data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
                     <th data-call-history-column="status" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
+                    <th data-call-history-column="deleted-by" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Deleted By</th>
                     <th data-call-history-column="created" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Created</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-100 bg-white">
                   {calls.map((request) => {
                     const status = normalizeStatus(request.status);
+                    const isDeleted = Boolean(request.deletedAt);
 
                     return (
                       <tr key={request.id}>
@@ -255,12 +261,22 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                         <td data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-blue-900">{request.assignedTo?.name ?? "Unassigned"}</td>
                         <td data-call-history-column="status" className="px-2.5 py-2.5">
                           <span
-                            className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusPillClass(
-                              status,
-                            )}`}
+                            className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                              isDeleted ? "bg-rose-100 text-rose-800 ring-rose-300" : getStatusPillClass(status)
+                            }`}
                           >
-                            {getStatusLabel(status)}
+                            {isDeleted ? "Deleted" : getStatusLabel(status)}
                           </span>
+                        </td>
+                        <td data-call-history-column="deleted-by" className="px-2.5 py-2.5 text-blue-900">
+                          {isDeleted ? (
+                            <div>
+                              <p className="font-semibold text-rose-700">{request.deletedByName || "Unknown"}</p>
+                              {request.deletedAt ? <p className="text-[11px] text-rose-500">{formatDateTime(request.deletedAt)}</p> : null}
+                            </div>
+                          ) : (
+                            <span className="text-blue-400">-</span>
+                          )}
                         </td>
                         <td data-call-history-column="created" className="px-2.5 py-2.5 text-blue-900">{formatDateTime(request.createdAt)}</td>
                       </tr>

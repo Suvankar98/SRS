@@ -51,7 +51,7 @@ export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGall
     const requestIds = requestFolders.map((folder) => folder.requestId);
     const requests = requestIds.length
       ? await prisma.serviceRequest.findMany({
-          where: { id: { in: requestIds } },
+          where: { id: { in: requestIds }, deletedAt: null },
           select: { id: true, company: true },
         })
       : [];

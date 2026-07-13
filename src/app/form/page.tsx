@@ -21,6 +21,7 @@ export default async function FormPage() {
   const [databaseProducts, savedRequests] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.serviceRequest.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "asc" },
       take: 100,
       select: {

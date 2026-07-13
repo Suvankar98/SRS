@@ -58,6 +58,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     prisma.product.findMany({ orderBy: { name: "asc" } }),
     prisma.callType.findMany({ orderBy: { name: "asc" } }),
     prisma.serviceRequest.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "asc" },
       take: 100,
       select: {
@@ -78,19 +79,61 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_#f8fbff_0%,_#eef6ff_100%)]">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mb-6 overflow-hidden rounded-[2rem] border border-blue-200/70 bg-gradient-to-br from-[#001f3f] via-[#003d73] to-[#1d4ed8] p-6 text-white shadow-[0_20px_80px_rgba(15,23,42,0.2)] sm:p-8">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-              <p className="text-sm text-blue-100/80">Team members</p>
-              <p className="mt-2 text-2xl font-semibold">{staffMembers.length}</p>
+        <header className="mb-6 rounded-[1.25rem] border border-blue-200 bg-white p-4 shadow-[0_16px_50px_rgba(15,23,42,0.08)] sm:p-5">
+          <div className="grid gap-4 xl:grid-cols-[minmax(13rem,0.72fr)_minmax(0,2fr)] xl:items-stretch">
+            <div className="flex min-h-28 flex-col justify-between rounded-lg bg-blue-950 px-4 py-4 text-white">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-200">Admin panel</p>
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight">Overview</h1>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-blue-100">Manage users, products, and call categories from one place.</p>
             </div>
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-              <p className="text-sm text-blue-100/80">Products</p>
-              <p className="mt-2 text-2xl font-semibold">{products.length}</p>
-            </div>
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-              <p className="text-sm text-blue-100/80">Fixed call types</p>
-              <p className="mt-2 text-2xl font-semibold">{callTypes.length}</p>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-500">Team members</p>
+                    <p className="mt-3 text-3xl font-semibold leading-none text-blue-950">{staffMembers.length}</p>
+                  </div>
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                    <TeamMetricIcon />
+                  </span>
+                </div>
+                <div className="mt-4 h-1.5 rounded-full bg-blue-100">
+                  <div className="h-full w-2/3 rounded-full bg-blue-600" />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-cyan-100 bg-cyan-50/70 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-600">Products</p>
+                    <p className="mt-3 text-3xl font-semibold leading-none text-slate-950">{products.length}</p>
+                  </div>
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-cyan-700 shadow-sm">
+                    <ProductMetricIcon />
+                  </span>
+                </div>
+                <div className="mt-4 h-1.5 rounded-full bg-cyan-100">
+                  <div className="h-full w-4/5 rounded-full bg-cyan-600" />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-600">Call types</p>
+                    <p className="mt-3 text-3xl font-semibold leading-none text-slate-950">{callTypes.length}</p>
+                  </div>
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-indigo-700 shadow-sm">
+                    <CallTypeMetricIcon />
+                  </span>
+                </div>
+                <div className="mt-4 h-1.5 rounded-full bg-indigo-100">
+                  <div className="h-full w-1/2 rounded-full bg-indigo-600" />
+                </div>
+              </div>
             </div>
           </div>
         </header>
@@ -304,6 +347,48 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </section>
       </div>
     </main>
+  );
+}
+
+function TeamMetricIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM15.5 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3.5 19c.4-3.1 2.3-5 5-5s4.6 1.9 5 5M13.5 14.2c.6-.2 1.3-.3 2-.3 2.4 0 4.1 1.5 4.5 4.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ProductMetricIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M4.5 8.5 12 4l7.5 4.5v7L12 20l-7.5-4.5v-7ZM12 12.7 19.2 8.5M12 12.7 4.8 8.5M12 12.7V20"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CallTypeMetricIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M5 6.5h14M5 12h14M5 17.5h8M17.5 15.5 20 18l-2.5 2.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

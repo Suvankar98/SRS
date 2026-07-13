@@ -569,17 +569,198 @@ export async function updateServiceRequestDetails(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function deleteServiceRequest(formData: FormData) {
+function normalizeSavedCustomerPhone(value: string) {
+  if (value.trim() === "") {
+    return "";
+  }
+
+  const normalized = normalizeIndianPhoneNumber(value);
+  if (!normalized) {
+    throw new Error("Phone Number must be a valid 10-digit Indian mobile number.");
+  }
+
+  return normalized;
+}
+
+export async function updateSavedCustomerDetails(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
 
   const requestId = getRequiredField(formData, "requestId");
+  const company = getRequiredField(formData, "company");
+  const name = getRequiredField(formData, "name");
+  const phoneNumber1 = normalizeSavedCustomerPhone(getRequiredField(formData, "phoneNumber1"));
+  const area = getRequiredField(formData, "area");
+  const fullAddress = getRequiredField(formData, "fullAddress");
 
-  await prisma.serviceRequest.delete({
+  await prisma.serviceRequest.update({
     where: { id: requestId },
+    data: {
+      company,
+      name,
+      phoneNumber1,
+      area,
+      fullAddress,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/call-history");
+  revalidatePath("/report");
+}
+
+type SavedCustomerUploadRow = {
+  company?: unknown;
+  name?: unknown;
+  phoneNumber?: unknown;
+  area?: unknown;
+  fullAddress?: unknown;
+};
+
+function getUploadString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export async function importSavedCustomerDetails(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+
+  const rowsRaw = formData.get("rows");
+  if (typeof rowsRaw !== "string") {
+    return { ok: false, message: "No customer rows were uploaded.", updated: 0, skipped: 0 };
+  }
+
+  let rows: SavedCustomerUploadRow[];
+  try {
+    const parsed = JSON.parse(rowsRaw);
+    rows = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return { ok: false, message: "The uploaded file could not be read.", updated: 0, skipped: 0 };
+  }
+
+  let updated = 0;
+  let skipped = 0;
+
+  for (const row of rows.slice(0, 500)) {
+    const company = getUploadString(row.company);
+    if (!company) {
+      skipped += 1;
+      continue;
+    }
+
+    const updateData: Prisma.ServiceRequestUpdateInput = {};
+    const name = getUploadString(row.name);
+    const phoneNumberRaw = getUploadString(row.phoneNumber);
+    const area = getUploadString(row.area);
+    const fullAddress = getUploadString(row.fullAddress);
+
+    if (name) {
+      updateData.name = name;
+    }
+
+    if (phoneNumberRaw) {
+      const normalizedPhone = normalizeIndianPhoneNumber(phoneNumberRaw);
+      if (!normalizedPhone) {
+        skipped += 1;
+        continue;
+      }
+      updateData.phoneNumber1 = normalizedPhone;
+    }
+
+    if (area) {
+      updateData.area = area;
+    }
+
+    if (fullAddress) {
+      updateData.fullAddress = fullAddress;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    const existing = await prisma.serviceRequest.findFirst({
+      where: {
+        deletedAt: null,
+        company: { equals: company, mode: "insensitive" },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      skipped += 1;
+      continue;
+    }
+
+    await prisma.serviceRequest.update({
+      where: { id: existing.id },
+      data: updateData,
+    });
+    updated += 1;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/call-history");
+  revalidatePath("/report");
+
+  return {
+    ok: true,
+    message: updated > 0 ? `Updated ${updated} saved customer record${updated === 1 ? "" : "s"}.` : "No saved customer records were updated.",
+    updated,
+    skipped,
+  };
+}
+
+export async function deleteServiceRequest(formData: FormData) {
+  const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+
+  const requestId = getRequiredField(formData, "requestId");
+  const deletedAt = new Date();
+  const actor = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true },
+  });
+  const actorName = actor?.name || "Admin / Manager";
+  const actorRole = getActorRoleLabel(session.role);
+
+  await prisma.$transaction(async (transaction) => {
+    const request = await transaction.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        assignedToId: null,
+        assignedAt: null,
+        deletedAt,
+        deletedById: session.userId,
+        deletedByName: actorName,
+        deletedByRole: actorRole,
+      },
+      select: {
+        docketNumber: true,
+      },
+    });
+
+    await addServiceActivity(transaction, {
+      requestId,
+      type: "deleted",
+      title: "Service Request Deleted",
+      details: `${actorName} deleted docket ${request.docketNumber}`,
+      actorId: session.userId,
+      actorName,
+      actorRole,
+      createdAt: deletedAt,
+    });
+
+    await transaction.serviceAssignment.deleteMany({
+      where: { requestId },
+    });
   });
 
   revalidatePath("/dashboard");
   revalidatePath("/form");
+  revalidatePath("/call-history");
+  revalidatePath("/report");
 }
 
 export async function addStaff(formData: FormData) {
@@ -847,10 +1028,11 @@ export async function assignServiceCall(formData: FormData) {
       statusSubmittedAt: true,
       lastAttemptAt: true,
       closedAt: true,
+      deletedAt: true,
     },
   });
 
-  if (!previousRequest) {
+  if (!previousRequest || previousRequest.deletedAt) {
     redirect("/dashboard");
   }
 
@@ -1065,10 +1247,8 @@ export async function updateServiceCallStatus(formData: FormData) {
     throw new Error("Please choose a status other than New Call.");
   }
 
-  if (status === "Completed") {
-    if (!assignment.mediaUploadedAt) {
-      throw new Error("Upload media first.");
-    }
+  if (status === "Completed" && reasonValue === "") {
+    throw new Error("Remark is required when status is Completed.");
   }
 
   const employee = await prisma.user.findUnique({

@@ -55,10 +55,11 @@ export async function POST(request: Request) {
         closedAt: true,
         statusSubmittedAt: true,
         lastAttemptAt: true,
+        deletedAt: true,
       },
     });
 
-    if (!serviceRequest) {
+    if (!serviceRequest || serviceRequest.deletedAt) {
       return NextResponse.json({ success: false, message: "Service request not found" }, { status: 404 });
     }
 

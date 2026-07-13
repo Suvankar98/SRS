@@ -143,7 +143,7 @@ function DashboardTableRow({
       <td className="px-2.5 py-2.5 align-top whitespace-normal break-words text-xs">
         <p>{request.callType}</p>
         {request.callType === "Service" && request.serviceBillingType ? (
-          <p className="mt-1 text-[11px] font-bold text-blue-700">
+          <p className="mt-1 inline-block whitespace-nowrap text-[9px] font-bold leading-3 text-blue-700">
             {formatServiceBillingType(request.serviceBillingType)}
             {request.serviceBillingType === "chargeable" && request.chargeableAmount !== null
               ? ` - ${formatINRCurrency(request.chargeableAmount)}`

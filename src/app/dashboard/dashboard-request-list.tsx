@@ -62,35 +62,54 @@ export function DashboardRequestList({
 }: DashboardRequestListProps) {
   const [items, setItems] = React.useState(requests);
   const [orderMessage, setOrderMessage] = React.useState("");
+  const [starredRequestIds, setStarredRequestIds] = React.useState<Set<string>>(() => new Set());
+  const canReorder = canEditDocket && canAssign && !isEmployee;
 
-  // drag & drop state
+  const normalOrderIds = React.useRef(requests.map((request) => request.id));
   const dragItem = React.useRef<number | null>(null);
   const dragOverItem = React.useRef<number | null>(null);
 
   const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    if (!canReorder) {
+      e.preventDefault();
+      return;
+    }
+
     const idx = items.findIndex((it) => it.id === id);
     dragItem.current = idx >= 0 ? idx : null;
     e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    if (!canReorder) {
+      return;
+    }
+
     e.preventDefault();
     const idx = items.findIndex((it) => it.id === id);
     dragOverItem.current = idx >= 0 ? idx : null;
   };
 
   const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    if (!canReorder) {
+      return;
+    }
+
     e.preventDefault();
     const from = dragItem.current;
+    if (dragOverItem.current === null) {
+      const idx = items.findIndex((it) => it.id === id);
+      dragOverItem.current = idx >= 0 ? idx : null;
+    }
     const to = dragOverItem.current;
     if (from === null || to === null || from === to) return;
     setItems((current) => {
       const copy = [...current];
       const [moved] = copy.splice(from, 1);
       copy.splice(to, 0, moved);
-      if (!isEmployee && canAssign) {
-        void saveDashboardOrder(copy.map((item) => item.id));
-      }
+      normalOrderIds.current = copy.map((item) => item.id);
+      setStarredRequestIds(new Set());
+      void saveDashboardOrder(copy.map((item) => item.id));
       return copy;
     });
     dragItem.current = null;
@@ -100,6 +119,57 @@ export function DashboardRequestList({
   const handleDragEnd = () => {
     dragItem.current = null;
     dragOverItem.current = null;
+  };
+
+  const handleToggleStar = (id: string) => {
+    if (!canReorder) {
+      return;
+    }
+
+    setItems((current) => {
+      const from = current.findIndex((item) => item.id === id);
+      if (from < 0) {
+        return current;
+      }
+
+      const isStarred = starredRequestIds.has(id);
+
+      if (isStarred) {
+        const nextStarredRequestIds = new Set(starredRequestIds);
+        nextStarredRequestIds.delete(id);
+
+        const moved = current[from];
+        const starredItems = current.filter((item) => item.id !== id && nextStarredRequestIds.has(item.id));
+        const unstarredItems = current.filter((item) => item.id !== id && !nextStarredRequestIds.has(item.id));
+        const targetNormalIndex = getNormalOrderIndex(normalOrderIds.current, id);
+        let targetIndex = unstarredItems.findIndex(
+          (item) => getNormalOrderIndex(normalOrderIds.current, item.id) > targetNormalIndex,
+        );
+
+        if (targetIndex < 0) {
+          targetIndex = unstarredItems.length;
+        }
+
+        const restoredUnstarredItems = [...unstarredItems];
+        restoredUnstarredItems.splice(targetIndex, 0, moved);
+        const copy = [...starredItems, ...restoredUnstarredItems];
+        setStarredRequestIds(nextStarredRequestIds);
+        void saveDashboardOrder(copy.map((item) => item.id));
+        return copy;
+      }
+
+      const copy = [...current];
+      const [moved] = copy.splice(from, 1);
+
+      copy.unshift(moved);
+      setStarredRequestIds((currentStarredRequestIds) => {
+        const nextStarredRequestIds = new Set(currentStarredRequestIds);
+        nextStarredRequestIds.add(id);
+        return nextStarredRequestIds;
+      });
+      void saveDashboardOrder(copy.map((item) => item.id));
+      return copy;
+    });
   };
 
   const saveDashboardOrder = async (requestIds: string[]) => {
@@ -198,7 +268,7 @@ export function DashboardRequestList({
                 <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Call Type</p>
                 <p className="mt-1 break-words text-[13px] font-bold leading-snug text-blue-950">{request.callType}</p>
                 {request.callType === "Service" ? (
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-700">
+                  <p className="mt-1 inline-block whitespace-nowrap text-[9px] font-bold uppercase leading-3 tracking-normal text-blue-700">
                     {request.serviceBillingType ? formatServiceBillingType(request.serviceBillingType) : "Not specified"}
                   </p>
                 ) : null}
@@ -290,7 +360,7 @@ export function DashboardRequestList({
             </tr>
           </thead>
           <tbody className="divide-y divide-blue-100 bg-white">
-            {items.map((request, index) => (
+            {items.map((request) => (
               <DashboardRequestRow
                 key={request.id}
                 request={request}
@@ -299,11 +369,13 @@ export function DashboardRequestList({
                 canEditDocket={canEditDocket}
                 canAssign={canAssign}
                 isEmployee={isEmployee}
-                draggable={true}
+                draggable={canReorder}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onDragEnd={handleDragEnd}
+                onToggleStar={canReorder ? handleToggleStar : undefined}
+                isStarred={starredRequestIds.has(request.id)}
               />
             ))}
           </tbody>
@@ -311,6 +383,11 @@ export function DashboardRequestList({
       </div>
     </section>
   );
+}
+
+function getNormalOrderIndex(orderIds: string[], id: string) {
+  const index = orderIds.indexOf(id);
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
 }
 
 function getComplaintAgeLabel(request: DashboardListRequest) {
