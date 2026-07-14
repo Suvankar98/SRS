@@ -353,9 +353,6 @@ export function DashboardRequestRow({
         <div className="flex items-start gap-2">
           {showReorderControls ? (
             <div className="mt-1 flex shrink-0 flex-col items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm" title="Drag to reorder">
-                <DragHandleIcon />
-              </div>
               <button
                 type="button"
                 onClick={(event) => {
@@ -403,9 +400,7 @@ export function DashboardRequestRow({
             />
 
             {!isEmployee ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {/* previously up/down buttons removed - drag handle used instead */}
-              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2" />
             ) : null}
           </div>
         </div>
@@ -417,7 +412,7 @@ export function DashboardRequestRow({
         </div>
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
-        <p className="break-words text-[13px] font-extrabold leading-snug text-blue-700">{request.company}</p>
+        <p className={`break-words text-[13px] leading-snug text-blue-700 ${isEmployee ? "font-extrabold" : "font-semibold"}`}>{request.company}</p>
         <p className="mt-1.5 break-words text-[12px] font-bold leading-snug text-slate-950">{request.name}</p>
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
@@ -467,14 +462,6 @@ export function DashboardRequestRow({
         </td>
       ) : null}
     </tr>
-  );
-}
-
-function DragHandleIcon() {
-  return (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M10 6h6M10 12h6M10 18h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
   );
 }
 

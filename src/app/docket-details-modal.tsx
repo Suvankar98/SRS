@@ -77,6 +77,12 @@ const AREAS = [
   "Tollygunge",
 ];
 
+const inputClassName =
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base";
+const mutedInputClassName =
+  "w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:text-base";
+const textareaClassName = `${inputClassName} min-h-24 resize-y`;
+
 export function DocketDetailsModal({
   request,
   canEdit,
@@ -236,10 +242,10 @@ export function DocketDetailsModal({
       onClick={() => setIsOpen(false)}
     >
       <div
-        className="my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-white shadow-lg sm:my-4 sm:max-h-[90vh]"
+        className="my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg sm:my-4 sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
             <h3 className="break-words text-base font-semibold text-blue-950 sm:text-lg">
               Docket Details - {request.docketNumber}
@@ -268,32 +274,35 @@ export function DocketDetailsModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
               <div className="space-y-4">
                 <GridField label="Customer">
                   {canEdit ? (
-                    <div className="grid gap-3">
+                    <div className="grid gap-4">
                       <EditFieldLabel label="Company">
-                        <input value={company} readOnly className="w-full rounded border bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:text-base" />
+                        <input value={company} readOnly className={mutedInputClassName} />
                       </EditFieldLabel>
-                      <div>
-                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-600">Name -&gt; contact number</p>
-                        <div className="grid gap-2">
-                          <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="grid gap-3">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <p className="mb-3 text-xs font-semibold text-slate-700">Primary contact</p>
+                          <div className="grid gap-3 sm:grid-cols-2">
                             <EditFieldLabel label="Name 1">
-                              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 1" />
+                              <input value={name} onChange={(e) => setName(e.target.value)} className={inputClassName} placeholder="Contact Person 1" />
                             </EditFieldLabel>
                             <EditFieldLabel label="Contact number 1">
-                              <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
+                              <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className={inputClassName} placeholder="+91 9876543210" />
                             </EditFieldLabel>
                           </div>
-                          <div className="grid gap-2 sm:grid-cols-2">
+                        </div>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <p className="mb-3 text-xs font-semibold text-slate-700">Secondary contact</p>
+                          <div className="grid gap-3 sm:grid-cols-2">
                             <EditFieldLabel label="Name 2">
-                              <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Contact Person 2" />
+                              <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className={inputClassName} placeholder="Contact Person 2" />
                             </EditFieldLabel>
                             <EditFieldLabel label="Contact number 2">
-                              <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="+91 9876543210" />
+                              <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className={inputClassName} placeholder="+91 9876543210" />
                             </EditFieldLabel>
                           </div>
                         </div>
@@ -326,7 +335,7 @@ export function DocketDetailsModal({
                   }
                 >
                   {canEdit ? (
-                    <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
+                    <textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} className={textareaClassName} rows={4} />
                   ) : (
                     <InfoField label="Address" value={fullAddress} />
                   )}
@@ -334,7 +343,7 @@ export function DocketDetailsModal({
 
                 <GridField label="Complaint details">
                   {canEdit ? (
-                    <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" rows={4} />
+                    <textarea value={complaintDetails} onChange={(e) => setComplaintDetails(e.target.value)} className={textareaClassName} rows={4} />
                   ) : (
                     <InfoField label="Complaint" value={complaintDetails || "Not specified"} />
                   )}
@@ -350,7 +359,7 @@ export function DocketDetailsModal({
                       value={product}
                       onChange={setProduct}
                       placeholder="Type product name"
-                      inputClassName="w-full rounded border px-3 py-2 text-sm text-blue-950 outline-none focus:border-blue-400 sm:text-base"
+                      inputClassName={inputClassName}
                       required
                     />
                   ) : (
@@ -360,7 +369,7 @@ export function DocketDetailsModal({
 
                 <GridField label="Call type">
                   {canEdit ? (
-                    <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
+                    <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className={inputClassName}>
                       {callTypeOptions.map((opt) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
@@ -380,7 +389,7 @@ export function DocketDetailsModal({
                               key={opt.id}
                               type="button"
                               onClick={() => toggleServiceBillingType(opt.id)}
-                              className={`rounded px-3 py-1 ${serviceBillingType === opt.id ? "bg-blue-600 text-white" : "border text-gray-700"}`}>
+                              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${serviceBillingType === opt.id ? "bg-blue-600 text-white" : "border border-slate-300 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-700"}`}>
                               {opt.label}
                             </button>
                           ))}
@@ -389,7 +398,7 @@ export function DocketDetailsModal({
                         {isChargeable && (
                           <div className="mt-2">
                             <EditFieldLabel label="Chargeable amount">
-                              <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base" placeholder="Amount" />
+                              <input value={chargeableAmount} onChange={(e) => setChargeableAmount(e.target.value)} className={inputClassName} placeholder="Amount" />
                             </EditFieldLabel>
                           </div>
                         )}
@@ -405,7 +414,7 @@ export function DocketDetailsModal({
 
                 <GridField label="Area">
                   {canEdit ? (
-                    <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full rounded border px-3 py-2 text-sm sm:text-base">
+                    <select value={area} onChange={(e) => setArea(e.target.value)} className={inputClassName}>
                       {AREAS.map((a) => (
                         <option key={a} value={a}>{a}</option>
                       ))}
@@ -415,11 +424,10 @@ export function DocketDetailsModal({
                   )}
                 </GridField>
 
-                <div className="space-y-2">
-                  {canAssign && employees ? (
-                    <div>
-                      <label className="block text-sm font-medium text-blue-700">Assign to</label>
-                      <div className="mt-2">
+                {canAssign ? (
+                  <GridField label="Assignment">
+                    {employees ? (
+                      <div>
                         <AssignmentPicker
                           key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
                           requestId={request.id}
@@ -435,11 +443,9 @@ export function DocketDetailsModal({
                           </p>
                         ) : null}
                       </div>
-                    </div>
-                  ) : null}
+                    ) : null}
 
-                  {canAssign ? (
-                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                    <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-gray-600">
                       {request.createdBy ? <p>Created by: {request.createdBy.name}</p> : null}
                       {request.assignments && request.assignments.length > 0 ? (
                         request.assignments.map((assignment) => (
@@ -455,16 +461,16 @@ export function DocketDetailsModal({
                         </>
                       )}
                     </div>
-                  ) : null}
-                </div>
+                  </GridField>
+                ) : null}
               </div>
             </div>
           </div>
 
           {canEdit ? (
-            <div className="grid gap-2 border-t px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
-              <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded border px-3 py-2 text-sm text-red-600 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
-              <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white sm:w-auto">Save changes</button>
+            <div className="grid gap-2 border-t border-slate-200 bg-white px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
+              <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
+              <button type="submit" className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 sm:w-auto">Save changes</button>
             </div>
           ) : null}
         </form>
@@ -515,20 +521,20 @@ function GridField({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="block">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="block text-sm font-medium text-blue-700">{label}</span>
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="block text-sm font-semibold text-blue-950">{label}</span>
         {action ? <div>{action}</div> : null}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
 function InfoField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-      <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{label}</p>
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-blue-950">
+      <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <p className="mt-1 whitespace-pre-line font-semibold">{value}</p>
     </div>
   );
@@ -548,11 +554,9 @@ function CustomerNameField({
   phoneNumber2: string;
 }) {
   return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-      <p className="text-[10px] uppercase tracking-[0.12em] text-blue-600">Company</p>
-      <p className="mt-1 break-words font-semibold">{company}</p>
-      <p className="mt-3 border-t border-blue-200 pt-2 text-[10px] uppercase tracking-[0.12em] text-blue-600">Name -&gt; contact number</p>
-      <div className="mt-2 grid gap-2">
+    <div className="grid gap-3 text-sm text-blue-950">
+      <InfoField label="Company" value={company} />
+      <div className="grid gap-2">
         <ContactPairField nameLabel="Name 1" name={name} phoneLabel="Contact number 1" phoneNumber={phoneNumber1} />
         {contactPerson2.trim() || phoneNumber2.trim() ? (
           <ContactPairField
@@ -582,14 +586,14 @@ function ContactPairField({
   const copyValue = getIndianPhoneCopyValue(phoneNumber);
 
   return (
-    <div className="grid gap-2 rounded-xl border border-blue-100 bg-white px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500">{nameLabel}</p>
+        <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{nameLabel}</p>
         <p className="mt-1 break-words font-semibold text-blue-950">{name}</p>
       </div>
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-blue-500">{phoneLabel}</p>
+          <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{phoneLabel}</p>
           <p className="mt-1 break-words font-semibold text-blue-950">{displayValue}</p>
         </div>
         {phoneNumber.trim() ? <CopyPhoneButton value={copyValue} /> : null}
