@@ -205,7 +205,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const sortedFilteredRequests = isEmployee
     ? sortByEmployeeQueueOrder(visibleRequests)
     : sortByDashboardOrder(visibleRequests);
-  const requests = isEmployee ? sortedFilteredRequests : sortedFilteredRequests.slice(-10);
+  const requests = sortedFilteredRequests;
   const totalRequests = sortedFilteredRequests.length;
   const assignedRequests = sortedFilteredRequests.filter(
     (request) => Boolean(request.assignedToId) || (request.assignments?.length ?? 0) > 0,
