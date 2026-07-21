@@ -39,6 +39,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
   const [isEditing, setIsEditing] = React.useState(false);
   const [isImporting, startImportTransition] = React.useTransition();
   const [importMessage, setImportMessage] = React.useState<string | null>(null);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   const selectedDetail = selectedCompany?.detail;
 
@@ -91,7 +92,15 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
   }
 
   async function saveSelectedCustomer(formData: FormData) {
-    await updateSavedCustomerDetails(formData);
+    setSaveError(null);
+
+    try {
+      await updateSavedCustomerDetails(formData);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Unable to save customer details.");
+      return;
+    }
+
     const company = String(formData.get("company") ?? "").trim();
     const name = String(formData.get("name") ?? "").trim();
     const phoneNumber1 = String(formData.get("phoneNumber1") ?? "").trim();
@@ -123,6 +132,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
   function closeModal() {
     setSelectedCompany(null);
     setIsEditing(false);
+    setSaveError(null);
   }
 
   return (
@@ -251,6 +261,11 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
                       />
                     </label>
                   </div>
+                  {saveError ? (
+                    <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                      {saveError}
+                    </p>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
                     <button
                       type="button"
@@ -276,7 +291,10 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
                     </div>
                     <button
                       type="button"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setSaveError(null);
+                        setIsEditing(true);
+                      }}
                       className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
                     >
                       <EditIcon />

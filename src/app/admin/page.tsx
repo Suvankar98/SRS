@@ -15,6 +15,7 @@ import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SRTEC_PRODUCT_NAMES } from "@/lib/product-options";
+import { PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const showDuplicateWarning = (Array.isArray(duplicateParam) ? duplicateParam[0] : duplicateParam) === "1";
   const tabParam = resolvedSearchParams.tab;
   const activeTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
+  const phoneErrorParam = resolvedSearchParams.phoneError;
+  const showPhoneError = (Array.isArray(phoneErrorParam) ? phoneErrorParam[0] : phoneErrorParam) === "1";
   const duplicateItemLabel = activeTab === "call-types" ? "call type" : "product";
 
   if ((await prisma.product.count()) === 0) {
@@ -142,6 +145,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         </header>
 
+        {showPhoneError ? (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {PHONE_VALIDATION_MESSAGE}
+          </div>
+        ) : null}
+
         {showDuplicateWarning ? (
           <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
             This {duplicateItemLabel} already exists. Please use a different name.
@@ -181,13 +190,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <input
                 name="phoneNumber1"
                 type="tel"
-                placeholder="Phone number 1"
+                placeholder="+60123456789 or 9876543210"
                 className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
               />
               <input
                 name="phoneNumber2"
                 type="tel"
-                placeholder="Phone number 2"
+                placeholder="+447911123456 or 9876543210"
                 className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
               />
               <select

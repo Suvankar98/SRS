@@ -103,7 +103,10 @@ export function DocketDetailsModal({
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-  const openModal = () => setIsOpen(true);
+  const openModal = () => {
+    setSubmitError("");
+    setIsOpen(true);
+  };
 
   React.useEffect(() => {
     if (onReady) {
@@ -129,6 +132,7 @@ export function DocketDetailsModal({
   const [chargeableAmount, setChargeableAmount] = React.useState(
     request.chargeableAmount !== null && request.chargeableAmount !== undefined ? String(request.chargeableAmount) : "",
   );
+  const [submitError, setSubmitError] = React.useState("");
   const [isDeleting, setIsDeleting] = React.useState(false);
   const productOptions = React.useMemo(() => {
     if (products.some((option) => option.name.toLowerCase() === product.toLowerCase())) {
@@ -171,6 +175,8 @@ export function DocketDetailsModal({
       return;
     }
 
+    setSubmitError("");
+
     const formData = new FormData();
     formData.append("requestId", String(request.id));
     formData.append("name", name);
@@ -187,9 +193,13 @@ export function DocketDetailsModal({
     formData.append("serviceBillingType", isServiceCall ? serviceBillingType : "");
     formData.append("chargeableAmount", isChargeable ? chargeableAmount : "");
 
-    await updateServiceRequestDetails(formData);
-    setIsOpen(false);
-    router.refresh();
+    try {
+      await updateServiceRequestDetails(formData);
+      setIsOpen(false);
+      router.refresh();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to save service request details.");
+    }
   };
 
   const handleDelete = async () => {
@@ -294,7 +304,7 @@ export function DocketDetailsModal({
                               <input value={name} onChange={(e) => setName(e.target.value)} className={inputClassName} placeholder="Contact Person 1" />
                             </EditFieldLabel>
                             <EditFieldLabel label="Contact number 1">
-                              <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className={inputClassName} placeholder="+91 9876543210" />
+                              <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className={inputClassName} placeholder="+60123456789 or 9876543210" />
                             </EditFieldLabel>
                           </div>
                         </div>
@@ -305,7 +315,7 @@ export function DocketDetailsModal({
                               <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className={inputClassName} placeholder="Contact Person 2" />
                             </EditFieldLabel>
                             <EditFieldLabel label="Contact number 2">
-                              <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className={inputClassName} placeholder="+91 9876543210" />
+                              <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className={inputClassName} placeholder="+447911123456 or 9876543210" />
                             </EditFieldLabel>
                           </div>
                         </div>
@@ -487,6 +497,11 @@ export function DocketDetailsModal({
 
           {canEdit ? (
             <div className="grid gap-2 border-t border-slate-200 bg-white px-4 py-4 sm:flex sm:items-center sm:justify-end sm:gap-3 sm:px-6">
+              {submitError ? (
+                <p className="w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 sm:mr-auto sm:w-auto">
+                  {submitError}
+                </p>
+              ) : null}
               <button type="button" onClick={handleDelete} disabled={isDeleting} className="w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isDeleting ? "Deleting..." : "Delete"}</button>
               <button type="submit" className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 sm:w-auto">Save changes</button>
             </div>

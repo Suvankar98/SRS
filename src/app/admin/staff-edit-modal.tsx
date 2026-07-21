@@ -80,13 +80,13 @@ export function StaffEditModal({ member, departments }: StaffEditModalProps) {
               <input
                 name="phoneNumber1"
                 defaultValue={member.phoneNumber1 ?? member.whatsappNumber ?? ""}
-                placeholder="Phone number 1"
+                placeholder="+60123456789 or 9876543210"
                 className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
               />
               <input
                 name="phoneNumber2"
                 defaultValue={member.phoneNumber2 ?? ""}
-                placeholder="Phone number 2"
+                placeholder="+447911123456 or 9876543210"
                 className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
               />
               <select

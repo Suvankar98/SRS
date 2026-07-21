@@ -1,3 +1,5 @@
+import { normalizePhoneNumberForStorage } from "./phone";
+
 type AssignmentWhatsAppPayload = {
   toPhone: string;
   employeeName: string;
@@ -31,34 +33,7 @@ function normalizePhone(raw: string) {
   }
 
   const withoutPrefix = trimmed.replace(/^whatsapp:/i, "");
-  const compact = withoutPrefix.replace(/[\s().-]/g, "");
-  const withoutIntlPrefix = compact.startsWith("00") ? compact.slice(2) : compact;
-
-  if (/^\+\d{8,15}$/.test(withoutIntlPrefix)) {
-    return withoutIntlPrefix;
-  }
-
-  if (!/^\d{8,15}$/.test(withoutIntlPrefix)) {
-    return null;
-  }
-
-  // Most customer numbers are entered as local Indian mobile numbers.
-  // Handle both 10-digit format and 11-digit numbers with leading 0.
-  if (withoutIntlPrefix.length === 11 && withoutIntlPrefix.startsWith("0")) {
-    return `+91${withoutIntlPrefix.slice(1)}`;
-  }
-
-  // Default to +91 when no country code is supplied.
-  if (withoutIntlPrefix.length === 10) {
-    return `+91${withoutIntlPrefix}`;
-  }
-
-  // Handle explicit India country code without + prefix.
-  if (withoutIntlPrefix.length === 12 && withoutIntlPrefix.startsWith("91")) {
-    return `+${withoutIntlPrefix}`;
-  }
-
-  return `+${withoutIntlPrefix}`;
+  return normalizePhoneNumberForStorage(withoutPrefix);
 }
 
 function buildAssignmentMessage(payload: AssignmentWhatsAppPayload) {

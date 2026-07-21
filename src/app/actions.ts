@@ -2,7 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { normalizeIndianPhoneNumber } from "@/lib/phone";
+import { PHONE_VALIDATION_MESSAGE, normalizePhoneNumberForStorage } from "@/lib/phone";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
@@ -221,10 +221,10 @@ function getPrimaryOpenAssignment(assignments: AssignmentStatusSummaryInput[]) {
 
 function getRequiredPhoneField(formData: FormData, key: string, label: string) {
   const value = getRequiredField(formData, key);
-  const normalized = normalizeIndianPhoneNumber(value);
+  const normalized = normalizePhoneNumberForStorage(value);
 
   if (!normalized) {
-    throw new Error(`${label} must be a valid 10-digit Indian mobile number.`);
+    throw new Error(`${label}: ${PHONE_VALIDATION_MESSAGE}`);
   }
 
   return normalized;
@@ -237,12 +237,16 @@ function getOptionalPhoneField(formData: FormData, key: string, label: string) {
     return null;
   }
 
-  const normalized = normalizeIndianPhoneNumber(value);
+  const normalized = normalizePhoneNumberForStorage(value);
   if (!normalized) {
-    throw new Error(`${label} must be a valid 10-digit Indian mobile number.`);
+    throw new Error(`${label}: ${PHONE_VALIDATION_MESSAGE}`);
   }
 
   return normalized;
+}
+
+function isPhoneValidationError(error: unknown) {
+  return error instanceof Error && error.message.includes(PHONE_VALIDATION_MESSAGE);
 }
 
 function parsePerformanceAdjustmentDate(value: string) {
@@ -563,14 +567,26 @@ export async function createServiceRequest(formData: FormData) {
   const name = getRequiredField(formData, "name");
   const company = getRequiredField(formData, "company");
   const contactPerson2 = getOptionalNullableField(formData, "contactPerson2");
-  const phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number 1");
+  let phoneNumber1: string;
+  let phoneNumber2: string | null;
+
+  try {
+    phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number 1");
+    phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  } catch (error) {
+    if (isPhoneValidationError(error)) {
+      redirect("/form?phoneError=1");
+    }
+
+    throw error;
+  }
+
   const fullAddress = getRequiredField(formData, "fullAddress");
   const complaintDetails = getRequiredField(formData, "complaintDetails");
   const area = getRequiredField(formData, "area");
   const product = getRequiredField(formData, "product");
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
-  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
   const companyKey = getCompanyMatchKey(company);
   const [creator, existingRequestCompany, existingSavedCustomerCompany] = await Promise.all([
     prisma.user.findUnique({
@@ -699,11 +715,10 @@ export async function updateServiceRequestDetails(formData: FormData) {
 
 function normalizeSavedCustomerPhone(value: string) {
   if (value.trim() === "") {
-    return "";
+    return null;
   }
 
-  const normalized = normalizeIndianPhoneNumber(value);
-  return normalized ?? value.trim();
+  return normalizePhoneNumberForStorage(value);
 }
 
 function parseOptionalInstallationDate(value: string) {
@@ -731,7 +746,7 @@ export async function updateSavedCustomerDetails(formData: FormData) {
   const source = getOptionalField(formData, "source") || "serviceRequest";
   const company = getRequiredField(formData, "company");
   const name = getRequiredField(formData, "name");
-  const phoneNumber1 = normalizeSavedCustomerPhone(getRequiredField(formData, "phoneNumber1"));
+  const phoneNumber1 = getRequiredPhoneField(formData, "phoneNumber1", "Phone Number");
   const area = getRequiredField(formData, "area");
   const fullAddress = getRequiredField(formData, "fullAddress");
   const installationDate = parseOptionalInstallationDate(getOptionalField(formData, "installationDate"));
@@ -852,9 +867,16 @@ export async function importSavedCustomerDetails(formData: FormData) {
     const fullAddress = getUploadString(row.fullAddress);
     const installationDateRaw = getUploadString(row.installationDate);
     const installationDate = installationDateRaw ? parseOptionalInstallationDate(installationDateRaw) : null;
+    const phoneNumber1 = phoneNumberRaw ? normalizeSavedCustomerPhone(phoneNumberRaw) : "";
+
+    if (phoneNumberRaw && !phoneNumber1) {
+      skipped += 1;
+      continue;
+    }
+
     const updateData = {
       name,
-      phoneNumber1: phoneNumberRaw ? normalizeSavedCustomerPhone(phoneNumberRaw) : "",
+      phoneNumber1: phoneNumber1 ?? "",
       area,
       fullAddress,
       ...(installationDateRaw ? { installationDate } : {}),
@@ -1169,8 +1191,20 @@ export async function addStaff(formData: FormData) {
   const username = getRequiredField(formData, "username");
   const password = getRequiredField(formData, "password");
   const role = getRequiredField(formData, "role");
-  const phoneNumber1 = getOptionalPhoneField(formData, "phoneNumber1", "Phone Number 1");
-  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  let phoneNumber1: string | null;
+  let phoneNumber2: string | null;
+
+  try {
+    phoneNumber1 = getOptionalPhoneField(formData, "phoneNumber1", "Phone Number 1");
+    phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  } catch (error) {
+    if (isPhoneValidationError(error)) {
+      redirect("/admin?tab=staff&phoneError=1");
+    }
+
+    throw error;
+  }
+
   const department = getStaffDepartment(formData);
 
   if (role !== APP_ROLES.MANAGER && role !== APP_ROLES.EMPLOYEE) {
@@ -1221,8 +1255,20 @@ export async function updateStaff(formData: FormData) {
   const name = getRequiredField(formData, "name");
   const username = getRequiredField(formData, "username");
   const role = getRequiredField(formData, "role");
-  const phoneNumber1 = getOptionalPhoneField(formData, "phoneNumber1", "Phone Number 1");
-  const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  let phoneNumber1: string | null;
+  let phoneNumber2: string | null;
+
+  try {
+    phoneNumber1 = getOptionalPhoneField(formData, "phoneNumber1", "Phone Number 1");
+    phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  } catch (error) {
+    if (isPhoneValidationError(error)) {
+      redirect("/admin?tab=staff&phoneError=1");
+    }
+
+    throw error;
+  }
+
   const department = getStaffDepartment(formData);
 
   if (role !== APP_ROLES.MANAGER && role !== APP_ROLES.EMPLOYEE) {

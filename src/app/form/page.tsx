@@ -8,16 +8,24 @@ import { getProductOptions } from "@/lib/product-options";
 import { ServiceCallBillingFields } from "../service-call-billing-fields";
 import { CustomerDetailsFields, type SavedCompanyOption } from "./customer-details-fields";
 import { ProductAutocomplete } from "../product-autocomplete";
+import { PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
-export default async function FormPage() {
+type FormPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function FormPage({ searchParams }: FormPageProps) {
   const session = await getSession();
 
   if (!session || (session.role !== APP_ROLES.ADMIN && session.role !== APP_ROLES.MANAGER)) {
     redirect("/dashboard");
   }
 
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const phoneErrorParam = resolvedSearchParams.phoneError;
+  const showPhoneError = (Array.isArray(phoneErrorParam) ? phoneErrorParam[0] : phoneErrorParam) === "1";
   const [databaseProducts, savedRequests, importedSavedCustomers] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.serviceRequest.findMany({
@@ -59,6 +67,12 @@ export default async function FormPage() {
             <h2 className="text-2xl font-semibold text-blue-950">New service request</h2>
             <p className="text-sm leading-6 text-blue-600">Fill details and submit.</p>
           </div>
+
+          {showPhoneError ? (
+            <p className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              {PHONE_VALIDATION_MESSAGE}
+            </p>
+          ) : null}
 
           <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
             <CustomerDetailsFields savedCompanies={savedCompanies} />
