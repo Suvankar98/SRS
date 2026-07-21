@@ -3,6 +3,7 @@
 import React from "react";
 
 import { updateStaff } from "../actions";
+import { PhoneNumberInput } from "../phone-number-input";
 import { OptionalPasswordField } from "./optional-password-field";
 import { APP_ROLES } from "@/lib/auth-constants";
 
@@ -77,17 +78,17 @@ export function StaffEditModal({ member, departments }: StaffEditModalProps) {
                 required
               />
               <OptionalPasswordField />
-              <input
+              <PhoneNumberInput
                 name="phoneNumber1"
                 defaultValue={member.phoneNumber1 ?? member.whatsappNumber ?? ""}
-                placeholder="+60123456789 or 9876543210"
-                className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                inputClassName="min-w-0 flex-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                selectClassName="w-28 shrink-0 rounded-xl border border-blue-200 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none focus:border-blue-400"
               />
-              <input
+              <PhoneNumberInput
                 name="phoneNumber2"
                 defaultValue={member.phoneNumber2 ?? ""}
-                placeholder="+447911123456 or 9876543210"
-                className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                inputClassName="min-w-0 flex-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                selectClassName="w-28 shrink-0 rounded-xl border border-blue-200 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none focus:border-blue-400"
               />
               <select
                 name="department"

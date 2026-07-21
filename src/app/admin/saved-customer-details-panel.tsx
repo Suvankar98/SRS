@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 
 import { importSavedCustomerDetails, updateSavedCustomerDetails } from "../actions";
+import { PhoneNumberInput } from "../phone-number-input";
 
 export type SavedCustomerRequest = {
   id: string;
@@ -247,7 +248,14 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
                   <div className="grid gap-3 sm:grid-cols-2">
                     <CustomerInput label="Company Name" name="company" defaultValue={selectedCompany.company} />
                     <CustomerInput label="Name" name="name" defaultValue={selectedDetail.name} />
-                    <CustomerInput label="Phone Number" name="phoneNumber1" defaultValue={selectedDetail.phoneNumber1} />
+                    <PhoneNumberInput
+                      label="Phone Number"
+                      name="phoneNumber1"
+                      defaultValue={selectedDetail.phoneNumber1}
+                      required
+                      inputClassName="min-w-0 flex-1 rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-950 outline-none transition focus:border-blue-400"
+                      selectClassName="w-28 shrink-0 rounded-2xl border border-blue-200 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-400"
+                    />
                     <CustomerInput label="Area" name="area" defaultValue={selectedDetail.area} />
                     <CustomerDateInput label="Installation Date" name="installationDate" defaultValue={selectedDetail.installationDateInputValue} />
                     <label className="sm:col-span-2">

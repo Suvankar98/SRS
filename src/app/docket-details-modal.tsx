@@ -7,6 +7,7 @@ import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./dashboard/assignment-picker";
 import { CopyPhoneButton } from "./dashboard/copy-phone-button";
 import { ProductAutocomplete } from "./product-autocomplete";
+import { PhoneNumberInput } from "./phone-number-input";
 import { formatIndianPhoneNumber, getIndianPhoneCopyValue } from "@/lib/phone";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -303,9 +304,15 @@ export function DocketDetailsModal({
                             <EditFieldLabel label="Name 1">
                               <input value={name} onChange={(e) => setName(e.target.value)} className={inputClassName} placeholder="Contact Person 1" />
                             </EditFieldLabel>
-                            <EditFieldLabel label="Contact number 1">
-                              <input value={phoneNumber1} onChange={(e) => setPhoneNumber1(e.target.value)} className={inputClassName} placeholder="+60123456789 or 9876543210" />
-                            </EditFieldLabel>
+                            <PhoneNumberInput
+                              label="Contact number 1"
+                              name="phoneNumber1"
+                              value={phoneNumber1}
+                              onChange={setPhoneNumber1}
+                              required
+                              inputClassName="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
+                              selectClassName="w-28 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
+                            />
                           </div>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -314,9 +321,14 @@ export function DocketDetailsModal({
                             <EditFieldLabel label="Name 2">
                               <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className={inputClassName} placeholder="Contact Person 2" />
                             </EditFieldLabel>
-                            <EditFieldLabel label="Contact number 2">
-                              <input value={phoneNumber2} onChange={(e) => setPhoneNumber2(e.target.value)} className={inputClassName} placeholder="+447911123456 or 9876543210" />
-                            </EditFieldLabel>
+                            <PhoneNumberInput
+                              label="Contact number 2"
+                              name="phoneNumber2"
+                              value={phoneNumber2}
+                              onChange={setPhoneNumber2}
+                              inputClassName="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
+                              selectClassName="w-28 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
+                            />
                           </div>
                         </div>
                       </div>

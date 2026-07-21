@@ -2,6 +2,7 @@
 
 import React from "react";
 
+import { PhoneNumberInput } from "../phone-number-input";
 import { AreaAutocomplete } from "./area-autocomplete";
 
 export type SavedCompanyOption = {
@@ -105,7 +106,13 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
         <div className="grid gap-4 rounded-2xl bg-slate-50 p-4 sm:gap-5 md:grid-cols-2">
           <Field label="Contact Person 1" name="name" value={name} onChange={setName} placeholder="Enter contact person name" />
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_3rem] sm:items-end">
-            <Field label="Ph No. - Contact 1" name="phoneNumber1" value={phoneNumber1} onChange={setPhoneNumber1} placeholder="+60123456789 or 9876543210" type="tel" />
+            <PhoneNumberInput
+              label="Ph No. - Contact 1"
+              name="phoneNumber1"
+              value={phoneNumber1}
+              onChange={setPhoneNumber1}
+              required
+            />
             <button
               type="button"
               onClick={() => setShowSecondContact(true)}
@@ -120,7 +127,12 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
           {showSecondContact ? (
             <>
               <Field label="Contact Person 2" name="contactPerson2" value={contactPerson2} onChange={setContactPerson2} placeholder="Enter contact person name" required={false} />
-              <Field label="Ph No. - Contact 2" name="phoneNumber2" value={phoneNumber2} onChange={setPhoneNumber2} placeholder="+447911123456 or 9876543210" type="tel" required={false} />
+              <PhoneNumberInput
+                label="Ph No. - Contact 2"
+                name="phoneNumber2"
+                value={phoneNumber2}
+                onChange={setPhoneNumber2}
+              />
             </>
           ) : null}
         </div>

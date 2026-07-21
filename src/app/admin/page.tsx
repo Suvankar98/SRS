@@ -11,6 +11,7 @@ import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { FixedCallTypesSection } from "./fixed-call-types-section";
 import { SavedCustomerDetailsPanel, type SavedCustomerCompany } from "./saved-customer-details-panel";
 import { StaffEditModal } from "./staff-edit-modal";
+import { PhoneNumberInput } from "../phone-number-input";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -187,17 +188,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
                 required
               />
-              <input
+              <PhoneNumberInput
                 name="phoneNumber1"
-                type="tel"
-                placeholder="+60123456789 or 9876543210"
-                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+                inputClassName="min-w-0 flex-1 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+                selectClassName="w-28 shrink-0 rounded-2xl border border-blue-200 bg-white px-2 py-2.5 text-sm font-semibold text-blue-800 outline-none focus:border-blue-400"
               />
-              <input
+              <PhoneNumberInput
                 name="phoneNumber2"
-                type="tel"
-                placeholder="+447911123456 or 9876543210"
-                className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+                inputClassName="min-w-0 flex-1 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+                selectClassName="w-28 shrink-0 rounded-2xl border border-blue-200 bg-white px-2 py-2.5 text-sm font-semibold text-blue-800 outline-none focus:border-blue-400"
               />
               <select
                 name="department"
