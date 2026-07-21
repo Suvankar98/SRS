@@ -25,7 +25,13 @@ type NavItem = {
   roles: AppRole[];
 };
 
-type IconName = "dashboard" | "call" | "gallery" | "report" | "history" | "admin" | "logout" | "menu" | "collapse";
+type ManualItem = {
+  href: string;
+  label: string;
+  description: string;
+};
+
+type IconName = "dashboard" | "call" | "gallery" | "report" | "history" | "admin" | "gear" | "folder" | "logout" | "menu" | "collapse";
 
 const navItems: NavItem[] = [
   {
@@ -66,15 +72,23 @@ const navItems: NavItem[] = [
   },
 ];
 
+const techManualItems: ManualItem[] = [
+  { href: "/tech-manual/safety", label: "Safety", description: "Site safety guides and handling procedures" },
+  { href: "/tech-manual/security", label: "Security", description: "Security setup, wiring, and service references" },
+  { href: "/tech-manual/automation", label: "Automation", description: "Automation product manuals and install notes" },
+];
+
 export function AppShell({ children, user }: AppShellProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isTechManualOpen, setIsTechManualOpen] = useState(false);
 
   if (!user || pathname === "/") {
     return <>{children}</>;
   }
 
   const visibleItems = navItems.filter((item) => item.roles.includes(user.role));
+  const canSeeTechManual = [APP_ROLES.ADMIN, APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE].includes(user.role);
 
   return (
     <div
@@ -126,6 +140,13 @@ export function AppShell({ children, user }: AppShellProps) {
             {visibleItems.map((item) => (
               <SidebarLink key={item.href} item={item} active={isActivePath(pathname, item.href)} collapsed={isCollapsed} />
             ))}
+            {canSeeTechManual ? (
+              <TechManualNav
+                activePath={pathname}
+                collapsed={isCollapsed}
+                onOpen={() => setIsTechManualOpen(true)}
+              />
+            ) : null}
           </nav>
 
           <form action={logout} className="relative mt-5">
@@ -165,6 +186,9 @@ export function AppShell({ children, user }: AppShellProps) {
               {visibleItems.map((item) => (
                 <MobileSidebarLink key={item.href} item={item} active={isActivePath(pathname, item.href)} />
               ))}
+              {canSeeTechManual ? (
+                <MobileTechManualNav activePath={pathname} onOpen={() => setIsTechManualOpen(true)} />
+              ) : null}
               <form action={logout}>
                 <button
                   type="submit"
@@ -181,7 +205,42 @@ export function AppShell({ children, user }: AppShellProps) {
         </details>
       </header>
 
+      {isTechManualOpen ? <TechManualPopup onClose={() => setIsTechManualOpen(false)} /> : null}
+
       <div className="min-w-0 lg:col-start-2">{children}</div>
+    </div>
+  );
+}
+
+function TechManualNav({
+  activePath,
+  collapsed,
+  onOpen,
+}: {
+  activePath: string;
+  collapsed: boolean;
+  onOpen: () => void;
+}) {
+  const active = isActivePath(activePath, "/tech-manual");
+
+  return (
+    <div className="pt-1">
+      <button
+        type="button"
+        onClick={onOpen}
+        title="Tech Manual"
+        className={`group grid w-full items-center gap-3 text-left text-sm font-semibold transition ${
+          collapsed ? "grid-cols-[2.75rem] justify-center rounded-2xl px-0 py-2" : "grid-cols-[2.75rem_minmax(0,1fr)_1rem] rounded-r-full px-1 py-2"
+        } ${
+          active ? "bg-white text-[#0759b8] shadow-lg shadow-blue-950/10" : "text-white/88 hover:bg-white/14 hover:text-white"
+        }`}
+      >
+        <span className={`flex h-10 w-10 items-center justify-center transition ${active ? "text-[#0759b8]" : "text-white/80 group-hover:text-white"}`}>
+          <AppIcon name="gear" />
+        </span>
+        <span className={`truncate ${collapsed ? "hidden" : ""}`}>Tech Manual</span>
+        {active && !collapsed ? <span className="h-2 w-2 rounded-full bg-[#0759b8]" /> : null}
+      </button>
     </div>
   );
 }
@@ -210,6 +269,79 @@ function SidebarLink({ item, active, collapsed }: { item: NavItem; active: boole
   );
 }
 
+function MobileTechManualNav({ activePath, onOpen }: { activePath: string; onOpen: () => void }) {
+  const active = isActivePath(activePath, "/tech-manual");
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold ${
+          active ? "bg-white text-[#0759b8]" : "text-white/90 hover:bg-white/14"
+        }`}
+    >
+      <span className="flex h-8 w-8 items-center justify-center">
+        <AppIcon name="gear" />
+      </span>
+      <span>Tech Manual</span>
+    </button>
+  );
+}
+
+function TechManualPopup({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-blue-100 bg-gradient-to-br from-white via-blue-50/70 to-white px-5 py-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-700 shadow-sm">
+              <AppIcon name="gear" />
+            </span>
+            <span className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-500">Tech Manual</p>
+              <h2 className="mt-1 text-xl font-semibold text-blue-950">Manual Library</h2>
+              <p className="mt-1 text-xs font-medium leading-5 text-blue-600">Choose a category to open uploaded folders and documents.</p>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+            aria-label="Close tech manual folders"
+            title="Close"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="grid gap-3 bg-slate-50/70 p-5">
+          {techManualItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className="group grid grid-cols-[3.25rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-4 text-blue-950 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-[0_14px_34px_rgba(15,23,42,0.12)]"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700 shadow-sm transition group-hover:bg-blue-100">
+                <AppIcon name="folder" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">{item.label}</span>
+                <span className="mt-0.5 block truncate text-xs font-medium text-blue-600">{item.description}</span>
+              </span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-700 transition group-hover:bg-blue-700 group-hover:text-white">
+                <ArrowRightIcon />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MobileSidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
@@ -233,6 +365,22 @@ function isActivePath(pathname: string, href: string) {
 
 function formatRole(role: AppRole) {
   return role.toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M9 18 15 12 9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function AppIcon({ name }: { name: IconName }) {
@@ -306,6 +454,24 @@ function AppIcon({ name }: { name: IconName }) {
       <svg {...common}>
         <path d="M12 3 5 6v5c0 4.2 2.9 7.9 7 9 4.1-1.1 7-4.8 7-9V6l-7-3Z" />
         <path d="M9.5 12.5 11.2 14l3.5-4" />
+      </svg>
+    );
+  }
+
+  if (name === "gear") {
+    return (
+      <svg {...common}>
+        <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .35 1.88l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.02.03a2 2 0 0 1-3.96 0L10 20a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.35l-.04.04a2 2 0 0 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.03-.02a2 2 0 0 1 0-3.96L4 10a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.35-1.88l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.02-.03a2 2 0 0 1 3.96 0L14 4a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.35l.04-.04a2 2 0 0 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9c.15.37.37.71.6 1l.03.02a2 2 0 0 1 0 3.96L20 14c-.23.29-.45.63-.6 1Z" />
+      </svg>
+    );
+  }
+
+  if (name === "folder") {
+    return (
+      <svg {...common}>
+        <path d="M4 6.5h6l1.6 2H20v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5Z" />
+        <path d="M4 9h16" />
       </svg>
     );
   }

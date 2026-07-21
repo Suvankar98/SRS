@@ -7,7 +7,10 @@ export type AssignmentPickerAssignment = {
   id?: string;
   employeeId: string;
   assignedAt?: Date | string | null;
+  status?: string | null;
+  statusReason?: string | null;
   statusSubmittedAt?: Date | string | null;
+  closedAt?: Date | string | null;
   employee?: { name: string } | null;
 };
 

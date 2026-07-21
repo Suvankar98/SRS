@@ -26,6 +26,7 @@ type RequestDetails = {
   phoneNumber1: string;
   phoneNumber2: string | null;
   fullAddress: string;
+  installationDate?: Date | string | null;
   complaintDetails: string | null;
   area: string;
   product: string;
@@ -115,6 +116,7 @@ export function DocketDetailsModal({
   const [phoneNumber1, setPhoneNumber1] = React.useState(request.phoneNumber1);
   const [phoneNumber2, setPhoneNumber2] = React.useState(request.phoneNumber2 || "");
   const [fullAddress, setFullAddress] = React.useState(request.fullAddress);
+  const [installationDate, setInstallationDate] = React.useState(getDateInputValue(request.installationDate));
   const [complaintDetails, setComplaintDetails] = React.useState(request.complaintDetails || "");
   const [area, setArea] = React.useState(request.area);
   const [product, setProduct] = React.useState(request.product);
@@ -177,6 +179,7 @@ export function DocketDetailsModal({
     formData.append("phoneNumber1", phoneNumber1);
     formData.append("phoneNumber2", phoneNumber2);
     formData.append("fullAddress", fullAddress);
+    formData.append("installationDate", installationDate);
     formData.append("complaintDetails", complaintDetails);
     formData.append("area", area);
     formData.append("product", product);
@@ -351,6 +354,21 @@ export function DocketDetailsModal({
               </div>
 
               <div className="space-y-4">
+                <GridField label="Installation date">
+                  {canEdit ? (
+                    <EditFieldLabel label="Installation Date">
+                      <input
+                        type="date"
+                        value={installationDate}
+                        onChange={(event) => setInstallationDate(event.target.value)}
+                        className={inputClassName}
+                      />
+                    </EditFieldLabel>
+                  ) : (
+                    <InfoField label="Installation Date" value={formatInstallationDate(request.installationDate)} />
+                  )}
+                </GridField>
+
                 <GridField label="Product">
                   {canEdit ? (
                     <ProductAutocomplete
@@ -663,6 +681,36 @@ function parseDateValue(value: Date | string | null | undefined) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getDateInputValue(value: Date | string | null | undefined) {
+  const date = parseDateValue(value);
+
+  if (!date) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function formatInstallationDate(value: Date | string | null | undefined) {
+  const date = parseDateValue(value);
+
+  if (!date) {
+    return "Not specified";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(date);
 }
 
 function getCompletedAt(request: RequestDetails) {

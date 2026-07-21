@@ -12,6 +12,20 @@ type StatusRequest = {
   status: string | null;
   statusReason: string | null;
   mediaUploadedAt?: Date | string | null;
+  activities?: ServiceHistoryActivity[];
+};
+
+type ServiceHistoryActivity = {
+  id: string;
+  type: string;
+  title: string;
+  details: string | null;
+  status: string | null;
+  statusReason: string | null;
+  employeeName: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  createdAt: Date | string;
 };
 
 type EditableStatus = "In Process" | "Completed" | "Cancel";
@@ -234,6 +248,3 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     </>
   );
 }
-
-
-

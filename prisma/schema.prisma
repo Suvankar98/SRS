@@ -49,6 +49,7 @@ model SavedCustomer {
   phoneNumber1 String   @default("")
   area         String   @default("")
   fullAddress  String   @default("")
+  installationDate DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -62,6 +63,7 @@ model ServiceRequest {
   phoneNumber1 String
   phoneNumber2 String?
   fullAddress  String
+  installationDate DateTime?
   complaintDetails String?
   area         String
   product      String
@@ -165,6 +167,36 @@ model MonthlyPerformanceHistory {
   employee           User     @relation("MonthlyHistoryEmployee", fields: [employeeId], references: [id])
   
   @@unique([employeeId, year, month])
+}
+
+model TechManualFolder {
+  id          String   @id @default(uuid()) @db.Uuid
+  category    String
+  name        String
+  createdById String?  @db.Uuid
+  createdByName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   TechManualDocument[] @relation("TechManualFolderDocuments")
+
+  @@index([category, createdAt])
+}
+
+model TechManualDocument {
+  id            String   @id @default(uuid()) @db.Uuid
+  folderId      String   @db.Uuid
+  name          String
+  documentType  String
+  fileName      String?
+  fileUrl       String?
+  youtubeUrl    String?
+  uploadedById  String?  @db.Uuid
+  uploadedByName String?
+  createdAt     DateTime @default(now())
+
+  folder        TechManualFolder @relation("TechManualFolderDocuments", fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([folderId, createdAt])
 }
 
 enum UserRole {

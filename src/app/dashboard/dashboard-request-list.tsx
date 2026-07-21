@@ -21,6 +21,7 @@ export type DashboardListRequest = {
   phoneNumber1: string;
   phoneNumber2: string | null;
   fullAddress: string;
+  installationDate?: Date | string | null;
   complaintDetails: string | null;
   area: string;
   product: string;
@@ -39,8 +40,22 @@ export type DashboardListRequest = {
   lastAttemptAt?: Date | string | null;
   assignedTo?: { name: string } | null;
   assignments?: AssignmentPickerAssignment[];
+  activities?: DashboardServiceActivity[];
   createdBy?: { name: string } | null;
   mediaItems?: DashboardRequestMediaItem[];
+};
+
+export type DashboardServiceActivity = {
+  id: string;
+  type: string;
+  title: string;
+  details: string | null;
+  status: string | null;
+  statusReason: string | null;
+  employeeName: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  createdAt: Date | string;
 };
 
 type DashboardRequestListProps = {

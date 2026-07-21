@@ -34,8 +34,9 @@ export function EmployeeReportPopup({
               <button
                 type="button"
                 onClick={close}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-200 text-blue-700 transition hover:bg-blue-50"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
                 aria-label="Close report"
+                title="Close"
               >
                 x
               </button>

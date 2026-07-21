@@ -8,6 +8,10 @@ type DashboardGalleryItem = {
   label: string;
   fileName: string;
   requestId: string;
+  docketNumber: string;
+  company: string;
+  uploadedById: string;
+  uploadedByName: string;
   sizeLabel: string;
   uploadedAt: Date;
 };
@@ -19,9 +23,9 @@ export type DashboardGalleryGroup = {
   items: DashboardGalleryItem[];
 };
 
-export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGalleryGroup[]> {
+export async function getDashboardGalleryItems(): Promise<DashboardGalleryItem[]> {
   const uploadsBase = path.join(process.cwd(), "public", "uploads");
-  const groups: Record<string, DashboardGalleryItem[]> = {};
+  const items: DashboardGalleryItem[] = [];
 
   try {
     const userDirs = await fs.promises.readdir(uploadsBase, { withFileTypes: true });
@@ -48,19 +52,28 @@ export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGall
       }
     }
 
-    const requestIds = requestFolders.map((folder) => folder.requestId);
-    const requests = requestIds.length
-      ? await prisma.serviceRequest.findMany({
-          where: { id: { in: requestIds }, deletedAt: null },
-          select: { id: true, company: true },
-        })
-      : [];
-
-    const companyByRequestId = new Map(requests.map((request) => [request.id, request.company]));
+    const requestIds = Array.from(new Set(requestFolders.map((folder) => folder.requestId)));
+    const userIds = Array.from(new Set(requestFolders.map((folder) => folder.userId)));
+    const [requests, users] = await Promise.all([
+      requestIds.length
+        ? prisma.serviceRequest.findMany({
+            where: { id: { in: requestIds }, deletedAt: null },
+            select: { id: true, docketNumber: true, company: true },
+          })
+        : Promise.resolve([]),
+      userIds.length
+        ? prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const requestById = new Map(requests.map((request) => [request.id, request]));
+    const userNameById = new Map(users.map((user) => [user.id, user.name]));
 
     for (const folder of requestFolders) {
       const files = await fs.promises.readdir(folder.requestPath, { withFileTypes: true });
-      const company = companyByRequestId.get(folder.requestId) || "Unknown Company";
+      const request = requestById.get(folder.requestId);
 
       for (const file of files) {
         if (!file.isFile()) {
@@ -76,14 +89,19 @@ export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGall
         }
 
         const stat = await fs.promises.stat(path.join(folder.requestPath, file.name));
+        const docketNumber = request?.docketNumber ?? folder.requestId;
+        const company = request?.company ?? "Unknown Company";
 
-        groups[company] = groups[company] || [];
-        groups[company].push({
+        items.push({
           url: `/uploads/${encodeURIComponent(folder.userId)}/${encodeURIComponent(folder.requestId)}/${encodeURIComponent(file.name)}`,
           type: isVideo ? "video" : "image",
-          label: `${folder.requestId} - ${file.name}`,
+          label: `${docketNumber} - ${file.name}`,
           fileName: file.name,
           requestId: folder.requestId,
+          docketNumber,
+          company,
+          uploadedById: folder.userId,
+          uploadedByName: userNameById.get(folder.userId) ?? "Unknown employee",
           sizeLabel: formatFileSize(stat.size),
           uploadedAt: stat.mtime,
         });
@@ -91,6 +109,18 @@ export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGall
     }
   } catch {
     return [];
+  }
+
+  return items.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+}
+
+export async function getDashboardGalleryItemsByCompany(): Promise<DashboardGalleryGroup[]> {
+  const groups: Record<string, DashboardGalleryItem[]> = {};
+  const items = await getDashboardGalleryItems();
+
+  for (const item of items) {
+    groups[item.company] = groups[item.company] || [];
+    groups[item.company].push(item);
   }
 
   return Object.entries(groups)

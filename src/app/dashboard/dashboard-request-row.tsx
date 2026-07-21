@@ -8,6 +8,7 @@ import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-
 import {
   formatServiceBillingType,
   formatINRCurrency,
+  normalizeStatus,
 } from "../status-utils";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
@@ -23,6 +24,7 @@ type DashboardRequestRowRequest = {
   phoneNumber1: string;
   phoneNumber2: string | null;
   fullAddress: string;
+  installationDate?: Date | string | null;
   complaintDetails: string | null;
   area: string;
   product: string;
@@ -41,8 +43,22 @@ type DashboardRequestRowRequest = {
   lastAttemptAt?: Date | string | null;
   assignedTo?: { name: string } | null;
   assignments?: AssignmentPickerAssignment[];
+  activities?: DashboardServiceActivity[];
   createdBy?: { name: string } | null;
   mediaItems?: DashboardRequestMediaItem[];
+};
+
+type DashboardServiceActivity = {
+  id: string;
+  type: string;
+  title: string;
+  details: string | null;
+  status: string | null;
+  statusReason: string | null;
+  employeeName: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  createdAt: Date | string;
 };
 
 type DashboardRequestRowProps = {
@@ -272,32 +288,19 @@ export function DashboardRequestRow({
     return Math.floor(Date.UTC(year, month - 1, day) / (1000 * 60 * 60 * 24));
   };
 
-  const getLastAttempt = () => {
-    const submittedAssignments =
-      request.assignments
-        ?.filter((assignment) => assignment.statusSubmittedAt)
-        .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt)) ?? [];
-    const latestAssignment = submittedAssignments[0];
-    const fallbackClosedBy =
-      request.closedByName && request.closedByName !== "Unknown" ? request.closedByName.trim() : "";
-    const name =
-      request.lastAttemptByName?.trim() ||
-      latestAssignment?.employee?.name ||
-      fallbackClosedBy ||
-      null;
-    const attemptedAt = request.lastAttemptAt ?? latestAssignment?.statusSubmittedAt ?? request.statusSubmittedAt ?? null;
-
-    return { name, attemptedAt };
-  };
+  const getSubmittedAssignmentAttempts = () =>
+    request.assignments
+      ?.filter((assignment) => assignment.statusSubmittedAt)
+      .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt)) ?? [];
 
   const renderLastAttemptBadge = () => {
     if (isEmployee) {
       return null;
     }
 
-    const lastAttempt = getLastAttempt();
+    const assignmentAttempts = getSubmittedAssignmentAttempts();
 
-    if (!lastAttempt.name) {
+    if (assignmentAttempts.length === 0 && !request.lastAttemptByName?.trim()) {
       return (
         <span className="inline-flex rounded-md bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
           No attempt yet
@@ -305,12 +308,36 @@ export function DashboardRequestRow({
       );
     }
 
+    if (assignmentAttempts.length > 0) {
+      return (
+        <span className="flex w-full min-w-0 max-w-full flex-col gap-1 rounded-md bg-slate-50 px-2 py-1.5 text-[10px] font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+          <span className="text-[9px] uppercase tracking-[0.12em] text-slate-500">Last attempts</span>
+          {assignmentAttempts.map((assignment) => {
+            const status = normalizeStatus(assignment.status);
+
+            return (
+              <span
+                key={assignment.id ?? assignment.employeeId}
+                className={`flex min-w-0 flex-col rounded px-1.5 py-1 ring-1 ring-inset ${getAttemptBadgeClass(status)}`}
+              >
+                <span className="truncate">{assignment.employee?.name ?? "Employee"}</span>
+                <span className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.08em]">{status}</span>
+                {assignment.statusSubmittedAt ? (
+                  <span className="mt-0.5 text-[10px] font-medium">{formatShortDateTime(assignment.statusSubmittedAt)}</span>
+                ) : null}
+              </span>
+            );
+          })}
+        </span>
+      );
+    }
+
     return (
       <span className="inline-flex w-full min-w-0 max-w-full flex-col rounded-md bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-900 ring-1 ring-inset ring-blue-200">
         <span className="text-[9px] uppercase tracking-[0.12em] text-blue-500">Last attempt</span>
-        <span className="truncate">{lastAttempt.name}</span>
-        {lastAttempt.attemptedAt ? (
-          <span className="mt-0.5 text-[10px] font-medium text-blue-600">{formatShortDateTime(lastAttempt.attemptedAt)}</span>
+        <span className="truncate">{request.lastAttemptByName}</span>
+        {request.lastAttemptAt ? (
+          <span className="mt-0.5 text-[10px] font-medium text-blue-600">{formatShortDateTime(request.lastAttemptAt)}</span>
         ) : null}
       </span>
     );
@@ -399,9 +426,11 @@ export function DashboardRequestRow({
               )}
             />
 
-            {!isEmployee ? (
+            {isEmployee ? (
+              <PreviousStatusButton request={request} />
+            ) : (
               <div className="mt-2 flex flex-wrap items-center gap-2" />
-            ) : null}
+            )}
           </div>
         </div>
       </td>
@@ -465,6 +494,142 @@ export function DashboardRequestRow({
   );
 }
 
+function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const entries = getPreviousStatusEntries(request);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          setIsOpen(true);
+        }}
+        className="mt-2 inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+        Previous status
+      </button>
+
+      {isOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-blue-200 px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-blue-950">Previous Status</h3>
+                <p className="mt-1 text-xs font-medium text-blue-600">{request.docketNumber}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+                aria-label="Close previous status"
+                title="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="space-y-2 p-5">
+              {entries.length === 0 ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-sm font-medium text-slate-600">
+                  No previous status found for this service.
+                </p>
+              ) : (
+                entries.map((entry) => (
+                  <article key={entry.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-900">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-blue-950">{entry.person}</p>
+                        <p className="mt-0.5 text-[11px] font-medium text-blue-600">{entry.title}</p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${getPreviousStatusClass(entry.status)}`}>
+                        {entry.status}
+                      </span>
+                    </div>
+                    {entry.remark ? (
+                      <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-white px-2.5 py-2 text-[11px] leading-5 text-slate-700 ring-1 ring-inset ring-blue-100">
+                        {entry.remark}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-[10px] font-medium text-blue-500">{formatPreviousStatusDateTime(entry.createdAt)}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+type PreviousStatusEntry = {
+  id: string;
+  title: string;
+  person: string;
+  status: ReturnType<typeof normalizeStatus>;
+  remark: string;
+  createdAt: Date | string;
+};
+
+function getPreviousStatusEntries(request: DashboardRequestRowRequest): PreviousStatusEntry[] {
+  const activityEntries =
+    request.activities
+      ?.filter((activity) => Boolean(activity.status) || Boolean(activity.statusReason))
+      .map((activity) => ({
+        id: `activity-${activity.id}`,
+        title: activity.title,
+        person: activity.employeeName || activity.actorName || "Staff",
+        status: normalizeStatus(activity.status),
+        remark: getPreviousStatusRemark(activity.statusReason, activity.details),
+        createdAt: activity.createdAt,
+      })) ?? [];
+
+  if (activityEntries.length > 0) {
+    return activityEntries.slice(0, 8);
+  }
+
+  return (
+    request.assignments
+      ?.filter((assignment) => assignment.statusSubmittedAt)
+      .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt))
+      .map((assignment) => ({
+        id: `assignment-${assignment.id ?? assignment.employeeId}`,
+        title: "Status Updated",
+        person: assignment.employee?.name || "Employee",
+        status: normalizeStatus(assignment.status),
+        remark: assignment.statusReason?.trim() ?? "",
+        createdAt: assignment.statusSubmittedAt ?? assignment.closedAt ?? "",
+      }))
+      .slice(0, 8) ?? []
+  );
+}
+
+function getPreviousStatusRemark(statusReason: string | null, details: string | null) {
+  return statusReason?.trim() || details?.trim() || "";
+}
+
+function getPreviousStatusClass(status: ReturnType<typeof normalizeStatus>) {
+  switch (status) {
+    case "Completed":
+      return "bg-emerald-100 text-emerald-800";
+    case "In Process":
+      return "bg-amber-100 text-amber-800";
+    case "Cancel":
+      return "bg-red-100 text-red-800";
+    case "New Call":
+    default:
+      return "bg-blue-100 text-blue-800";
+  }
+}
+
 function StarIcon({ filled }: { filled: boolean }) {
   return (
     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden="true">
@@ -475,6 +640,14 @@ function StarIcon({ filled }: { filled: boolean }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -511,6 +684,20 @@ function getParsedDate(value: Date | string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function getAttemptBadgeClass(status: ReturnType<typeof normalizeStatus>) {
+  switch (status) {
+    case "Completed":
+      return "bg-emerald-50 text-emerald-900 ring-emerald-200";
+    case "In Process":
+      return "bg-amber-50 text-amber-900 ring-amber-200";
+    case "Cancel":
+      return "bg-red-50 text-red-900 ring-red-200";
+    case "New Call":
+    default:
+      return "bg-blue-50 text-blue-900 ring-blue-200";
+  }
+}
+
 function getCompletedAt(request: DashboardRequestRowRequest) {
   return (
     getParsedDate(request.closedAt) ??
@@ -539,6 +726,22 @@ function formatShortDateTime(value: Date | string) {
   return new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
     month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatPreviousStatusDateTime(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);

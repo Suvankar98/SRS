@@ -12,9 +12,15 @@ async function main() {
       "phoneNumber1" TEXT NOT NULL DEFAULT '',
       "area" TEXT NOT NULL DEFAULT '',
       "fullAddress" TEXT NOT NULL DEFAULT '',
+      "installationDate" TIMESTAMP(3),
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "SavedCustomer"
+    ADD COLUMN IF NOT EXISTS "installationDate" TIMESTAMP(3)
   `);
 
   await prisma.$executeRawUnsafe(`

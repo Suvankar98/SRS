@@ -102,6 +102,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   orderBy: { assignedAt: "asc" },
                   include: { employee: { select: { name: true } } },
                 },
+                activities: {
+                  orderBy: { createdAt: "desc" },
+                  take: 12,
+                  select: {
+                    id: true,
+                    type: true,
+                    title: true,
+                    details: true,
+                    status: true,
+                    statusReason: true,
+                    employeeName: true,
+                    actorName: true,
+                    actorRole: true,
+                    createdAt: true,
+                  },
+                },
               },
             },
           },
@@ -138,6 +154,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               orderBy: { assignedAt: "asc" },
               include: { employee: { select: { name: true } } },
             },
+            activities: {
+              orderBy: { createdAt: "desc" },
+              take: 12,
+              select: {
+                id: true,
+                type: true,
+                title: true,
+                details: true,
+                status: true,
+                statusReason: true,
+                employeeName: true,
+                actorName: true,
+                actorRole: true,
+                createdAt: true,
+              },
+            },
           },
         })),
       ]
@@ -154,6 +186,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           assignments: {
             orderBy: { assignedAt: "asc" },
             include: { employee: { select: { name: true } } },
+          },
+          activities: {
+            orderBy: { createdAt: "desc" },
+            take: 12,
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              details: true,
+              status: true,
+              statusReason: true,
+              employeeName: true,
+              actorName: true,
+              actorRole: true,
+              createdAt: true,
+            },
           },
         },
       });
@@ -191,10 +239,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
     ? await getDashboardMediaItemsByRequestIds(allRequests.map((request) => request.id))
     : new Map();
-  const dashboardRequests = allRequests.map((request) => ({
-    ...request,
-    mediaItems: mediaByRequestId.get(request.id) ?? [],
-  }));
+  const dashboardRequests = allRequests.map((request) => {
+    const assignmentSummary = getDashboardAssignmentSummary(request.assignments ?? []);
+
+    return {
+      ...request,
+      ...(!isEmployee && assignmentSummary
+        ? {
+            status: assignmentSummary.status,
+            statusReason: assignmentSummary.statusReason ?? request.statusReason,
+            statusSubmittedAt: assignmentSummary.statusSubmittedAt ?? request.statusSubmittedAt,
+            lastAttemptByName: assignmentSummary.lastAttemptByName ?? request.lastAttemptByName,
+            lastAttemptAt: assignmentSummary.lastAttemptAt ?? request.lastAttemptAt,
+            closedByName: assignmentSummary.closedByName,
+            closedAt: assignmentSummary.closedAt,
+          }
+        : {}),
+      mediaItems: mediaByRequestId.get(request.id) ?? [],
+    };
+  });
 
   const filteredRequests = filterRequests(dashboardRequests, searchQuery, selectedStatuses);
   const visibleRequests = isEmployee
@@ -646,7 +709,7 @@ function buildEmployeeReportRows({
     addCompanyDocketToEmployeeReportRow(row, request);
 
     if (typeof request.statusPointsDelta === "number") {
-      addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
+      setEmployeeReportWorkSubmissionPoints(row.workSubmission, request.statusPointsDelta);
     }
 
     countedRequestIds.add(request.id);
@@ -709,6 +772,10 @@ function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: Em
 
 function addEmployeeReportPoints(cell: EmployeeReportPointCell, points: number) {
   cell.points = (cell.points ?? 0) + points;
+}
+
+function setEmployeeReportWorkSubmissionPoints(cell: EmployeeReportPointCell, points: number) {
+  cell.points = typeof cell.points === "number" ? Math.min(cell.points, points) : points;
 }
 
 function getEmployeeReportAttendancePoints(adjustment: EmployeeReportPointAdjustment) {
@@ -1031,6 +1098,60 @@ function EmployeeReportDayWiseBadge({ value }: { value: number }) {
       {formatPointDelta(value)}
     </span>
   );
+}
+
+function getDashboardAssignmentSummary(
+  assignments: Array<{
+    status: string | null;
+    statusReason: string | null;
+    statusSubmittedAt: Date | string | null;
+    closedAt: Date | string | null;
+    employee?: { name: string } | null;
+  }>,
+) {
+  if (assignments.length === 0) {
+    return null;
+  }
+
+  const statuses = assignments.map((assignment) => normalizeStatus(assignment.status));
+  const hasInProcess = statuses.includes("In Process");
+  const hasCompleted = statuses.includes("Completed");
+  const hasNewCall = statuses.includes("New Call");
+  const hasCancel = statuses.includes("Cancel");
+  const latestAssignment = assignments
+    .filter((assignment) => assignment.statusSubmittedAt)
+    .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt))[0] ?? null;
+  const completedAssignment = assignments
+    .filter((assignment) => normalizeStatus(assignment.status) === "Completed")
+    .sort((a, b) => getDateTime(b.closedAt ?? b.statusSubmittedAt) - getDateTime(a.closedAt ?? a.statusSubmittedAt))[0] ?? null;
+  let status: DashboardStatus = "New Call";
+
+  if (hasInProcess || (hasCompleted && (hasNewCall || hasCancel)) || (hasCancel && hasNewCall)) {
+    status = "In Process";
+  } else if (hasCompleted && statuses.every((assignmentStatus) => assignmentStatus === "Completed")) {
+    status = "Completed";
+  } else if (hasCancel && statuses.every((assignmentStatus) => assignmentStatus === "Cancel")) {
+    status = "Cancel";
+  }
+
+  return {
+    status,
+    statusReason: latestAssignment?.statusReason ?? null,
+    statusSubmittedAt: latestAssignment?.statusSubmittedAt ?? null,
+    lastAttemptByName: latestAssignment?.employee?.name ?? null,
+    lastAttemptAt: latestAssignment?.statusSubmittedAt ?? null,
+    closedByName: status === "Completed" ? completedAssignment?.employee?.name ?? null : null,
+    closedAt: status === "Completed" ? completedAssignment?.closedAt ?? completedAssignment?.statusSubmittedAt ?? null : null,
+  };
+}
+
+function getDateTime(value: Date | string | null | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
 function isVisibleOnAdminManagerDashboard(request: {

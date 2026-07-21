@@ -83,7 +83,7 @@ export function buildEmployeeReportRows({
     addCompanyDocketToEmployeeReportRow(row, request);
 
     if (typeof request.statusPointsDelta === "number") {
-      addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
+      setEmployeeReportWorkSubmissionPoints(row.workSubmission, request.statusPointsDelta);
     }
 
     countedRequestIds.add(request.id);
@@ -145,6 +145,10 @@ function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: Em
 
 function addEmployeeReportPoints(cell: EmployeeReportPointCell, points: number) {
   cell.points = (cell.points ?? 0) + points;
+}
+
+function setEmployeeReportWorkSubmissionPoints(cell: EmployeeReportPointCell, points: number) {
+  cell.points = typeof cell.points === "number" ? Math.min(cell.points, points) : points;
 }
 
 function getEmployeeReportAttendancePoints(adjustment: EmployeeReportPointAdjustment) {

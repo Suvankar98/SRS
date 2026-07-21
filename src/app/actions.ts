@@ -98,6 +98,127 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
   return submittedMinutes <= 21 * 60 ? 4 : 2;
 }
 
+function getLocalDateKey(value: Date, timeZone: string) {
+  const parts = getLocalDateTimeParts(value, timeZone);
+  const pad = (part: number) => String(part).padStart(2, "0");
+
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
+function getLocalDayRange(value: Date, timeZone: string) {
+  const dateKey = getLocalDateKey(value, timeZone);
+
+  return {
+    startAt: new Date(`${dateKey}T00:00:00.000+05:30`),
+    endAt: new Date(`${dateKey}T23:59:59.999+05:30`),
+  };
+}
+
+async function shouldAwardStatusSubmissionPoints({
+  transaction,
+  employeeId,
+  employeeName,
+  assignedAt,
+}: {
+  transaction: Prisma.TransactionClient;
+  employeeId: string;
+  employeeName: string;
+  assignedAt: Date;
+}) {
+  const allocationDayRange = getLocalDayRange(assignedAt, STATUS_SCORING_TIME_ZONE);
+
+  const [remainingAssignedServices, alreadyScoredRequests] = await Promise.all([
+    transaction.serviceAssignment.count({
+      where: {
+        employeeId,
+        assignedAt: {
+          gte: allocationDayRange.startAt,
+          lte: allocationDayRange.endAt,
+        },
+        statusSubmittedAt: null,
+        request: { deletedAt: null },
+      },
+    }),
+    transaction.serviceRequest.count({
+      where: {
+        deletedAt: null,
+        statusPointsDelta: { not: null },
+        statusSubmittedAt: {
+          gte: allocationDayRange.startAt,
+          lte: allocationDayRange.endAt,
+        },
+        OR: [
+          { lastAttemptByName: { equals: employeeName, mode: "insensitive" } },
+          { closedByName: { equals: employeeName, mode: "insensitive" } },
+        ],
+      },
+    }),
+  ]);
+
+  return remainingAssignedServices <= 1 && alreadyScoredRequests === 0;
+}
+
+type AssignmentStatusSummaryInput = {
+  employeeId: string;
+  assignedAt: Date;
+  status: string | null;
+  statusReason: string | null;
+  statusSubmittedAt: Date | null;
+  statusPointsDelta: number | null;
+  closedAt: Date | null;
+  employee?: { name: string } | null;
+};
+
+function getAggregateAssignmentStatus(assignments: AssignmentStatusSummaryInput[]) {
+  if (assignments.length === 0) {
+    return "New Call";
+  }
+
+  const statuses = assignments.map((assignment) => normalizeStatus(assignment.status));
+
+  if (statuses.includes("In Process")) {
+    return "In Process";
+  }
+
+  const hasCompleted = statuses.includes("Completed");
+  const hasNewCall = statuses.includes("New Call");
+  const hasCancel = statuses.includes("Cancel");
+
+  if (hasCompleted && (hasNewCall || hasCancel)) {
+    return "In Process";
+  }
+
+  if (hasCompleted && statuses.every((status) => status === "Completed")) {
+    return "Completed";
+  }
+
+  if (hasCancel && statuses.every((status) => status === "Cancel")) {
+    return "Cancel";
+  }
+
+  if (hasCancel && hasNewCall) {
+    return "In Process";
+  }
+
+  return "New Call";
+}
+
+function getLatestSubmittedAssignment(assignments: AssignmentStatusSummaryInput[]) {
+  return assignments
+    .filter((assignment) => assignment.statusSubmittedAt)
+    .sort((a, b) => (b.statusSubmittedAt?.getTime() ?? 0) - (a.statusSubmittedAt?.getTime() ?? 0))[0] ?? null;
+}
+
+function getPrimaryOpenAssignment(assignments: AssignmentStatusSummaryInput[]) {
+  return (
+    assignments
+      .filter((assignment) => !assignment.statusSubmittedAt)
+      .sort((a, b) => a.assignedAt.getTime() - b.assignedAt.getTime())[0] ??
+    assignments.sort((a, b) => a.assignedAt.getTime() - b.assignedAt.getTime())[0] ??
+    null
+  );
+}
+
 function getRequiredPhoneField(formData: FormData, key: string, label: string) {
   const value = getRequiredField(formData, key);
   const normalized = normalizeIndianPhoneNumber(value);
@@ -552,6 +673,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
   const callType = getRequiredField(formData, "callType");
   const { serviceBillingType, chargeableAmount } = getServiceBillingFields(formData, callType);
   const phoneNumber2 = getOptionalPhoneField(formData, "phoneNumber2", "Phone Number 2");
+  const installationDate = parseOptionalInstallationDate(getOptionalField(formData, "installationDate"));
 
   await prisma.serviceRequest.update({
     where: { id: requestId },
@@ -562,6 +684,7 @@ export async function updateServiceRequestDetails(formData: FormData) {
       phoneNumber1,
       phoneNumber2,
       fullAddress,
+      installationDate,
       complaintDetails,
       area,
       product,
@@ -583,6 +706,24 @@ function normalizeSavedCustomerPhone(value: string) {
   return normalized ?? value.trim();
 }
 
+function parseOptionalInstallationDate(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? new Date(`${trimmed}T00:00:00.000+05:30`)
+    : new Date(trimmed);
+
+  if (Number.isNaN(isoDate.getTime())) {
+    throw new Error("Installation date must be a valid date.");
+  }
+
+  return isoDate;
+}
+
 export async function updateSavedCustomerDetails(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
 
@@ -593,6 +734,7 @@ export async function updateSavedCustomerDetails(formData: FormData) {
   const phoneNumber1 = normalizeSavedCustomerPhone(getRequiredField(formData, "phoneNumber1"));
   const area = getRequiredField(formData, "area");
   const fullAddress = getRequiredField(formData, "fullAddress");
+  const installationDate = parseOptionalInstallationDate(getOptionalField(formData, "installationDate"));
 
   if (source === "savedCustomer") {
     await prisma.savedCustomer.update({
@@ -604,6 +746,7 @@ export async function updateSavedCustomerDetails(formData: FormData) {
         phoneNumber1,
         area,
         fullAddress,
+        installationDate,
       },
     });
   } else {
@@ -615,6 +758,7 @@ export async function updateSavedCustomerDetails(formData: FormData) {
         phoneNumber1,
         area,
         fullAddress,
+        installationDate,
       },
     });
   }
@@ -631,6 +775,7 @@ type SavedCustomerUploadRow = {
   phoneNumber?: unknown;
   area?: unknown;
   fullAddress?: unknown;
+  installationDate?: unknown;
 };
 
 function getUploadString(value: unknown) {
@@ -705,11 +850,14 @@ export async function importSavedCustomerDetails(formData: FormData) {
     const phoneNumberRaw = getUploadString(row.phoneNumber);
     const area = getUploadString(row.area);
     const fullAddress = getUploadString(row.fullAddress);
+    const installationDateRaw = getUploadString(row.installationDate);
+    const installationDate = installationDateRaw ? parseOptionalInstallationDate(installationDateRaw) : null;
     const updateData = {
       name,
       phoneNumber1: phoneNumberRaw ? normalizeSavedCustomerPhone(phoneNumberRaw) : "",
       area,
       fullAddress,
+      ...(installationDateRaw ? { installationDate } : {}),
     };
 
     const existing = existingCompanyByKey.get(getCompanyMatchKey(company));
@@ -727,6 +875,9 @@ export async function importSavedCustomerDetails(formData: FormData) {
       }
       if (updateData.fullAddress) {
         serviceRequestUpdateData.fullAddress = updateData.fullAddress;
+      }
+      if (installationDateRaw) {
+        serviceRequestUpdateData.installationDate = installationDate;
       }
 
       if (Object.keys(serviceRequestUpdateData).length === 0) {
@@ -756,7 +907,11 @@ export async function importSavedCustomerDetails(formData: FormData) {
       data: {
         company,
         companyKey,
-        ...updateData,
+        name: updateData.name,
+        phoneNumber1: updateData.phoneNumber1,
+        area: updateData.area,
+        fullAddress: updateData.fullAddress,
+        installationDate,
       },
       select: { id: true },
     });
@@ -845,7 +1000,8 @@ function mapSavedCustomerRows(rows: string[][]): SavedCustomerUploadRow[] {
   const phoneIndex = findSavedCustomerHeaderIndex(header, ["phonenumber", "phone", "mobile", "contactnumber", "contactno", "contactno1", "phone1", "phonenumber1"]);
   const areaIndex = findSavedCustomerHeaderIndex(header, ["area", "location"]);
   const addressIndex = findSavedCustomerHeaderIndex(header, ["fulladdress", "address"]);
-  const hasKnownHeader = [companyIndex, nameIndex, phoneIndex, areaIndex, addressIndex].some((index) => index >= 0);
+  const installationDateIndex = findSavedCustomerHeaderIndex(header, ["installationdate", "installdate", "dateofinstallation"]);
+  const hasKnownHeader = [companyIndex, nameIndex, phoneIndex, areaIndex, addressIndex, installationDateIndex].some((index) => index >= 0);
   const dataRows = hasKnownHeader ? cleanRows.slice(headerRowIndex + 1) : cleanRows;
 
   return dataRows
@@ -855,6 +1011,7 @@ function mapSavedCustomerRows(rows: string[][]): SavedCustomerUploadRow[] {
       phoneNumber: getDelimitedCell(row, hasKnownHeader ? phoneIndex : 2),
       area: getDelimitedCell(row, hasKnownHeader ? areaIndex : 3),
       fullAddress: getDelimitedCell(row, hasKnownHeader ? addressIndex : 4),
+      installationDate: getDelimitedCell(row, hasKnownHeader ? installationDateIndex : 5),
     }))
     .filter((row) => getCompanyMatchKey(row.company) !== "" && !isSavedCustomerMetadataRow(row.company));
 }
@@ -1500,12 +1657,24 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   const submittedAt = new Date();
   const firstStatusPointsDelta = getStatusSubmissionPoints(assignment.assignedAt ?? assignment.request.createdAt, submittedAt);
-  const statusPointsDelta = alreadyUpdatedForCurrentAllocation
-    ? assignment.statusPointsDelta
-    : firstStatusPointsDelta;
-  const performancePointsIncrement = alreadyUpdatedForCurrentAllocation ? 0 : firstStatusPointsDelta;
+  const employeeName = employee?.name || "Unknown";
 
   await prisma.$transaction(async (transaction) => {
+    const shouldAwardPoints =
+      !alreadyUpdatedForCurrentAllocation &&
+      (await shouldAwardStatusSubmissionPoints({
+        transaction,
+        employeeId: session.userId,
+        employeeName,
+        assignedAt: assignment.assignedAt ?? assignment.request.createdAt,
+      }));
+    const statusPointsDelta = alreadyUpdatedForCurrentAllocation
+      ? assignment.statusPointsDelta
+      : shouldAwardPoints
+        ? firstStatusPointsDelta
+        : null;
+    const performancePointsIncrement = shouldAwardPoints ? firstStatusPointsDelta : 0;
+
     await transaction.serviceAssignment.update({
       where: { id: assignment.id },
       data: {
@@ -1513,26 +1682,47 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusReason: reasonValue || null,
         statusSubmittedAt: submittedAt,
         statusPointsDelta,
-        closedByName: status === "Completed" ? (employee?.name || "Unknown") : null,
+        closedByName: status === "Completed" ? employeeName : null,
         closedAt: status === "Completed" ? submittedAt : null,
       },
     });
 
+    const updatedAssignments = await transaction.serviceAssignment.findMany({
+      where: { requestId },
+      orderBy: { assignedAt: "asc" },
+      include: { employee: { select: { name: true } } },
+    });
+    const aggregateStatus = getAggregateAssignmentStatus(updatedAssignments);
+    const latestAssignment = getLatestSubmittedAssignment(updatedAssignments);
+    const primaryOpenAssignment = getPrimaryOpenAssignment(updatedAssignments);
+    const completedAssignment =
+      aggregateStatus === "Completed"
+        ? updatedAssignments
+            .filter((updatedAssignment) => normalizeStatus(updatedAssignment.status) === "Completed")
+            .sort((a, b) => (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0))[0] ?? latestAssignment
+        : null;
+
     await transaction.serviceRequest.update({
       where: { id: requestId },
       data: {
-        assignedToId: null,
-        assignedAt: null,
-        status,
-        statusReason: reasonValue || null,
+        assignedToId:
+          aggregateStatus === "Completed" || aggregateStatus === "Cancel"
+            ? null
+            : primaryOpenAssignment?.employeeId ?? null,
+        assignedAt:
+          aggregateStatus === "Completed" || aggregateStatus === "Cancel"
+            ? null
+            : primaryOpenAssignment?.assignedAt ?? null,
+        status: aggregateStatus,
+        statusReason: (latestAssignment?.statusReason ?? reasonValue) || null,
         customerReview: null,
-        statusSubmittedAt: submittedAt,
-        statusPointsDelta,
+        statusSubmittedAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
+        statusPointsDelta: latestAssignment?.statusPointsDelta ?? null,
         reviewPointsDelta: null,
-        lastAttemptByName: employee?.name || "Unknown",
-        lastAttemptAt: submittedAt,
-        closedByName: status === "Completed" ? employee?.name || "Unknown" : null,
-        closedAt: status === "Completed" ? submittedAt : null,
+        lastAttemptByName: latestAssignment?.employee?.name ?? employeeName,
+        lastAttemptAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
+        closedByName: completedAssignment?.employee?.name ?? null,
+        closedAt: completedAssignment?.closedAt ?? null,
       },
     });
 
@@ -1540,19 +1730,15 @@ export async function updateServiceCallStatus(formData: FormData) {
       requestId,
       type: status === "Completed" ? "completed" : "status",
       title: status === "Completed" ? "Service Request Completed" : "Status Updated",
-      details: `${employee?.name || "Unknown"} marked this call as ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
+      details: `${employeeName} marked this call as ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
       status,
       statusReason: reasonValue || null,
       actorId: session.userId,
-      actorName: employee?.name || "Unknown",
+      actorName: employeeName,
       actorRole: getActorRoleLabel(session.role),
       employeeId: session.userId,
-      employeeName: employee?.name || "Unknown",
+      employeeName,
       createdAt: submittedAt,
-    });
-
-    await transaction.serviceAssignment.deleteMany({
-      where: { requestId },
     });
 
     if (performancePointsIncrement !== 0) {
@@ -1837,6 +2023,209 @@ export async function canOpenAdmin(): Promise<boolean> {
 export async function canCreateService(): Promise<boolean> {
   const session = await getSession();
   return !!session && roleCanCreateService(session.role);
+}
+
+const TECH_MANUAL_CATEGORIES = ["safety", "security", "automation"] as const;
+
+function getTechManualCategory(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (TECH_MANUAL_CATEGORIES.includes(normalized as (typeof TECH_MANUAL_CATEGORIES)[number])) {
+    return normalized;
+  }
+
+  throw new Error("Invalid tech manual category.");
+}
+
+function getTechManualDocumentType(fileName: string) {
+  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+
+  if (["png", "jpeg", "jpg", "webp", "gif"].includes(extension)) {
+    return "image";
+  }
+
+  if (["mp4", "m4v", "webm", "mov", "qt", "ogv", "avi", "mkv", "3gp", "wmv"].includes(extension)) {
+    return "video";
+  }
+
+  if (extension === "pdf") {
+    return "pdf";
+  }
+
+  if (["doc", "docx", "rtf"].includes(extension)) {
+    return "word";
+  }
+
+  throw new Error("Unsupported manual document type.");
+}
+
+function getTechManualCategoryPath(category: string) {
+  return `/tech-manual/${category}`;
+}
+
+async function getTechManualActor(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+}
+
+export async function createTechManualFolder(formData: FormData) {
+  const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const category = getTechManualCategory(getRequiredField(formData, "category"));
+  const name = getRequiredField(formData, "name");
+  const actor = await getTechManualActor(session.userId);
+
+  await prisma.techManualFolder.create({
+    data: {
+      category,
+      name,
+      createdById: session.userId,
+      createdByName: actor?.name ?? "Admin / Manager",
+    },
+  });
+
+  revalidatePath(getTechManualCategoryPath(category));
+}
+
+export async function uploadTechManualDocument(formData: FormData) {
+  const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const folderId = getRequiredField(formData, "folderId");
+  const documentName = getRequiredField(formData, "documentName");
+  const file = formData.get("file");
+
+  if (!file || typeof file === "string" || file.size === 0 || !file.name) {
+    throw new Error("Please select a valid document file.");
+  }
+
+  const folder = await prisma.techManualFolder.findUnique({
+    where: { id: folderId },
+    select: { id: true, category: true },
+  });
+
+  if (!folder) {
+    throw new Error("Tech manual folder not found.");
+  }
+
+  const documentType = getTechManualDocumentType(file.name);
+  const path = await import("path");
+  const fs = await import("fs");
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const uploadsBase = path.join(process.cwd(), "public", "manual-uploads");
+  const folderPath = path.join(uploadsBase, folder.id);
+
+  await fs.promises.mkdir(folderPath, { recursive: true });
+
+  const safeName = `${Date.now()}-${sanitizeFileName(file.name)}`;
+  const filePath = path.join(folderPath, safeName);
+  await fs.promises.writeFile(filePath, buffer);
+
+  const actor = await getTechManualActor(session.userId);
+  await prisma.techManualDocument.create({
+    data: {
+      folderId: folder.id,
+      name: documentName,
+      documentType,
+      fileName: file.name,
+      fileUrl: `/manual-uploads/${encodeURIComponent(folder.id)}/${encodeURIComponent(safeName)}`,
+      uploadedById: session.userId,
+      uploadedByName: actor?.name ?? "Admin / Manager",
+    },
+  });
+
+  revalidatePath(getTechManualCategoryPath(folder.category));
+}
+
+export async function addTechManualYoutubeLink(formData: FormData) {
+  const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const folderId = getRequiredField(formData, "folderId");
+  const documentName = getRequiredField(formData, "documentName");
+  const youtubeUrl = getRequiredField(formData, "youtubeUrl");
+
+  if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(youtubeUrl)) {
+    throw new Error("Please enter a valid YouTube link.");
+  }
+
+  const folder = await prisma.techManualFolder.findUnique({
+    where: { id: folderId },
+    select: { id: true, category: true },
+  });
+
+  if (!folder) {
+    throw new Error("Tech manual folder not found.");
+  }
+
+  const actor = await getTechManualActor(session.userId);
+  await prisma.techManualDocument.create({
+    data: {
+      folderId: folder.id,
+      name: documentName,
+      documentType: "youtube",
+      youtubeUrl,
+      uploadedById: session.userId,
+      uploadedByName: actor?.name ?? "Admin / Manager",
+    },
+  });
+
+  revalidatePath(getTechManualCategoryPath(folder.category));
+}
+
+export async function deleteTechManualDocument(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const documentId = getRequiredField(formData, "documentId");
+
+  const document = await prisma.techManualDocument.findUnique({
+    where: { id: documentId },
+    include: { folder: { select: { category: true } } },
+  });
+
+  if (!document) {
+    return;
+  }
+
+  if (document.fileUrl) {
+    const path = await import("path");
+    const fs = await import("fs");
+    const uploadsBase = path.resolve(process.cwd(), "public", "manual-uploads");
+    const urlParts = document.fileUrl.split("/").filter(Boolean);
+
+    if (urlParts.length === 3 && urlParts[0] === "manual-uploads") {
+      const folderId = decodeURIComponent(urlParts[1]);
+      const fileName = decodeURIComponent(urlParts[2]);
+      const filePath = path.resolve(uploadsBase, folderId, fileName);
+      const uploadsRootPrefix = `${uploadsBase}${path.sep}`;
+
+      if (filePath.startsWith(uploadsRootPrefix)) {
+        await fs.promises.unlink(filePath).catch(() => undefined);
+      }
+    }
+  }
+
+  await prisma.techManualDocument.delete({ where: { id: document.id } });
+  revalidatePath(getTechManualCategoryPath(document.folder.category));
+}
+
+export async function deleteTechManualFolder(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const folderId = getRequiredField(formData, "folderId");
+
+  const folder = await prisma.techManualFolder.findUnique({
+    where: { id: folderId },
+    select: { id: true, category: true },
+  });
+
+  if (!folder) {
+    return;
+  }
+
+  await prisma.techManualFolder.delete({ where: { id: folder.id } });
+
+  const path = await import("path");
+  const fs = await import("fs");
+  const folderPath = path.resolve(process.cwd(), "public", "manual-uploads", folder.id);
+  await fs.promises.rm(folderPath, { recursive: true, force: true }).catch(() => undefined);
+
+  revalidatePath(getTechManualCategoryPath(folder.category));
 }
 
 export async function uploadEmployeeImage(formData: FormData) {

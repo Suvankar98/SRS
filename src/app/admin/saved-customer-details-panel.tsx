@@ -14,6 +14,9 @@ export type SavedCustomerRequest = {
   phoneNumber2: string | null;
   area: string;
   fullAddress: string;
+  installationDate: Date | string | null;
+  installationDateInputValue: string;
+  installationDateLabel: string;
   createdAtLabel: string;
 };
 
@@ -27,7 +30,7 @@ type SavedCustomerDetailsPanelProps = {
   totalRequests: number;
 };
 
-const CSV_HEADERS = ["Company Name", "Name", "Phone Number", "Area", "Full Address"] as const;
+const CSV_HEADERS = ["Company Name", "Name", "Phone Number", "Area", "Full Address", "Installation Date"] as const;
 
 export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCustomerDetailsPanelProps) {
   const router = useRouter();
@@ -48,6 +51,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
         company.detail.phoneNumber1,
         company.detail.area,
         company.detail.fullAddress,
+        company.detail.installationDateInputValue,
       ]),
     ];
     const csv = csvRows.map((row) => row.map(escapeCsvValue).join(",")).join("\r\n");
@@ -93,6 +97,8 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
     const phoneNumber1 = String(formData.get("phoneNumber1") ?? "").trim();
     const area = String(formData.get("area") ?? "").trim();
     const fullAddress = String(formData.get("fullAddress") ?? "").trim();
+    const installationDateInputValue = String(formData.get("installationDate") ?? "").trim();
+    const installationDateLabel = formatInstallationDateLabel(installationDateInputValue);
 
     if (selectedCompany) {
       setSelectedCompany({
@@ -103,6 +109,9 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
           phoneNumber1,
           area,
           fullAddress,
+          installationDate: installationDateInputValue || null,
+          installationDateInputValue,
+          installationDateLabel,
         },
       });
     }
@@ -230,6 +239,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
                     <CustomerInput label="Name" name="name" defaultValue={selectedDetail.name} />
                     <CustomerInput label="Phone Number" name="phoneNumber1" defaultValue={selectedDetail.phoneNumber1} />
                     <CustomerInput label="Area" name="area" defaultValue={selectedDetail.area} />
+                    <CustomerDateInput label="Installation Date" name="installationDate" defaultValue={selectedDetail.installationDateInputValue} />
                     <label className="sm:col-span-2">
                       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Full Address</span>
                       <textarea
@@ -278,6 +288,7 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
                     <CustomerValue label="Name" value={selectedDetail.name} />
                     <CustomerValue label="Phone Number" value={selectedDetail.phoneNumber1} />
                     <CustomerValue label="Area" value={selectedDetail.area} />
+                    <CustomerValue label="Installation Date" value={selectedDetail.installationDateLabel} />
                     <CustomerValue label="Full Address" value={selectedDetail.fullAddress} wide />
                   </div>
                 </div>
@@ -304,6 +315,20 @@ function CustomerInput({ label, name, defaultValue }: { label: string; name: str
   );
 }
 
+function CustomerDateInput({ label, name, defaultValue }: { label: string; name: string; defaultValue: string }) {
+  return (
+    <label>
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">{label}</span>
+      <input
+        name={name}
+        type="date"
+        defaultValue={defaultValue}
+        className="mt-1 w-full rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-950 outline-none transition focus:border-blue-400"
+      />
+    </label>
+  );
+}
+
 function CustomerValue({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   const hasValue = value.trim() !== "";
 
@@ -324,9 +349,29 @@ function getMissingFieldCount(company: SavedCustomerCompany) {
     company.detail.phoneNumber1,
     company.detail.area,
     company.detail.fullAddress,
+    company.detail.installationDateInputValue,
   ];
 
   return values.filter((value) => value.trim() === "").length;
+}
+
+function formatInstallationDateLabel(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(`${value}T00:00:00.000+05:30`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(date);
 }
 
 function escapeCsvValue(value: string) {

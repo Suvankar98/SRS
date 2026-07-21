@@ -70,6 +70,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         phoneNumber2: true,
         area: true,
         fullAddress: true,
+        installationDate: true,
         createdAt: true,
       },
     }),
@@ -445,6 +446,7 @@ type AdminSavedCustomerRequest = {
   phoneNumber2: string | null;
   area: string;
   fullAddress: string;
+  installationDate: Date | null;
   createdAt: Date;
 };
 
@@ -455,6 +457,7 @@ type AdminImportedSavedCustomer = {
   phoneNumber1: string;
   area: string;
   fullAddress: string;
+  installationDate: Date | null;
   createdAt: Date;
 };
 
@@ -497,6 +500,9 @@ function buildSavedCustomerCompanies(
         phoneNumber2: null,
         area: customer.area,
         fullAddress: customer.fullAddress,
+        installationDate: customer.installationDate,
+        installationDateInputValue: formatDateInputValue(customer.installationDate),
+        installationDateLabel: formatInstallationDate(customer.installationDate),
         createdAtLabel: formatAdminDate(customer.createdAt),
       },
     });
@@ -515,8 +521,37 @@ function formatSavedCustomerRequest(request: AdminSavedCustomerRequest) {
     phoneNumber2: request.phoneNumber2,
     area: request.area,
     fullAddress: request.fullAddress,
+    installationDate: request.installationDate,
+    installationDateInputValue: formatDateInputValue(request.installationDate),
+    installationDateLabel: formatInstallationDate(request.installationDate),
     createdAtLabel: formatAdminDate(request.createdAt),
   };
+}
+
+function formatDateInputValue(value: Date | null) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
+function formatInstallationDate(value: Date | null) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(value);
 }
 
 function getSavedCustomerCompanyKey(value: string) {
