@@ -242,7 +242,10 @@ export function PhoneNumberInput({
   const initialValue = value ?? defaultValue;
   const [countryCode, setCountryCode] = React.useState(() => getPhoneParts(initialValue).countryCode);
   const [localNumber, setLocalNumber] = React.useState(() => getPhoneParts(initialValue).localNumber);
+  const [isCodeOpen, setIsCodeOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement | null>(null);
   const submittedValue = composePhoneValue(countryCode, localNumber);
+  const selectedCountry = COUNTRY_CODES.find((country) => country.code === countryCode) ?? COUNTRY_CODES[0];
 
   React.useEffect(() => {
     const parts = getPhoneParts(value ?? defaultValue);
@@ -250,8 +253,26 @@ export function PhoneNumberInput({
     setLocalNumber(parts.localNumber);
   }, [value, defaultValue]);
 
+  React.useEffect(() => {
+    if (!isCodeOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (dropdownRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setIsCodeOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isCodeOpen]);
+
   function updateCountryCode(nextCode: string) {
     setCountryCode(nextCode);
+    setIsCodeOpen(false);
     onChange?.(composePhoneValue(nextCode, localNumber));
   }
 
@@ -265,18 +286,37 @@ export function PhoneNumberInput({
       {label ? <span className="mb-2 block text-sm font-medium text-blue-700">{label}</span> : null}
       <input type="hidden" name={name} value={submittedValue} />
       <div className="flex min-w-0 gap-2">
-        <select
-          value={countryCode}
-          onChange={(event) => updateCountryCode(event.target.value)}
-          className={selectClassName}
-          aria-label={label ? `${label} country code` : "Country code"}
-        >
-          {COUNTRY_CODES.map((country) => (
-            <option key={country.code} value={country.code}>
-              {country.code} {country.label}
-            </option>
-          ))}
-        </select>
+        <div ref={dropdownRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsCodeOpen((current) => !current)}
+            className={`${selectClassName} flex items-center justify-between gap-1`}
+            aria-label={label ? `${label} country code` : "Country code"}
+            aria-expanded={isCodeOpen}
+          >
+            <span>{selectedCountry.code}</span>
+            <ChevronDownIcon />
+          </button>
+          {isCodeOpen ? (
+            <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-72 overflow-y-auto rounded-xl border border-blue-200 bg-white p-1 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+              {COUNTRY_CODES.map((country) => (
+                <button
+                  key={country.code}
+                  type="button"
+                  onClick={() => updateCountryCode(country.code)}
+                  className={`grid w-full grid-cols-[4.25rem_minmax(0,1fr)] items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
+                    country.code === countryCode
+                      ? "bg-blue-700 font-semibold text-white"
+                      : "text-blue-950 hover:bg-blue-50"
+                  }`}
+                >
+                  <span>{country.code}</span>
+                  <span className="truncate">{country.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <input
           value={localNumber}
           onChange={(event) => updateLocalNumber(event.target.value)}
@@ -288,6 +328,14 @@ export function PhoneNumberInput({
         />
       </div>
     </label>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
