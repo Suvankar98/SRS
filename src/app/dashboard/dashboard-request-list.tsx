@@ -77,12 +77,18 @@ export function DashboardRequestList({
 }: DashboardRequestListProps) {
   const [items, setItems] = React.useState(requests);
   const [orderMessage, setOrderMessage] = React.useState("");
-  const [starredRequestIds, setStarredRequestIds] = React.useState<Set<string>>(() => new Set());
+  const [starredRequestIds, setStarredRequestIds] = React.useState<Set<string>>(() => getStarredRequestIds(requests));
   const canReorder = canEditDocket && canAssign && !isEmployee;
 
-  const normalOrderIds = React.useRef(requests.map((request) => request.id));
+  const normalOrderIds = React.useRef(getNormalOrderIds(requests));
   const dragItem = React.useRef<number | null>(null);
   const dragOverItem = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    setItems(requests);
+    setStarredRequestIds(getStarredRequestIds(requests));
+    normalOrderIds.current = getNormalOrderIds(requests);
+  }, [requests]);
 
   const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
     if (!canReorder) {
@@ -123,8 +129,7 @@ export function DashboardRequestList({
       const [moved] = copy.splice(from, 1);
       copy.splice(to, 0, moved);
       normalOrderIds.current = copy.map((item) => item.id);
-      setStarredRequestIds(new Set());
-      void saveDashboardOrder(copy.map((item) => item.id));
+      void saveDashboardOrder(copy.map((item) => item.id), starredRequestIds);
       return copy;
     });
     dragItem.current = null;
@@ -169,32 +174,33 @@ export function DashboardRequestList({
         restoredUnstarredItems.splice(targetIndex, 0, moved);
         const copy = [...starredItems, ...restoredUnstarredItems];
         setStarredRequestIds(nextStarredRequestIds);
-        void saveDashboardOrder(copy.map((item) => item.id));
+        void saveDashboardOrder(copy.map((item) => item.id), nextStarredRequestIds);
         return copy;
       }
 
       const copy = [...current];
       const [moved] = copy.splice(from, 1);
+      const nextStarredRequestIds = new Set(starredRequestIds);
 
       copy.unshift(moved);
-      setStarredRequestIds((currentStarredRequestIds) => {
-        const nextStarredRequestIds = new Set(currentStarredRequestIds);
-        nextStarredRequestIds.add(id);
-        return nextStarredRequestIds;
-      });
-      void saveDashboardOrder(copy.map((item) => item.id));
+      nextStarredRequestIds.add(id);
+      setStarredRequestIds(nextStarredRequestIds);
+      void saveDashboardOrder(copy.map((item) => item.id), nextStarredRequestIds);
       return copy;
     });
   };
 
-  const saveDashboardOrder = async (requestIds: string[]) => {
+  const saveDashboardOrder = async (requestIds: string[], nextStarredRequestIds: Set<string>) => {
     setOrderMessage("Saving order...");
 
     try {
       const response = await fetch("/api/dashboard/reorder", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ requestIds }),
+        body: JSON.stringify({
+          requestIds,
+          starredRequestIds: Array.from(nextStarredRequestIds),
+        }),
       });
       const json = await response.json();
 
@@ -351,15 +357,15 @@ export function DashboardRequestList({
       <div className="hidden overflow-hidden md:block">
         <table className="w-full table-fixed divide-y divide-blue-300 text-left text-xs">
           <colgroup>
-            <col className="w-[14%]" />
-            <col className="w-[13%]" />
+            <col className="w-[12%]" />
+            <col className="w-[16%]" />
             <col className="w-[10%]" />
             <col className="w-[9%]" />
+            <col className="w-[8%]" />
             <col className="w-[9%]" />
-            <col className="w-[9%]" />
-            <col className="w-[7%]" />
+            <col className="w-[6%]" />
             <col className="w-[11%]" />
-            {canAssign ? <col className="w-[18%]" /> : null}
+            {canAssign ? <col className="w-[19%]" /> : null}
           </colgroup>
           <thead className="bg-blue-50 text-blue-700">
             <tr>
@@ -398,6 +404,14 @@ export function DashboardRequestList({
       </div>
     </section>
   );
+}
+
+function getStarredRequestIds(requests: DashboardListRequest[]) {
+  return new Set(requests.filter((request) => (request.dashboardOrder ?? 0) < 0).map((request) => request.id));
+}
+
+function getNormalOrderIds(requests: DashboardListRequest[]) {
+  return requests.filter((request) => (request.dashboardOrder ?? 0) >= 0).map((request) => request.id);
 }
 
 function getNormalOrderIndex(orderIds: string[], id: string) {

@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const requestIds = getRequestIds(body.requestIds);
+    const starredRequestIds = new Set(getRequestIds(body.starredRequestIds));
 
     if (requestIds.length === 0) {
       return NextResponse.json({ success: false, message: "No requests supplied" }, { status: 400 });
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       requestIds.map((requestId, index) =>
         prisma.serviceRequest.update({
           where: { id: requestId },
-          data: { dashboardOrder: index + 1 },
+          data: { dashboardOrder: starredRequestIds.has(requestId) ? -(index + 1) : index + 1 },
         }),
       ),
     );

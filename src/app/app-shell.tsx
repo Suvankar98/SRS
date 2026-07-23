@@ -93,18 +93,17 @@ export function AppShell({ children, user }: AppShellProps) {
   return (
     <div
       className={`min-h-screen bg-[#f4f9ff] text-[#003d73] lg:grid ${
-        isCollapsed ? "lg:grid-cols-[5rem_minmax(0,1fr)]" : "lg:grid-cols-[14rem_minmax(0,1fr)]"
+        isCollapsed ? "lg:grid-cols-[5.5rem_minmax(0,1fr)]" : "lg:grid-cols-[15rem_minmax(0,1fr)]"
       }`}
     >
       <aside
-        className={`fixed inset-y-0 left-0 z-50 hidden overflow-hidden bg-[#0759b8] text-white shadow-[14px_0_45px_rgba(0,61,115,0.16)] transition-[width] duration-200 lg:block ${
-          isCollapsed ? "w-20" : "w-56"
+        className={`fixed inset-y-0 left-0 z-50 hidden overflow-hidden bg-gradient-to-b from-[#0759b8] via-[#064f9f] to-[#04356f] text-white shadow-[14px_0_45px_rgba(0,61,115,0.16)] transition-[width] duration-200 lg:block ${
+          isCollapsed ? "w-[5.5rem]" : "w-60"
         }`}
       >
-        <div className={`absolute inset-y-0 left-0 bg-[#06458f] transition-[width] duration-200 ${isCollapsed ? "w-20" : "w-12"}`} />
-        <div className={`relative flex min-h-full flex-col py-4 ${isCollapsed ? "px-3" : "pl-3 pr-4"}`}>
-          <div className={`mb-4 flex items-center ${isCollapsed ? "justify-center" : "ml-8"}`}>
-            <div className={`overflow-hidden rounded-xl border border-white/25 bg-white p-1.5 shadow-sm ${isCollapsed ? "h-11 w-11" : "h-14 w-32"}`}>
+        <div className={`relative flex h-full min-h-0 flex-col py-3 ${isCollapsed ? "px-3" : "px-4"}`}>
+          <div className="mb-3 flex shrink-0 justify-center">
+            <div className={`overflow-hidden rounded-xl border border-white/25 bg-white p-1.5 shadow-sm ${isCollapsed ? "h-10 w-10" : "h-12 w-28"}`}>
               <Image
                 src="/dashboard-srtec-logo.svg"
                 alt="SRTEC Automation"
@@ -116,22 +115,22 @@ export function AppShell({ children, user }: AppShellProps) {
             </div>
           </div>
 
-          <div className={`mb-4 ${isCollapsed ? "hidden" : "ml-8"}`}>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">{formatRole(user.role)}</p>
-            <p className="mt-1 truncate text-sm font-semibold text-white">{user.name}</p>
+          <div className={`mb-3 shrink-0 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 shadow-sm ${isCollapsed ? "hidden" : ""}`}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">{formatRole(user.role)}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-white">{user.name}</p>
           </div>
 
-          <nav className="relative flex-1 space-y-1">
+          <nav className="relative min-h-0 flex-1 space-y-1">
             <button
               type="button"
               onClick={() => setIsCollapsed((current) => !current)}
-              className={`group grid w-full items-center gap-3 text-left text-sm font-semibold text-white/88 transition hover:bg-white/14 hover:text-white ${
-                isCollapsed ? "grid-cols-[2.75rem] justify-center rounded-2xl px-0 py-2" : "grid-cols-[2.75rem_minmax(0,1fr)_1rem] rounded-r-full px-1 py-2"
+              className={`group grid w-full items-center gap-2 rounded-xl text-left text-xs font-semibold text-white/92 transition hover:bg-white/14 hover:text-white ${
+                isCollapsed ? "grid-cols-[2.25rem] justify-center px-0 py-1" : "grid-cols-[2.25rem_minmax(0,1fr)_0.75rem] px-2 py-1"
               }`}
               aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <span className="flex h-10 w-10 items-center justify-center text-white/80 transition group-hover:text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition group-hover:bg-white/18">
                 <AppIcon name="collapse" />
               </span>
               <span className={`truncate ${isCollapsed ? "hidden" : ""}`}>{isCollapsed ? "Expand" : "Collapse"}</span>
@@ -149,15 +148,15 @@ export function AppShell({ children, user }: AppShellProps) {
             ) : null}
           </nav>
 
-          <form action={logout} className="relative mt-5">
+          <form action={logout} className="relative mt-3 shrink-0">
             <button
               type="submit"
-              className={`group grid w-full items-center gap-3 text-left text-sm font-semibold text-white/90 transition hover:bg-white hover:text-[#0759b8] ${
-                isCollapsed ? "grid-cols-[2.75rem] justify-center rounded-2xl px-0 py-2" : "grid-cols-[2.75rem_minmax(0,1fr)] rounded-r-full px-1 py-2"
+              className={`group grid w-full items-center gap-2 rounded-xl text-left text-xs font-semibold text-white/95 transition hover:bg-white hover:text-[#0759b8] ${
+                isCollapsed ? "grid-cols-[2.25rem] justify-center px-0 py-1" : "grid-cols-[2.25rem_minmax(0,1fr)] px-2 py-1"
               }`}
               title="Logout"
             >
-              <span className="flex h-10 w-10 items-center justify-center text-white/90 transition group-hover:text-[#0759b8]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition group-hover:bg-blue-50 group-hover:text-[#0759b8]">
                 <AppIcon name="logout" />
               </span>
               <span className={`truncate ${isCollapsed ? "hidden" : ""}`}>Logout</span>
@@ -224,18 +223,20 @@ function TechManualNav({
   const active = isActivePath(activePath, "/tech-manual");
 
   return (
-    <div className="pt-1">
+    <div>
       <button
         type="button"
         onClick={onOpen}
         title="Tech Manual"
-        className={`group grid w-full items-center gap-3 text-left text-sm font-semibold transition ${
-          collapsed ? "grid-cols-[2.75rem] justify-center rounded-2xl px-0 py-2" : "grid-cols-[2.75rem_minmax(0,1fr)_1rem] rounded-r-full px-1 py-2"
+        className={`group grid w-full items-center gap-2 rounded-xl text-left text-xs font-semibold transition ${
+          collapsed ? "grid-cols-[2.25rem] justify-center px-0 py-1" : "grid-cols-[2.25rem_minmax(0,1fr)_0.75rem] px-2 py-1"
         } ${
-          active ? "bg-white text-[#0759b8] shadow-lg shadow-blue-950/10" : "text-white/88 hover:bg-white/14 hover:text-white"
+          active ? "bg-white text-[#0759b8] shadow-lg shadow-blue-950/10" : "text-white/92 hover:bg-white/14 hover:text-white"
         }`}
       >
-        <span className={`flex h-10 w-10 items-center justify-center transition ${active ? "text-[#0759b8]" : "text-white/80 group-hover:text-white"}`}>
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          active ? "bg-[#0759b8] text-white" : "bg-white/10 text-white group-hover:bg-white/18"
+        }`}>
           <AppIcon name="gear" />
         </span>
         <span className={`truncate ${collapsed ? "hidden" : ""}`}>Tech Manual</span>
@@ -250,15 +251,15 @@ function SidebarLink({ item, active, collapsed }: { item: NavItem; active: boole
     <Link
       href={item.href}
       title={item.label}
-      className={`group grid items-center gap-3 text-sm font-semibold transition ${
-        collapsed ? "grid-cols-[2.75rem] justify-center rounded-2xl px-0 py-2" : "grid-cols-[2.75rem_minmax(0,1fr)_1rem] rounded-r-full px-1 py-2"
+      className={`group grid items-center gap-2 rounded-xl text-xs font-semibold transition ${
+        collapsed ? "grid-cols-[2.25rem] justify-center px-0 py-1" : "grid-cols-[2.25rem_minmax(0,1fr)_0.75rem] px-2 py-1"
       } ${
-        active ? "bg-white text-[#0759b8] shadow-lg shadow-blue-950/10" : "text-white/88 hover:bg-white/14 hover:text-white"
+        active ? "bg-white text-[#0759b8] shadow-lg shadow-blue-950/10" : "text-white/92 hover:bg-white/14 hover:text-white"
       }`}
     >
       <span
-        className={`flex h-10 w-10 items-center justify-center transition ${
-          active ? "text-[#0759b8]" : "text-white/80 group-hover:text-white"
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          active ? "bg-[#0759b8] text-white" : "bg-white/10 text-white group-hover:bg-white/18"
         }`}
       >
         <AppIcon name={item.icon} />
@@ -385,7 +386,7 @@ function ArrowRightIcon() {
 
 function AppIcon({ name }: { name: IconName }) {
   const common = {
-    className: "h-5 w-5",
+    className: "h-4 w-4",
     fill: "none",
     stroke: "currentColor",
     strokeWidth: 1.8,

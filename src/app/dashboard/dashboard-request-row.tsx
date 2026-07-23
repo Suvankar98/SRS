@@ -318,12 +318,12 @@ export function DashboardRequestRow({
             return (
               <span
                 key={assignment.id ?? assignment.employeeId}
-                className={`grid min-w-0 max-w-full grid-cols-[minmax(3.75rem,1fr)_auto_auto] items-center gap-1 overflow-hidden rounded px-1.5 py-1 ring-1 ring-inset ${getAttemptBadgeClass(status)}`}
+                className={`grid min-w-0 max-w-full grid-cols-[minmax(2.75rem,1fr)_auto_auto] items-center gap-1 overflow-hidden rounded px-1.5 py-1 ring-1 ring-inset ${getAttemptBadgeClass(status)}`}
               >
                 <span className="min-w-0 truncate">{assignment.employee?.name ?? "Employee"}</span>
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/65 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em]">{status}</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/65 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em]">{getCompactStatusLabel(status)}</span>
                 {assignment.statusSubmittedAt ? (
-                  <span className="whitespace-nowrap text-right text-[9px] font-medium">{formatShortDateTime(assignment.statusSubmittedAt)}</span>
+                  <span className="whitespace-nowrap text-right text-[8px] font-medium">{formatAttemptDateTime(assignment.statusSubmittedAt)}</span>
                 ) : null}
               </span>
             );
@@ -335,13 +335,13 @@ export function DashboardRequestRow({
     return (
       <span className="inline-flex w-full min-w-0 max-w-full flex-col rounded-md bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-900 ring-1 ring-inset ring-blue-200">
         <span className="text-[9px] uppercase tracking-[0.12em] text-blue-500">Last attempt</span>
-        <span className="grid min-w-0 max-w-full grid-cols-[minmax(3.75rem,1fr)_auto_auto] items-center gap-1 overflow-hidden">
+        <span className="grid min-w-0 max-w-full grid-cols-[minmax(2.75rem,1fr)_auto_auto] items-center gap-1 overflow-hidden">
           <span className="min-w-0 truncate">{request.lastAttemptByName}</span>
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-white/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em] text-blue-700">
-            {normalizeStatus(request.status)}
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-white/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-blue-700">
+            {getCompactStatusLabel(normalizeStatus(request.status))}
           </span>
           {request.lastAttemptAt ? (
-            <span className="whitespace-nowrap text-right text-[9px] font-medium text-blue-600">{formatShortDateTime(request.lastAttemptAt)}</span>
+            <span className="whitespace-nowrap text-right text-[8px] font-medium text-blue-600">{formatAttemptDateTime(request.lastAttemptAt)}</span>
           ) : null}
         </span>
       </span>
@@ -703,6 +703,20 @@ function getAttemptBadgeClass(status: ReturnType<typeof normalizeStatus>) {
   }
 }
 
+function getCompactStatusLabel(status: ReturnType<typeof normalizeStatus>) {
+  switch (status) {
+    case "Completed":
+      return "Done";
+    case "In Process":
+      return "Process";
+    case "Cancel":
+      return "Cancel";
+    case "New Call":
+    default:
+      return "New";
+  }
+}
+
 function getCompletedAt(request: DashboardRequestRowRequest) {
   return (
     getParsedDate(request.closedAt) ??
@@ -734,6 +748,25 @@ function formatShortDateTime(value: Date | string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatAttemptDateTime(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })
+    .format(date)
+    .replace(",", "")
+    .replace(/\s(am|pm)$/i, (match) => match.trim().slice(0, 1).toLowerCase());
 }
 
 function formatPreviousStatusDateTime(value: Date | string) {

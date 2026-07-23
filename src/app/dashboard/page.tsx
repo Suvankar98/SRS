@@ -1212,8 +1212,9 @@ function sortByDashboardOrder<T extends { docketNumber: string; dashboardOrder: 
 
       const aOrder = a.dashboardOrder ?? 0;
       const bOrder = b.dashboardOrder ?? 0;
-      if (aOrder !== bOrder) {
-        return aOrder - bOrder;
+      const orderComparison = compareDashboardOrder(aOrder, bOrder);
+      if (orderComparison !== 0) {
+        return orderComparison;
       }
     }
 
@@ -1229,6 +1230,21 @@ function sortByDashboardOrder<T extends { docketNumber: string; dashboardOrder: 
       sensitivity: "base",
     });
   });
+}
+
+function compareDashboardOrder(aOrder: number, bOrder: number) {
+  const aStarred = aOrder < 0;
+  const bStarred = bOrder < 0;
+
+  if (aStarred !== bStarred) {
+    return aStarred ? -1 : 1;
+  }
+
+  if (aStarred && bStarred) {
+    return Math.abs(aOrder) - Math.abs(bOrder);
+  }
+
+  return aOrder - bOrder;
 }
 
 function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt: Date }>(requests: T[]) {
