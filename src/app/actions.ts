@@ -1851,8 +1851,16 @@ export async function updateManagerServiceStatus(formData: FormData) {
       createdAt: submittedAt ?? new Date(),
     });
 
-    await transaction.serviceAssignment.deleteMany({
+    await transaction.serviceAssignment.updateMany({
       where: { requestId },
+      data: {
+        status,
+        statusReason: reasonValue || null,
+        statusSubmittedAt: submittedAt,
+        statusPointsDelta: null,
+        closedByName,
+        closedAt,
+      },
     });
   });
 

@@ -121,19 +121,27 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               },
             },
           },
-        })).map((assignment) => ({
-          ...assignment.request,
-          assignedToId: assignment.employeeId,
-          assignedTo: assignment.employee,
-          assignedAt: assignment.assignedAt,
-          status: assignment.status ?? "New Call",
-          statusReason: assignment.statusReason,
-          statusSubmittedAt: assignment.statusSubmittedAt,
-          statusPointsDelta: assignment.statusPointsDelta,
-          mediaUploadedAt: assignment.mediaUploadedAt,
-          closedByName: assignment.closedByName,
-          closedAt: assignment.closedAt,
-        })),
+        })).map((assignment) => {
+          const parentStatus = normalizeStatus(assignment.request.status);
+          const assignmentStatus =
+            parentStatus === "Completed" || parentStatus === "Cancel"
+              ? parentStatus
+              : assignment.status ?? "New Call";
+
+          return {
+            ...assignment.request,
+            assignedToId: assignment.employeeId,
+            assignedTo: assignment.employee,
+            assignedAt: assignment.assignedAt,
+            status: assignmentStatus,
+            statusReason: assignment.statusReason,
+            statusSubmittedAt: assignment.statusSubmittedAt,
+            statusPointsDelta: assignment.statusPointsDelta,
+            mediaUploadedAt: assignment.mediaUploadedAt,
+            closedByName: assignment.closedByName,
+            closedAt: assignment.closedAt,
+          };
+        }),
         ...(await prisma.serviceRequest.findMany({
           where: {
             deletedAt: null,
@@ -262,7 +270,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const filteredRequests = filterRequests(dashboardRequests, searchQuery, selectedStatuses);
   const visibleRequests = isEmployee
     ? filteredRequests.filter(
-        (request) => !request.statusSubmittedAt && normalizeStatus(request.status) !== "Completed",
+        (request) =>
+          !request.statusSubmittedAt &&
+          !["Completed", "Cancel"].includes(normalizeStatus(request.status)),
       )
     : filteredRequests.filter(isVisibleOnAdminManagerDashboard);
   const sortedFilteredRequests = isEmployee
