@@ -318,12 +318,12 @@ export function DashboardRequestRow({
             return (
               <span
                 key={assignment.id ?? assignment.employeeId}
-                className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 rounded px-1.5 py-1 ring-1 ring-inset ${getAttemptBadgeClass(status)}`}
+                className={`flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 overflow-hidden rounded px-1.5 py-1 ring-1 ring-inset ${getAttemptBadgeClass(status)}`}
               >
-                <span className="truncate">{assignment.employee?.name ?? "Employee"}</span>
-                <span className="whitespace-nowrap rounded-full bg-white/65 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em]">{status}</span>
+                <span className="max-w-full min-w-0 shrink truncate">{assignment.employee?.name ?? "Employee"}</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/65 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em]">{status}</span>
                 {assignment.statusSubmittedAt ? (
-                  <span className="whitespace-nowrap text-[9px] font-medium">{formatShortDateTime(assignment.statusSubmittedAt)}</span>
+                  <span className="shrink-0 whitespace-nowrap text-[9px] font-medium">{formatShortDateTime(assignment.statusSubmittedAt)}</span>
                 ) : null}
               </span>
             );
@@ -335,13 +335,13 @@ export function DashboardRequestRow({
     return (
       <span className="inline-flex w-full min-w-0 max-w-full flex-col rounded-md bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-900 ring-1 ring-inset ring-blue-200">
         <span className="text-[9px] uppercase tracking-[0.12em] text-blue-500">Last attempt</span>
-        <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
-          <span className="truncate">{request.lastAttemptByName}</span>
-          <span className="whitespace-nowrap rounded-full bg-white/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em] text-blue-700">
+        <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 overflow-hidden">
+          <span className="max-w-full min-w-0 shrink truncate">{request.lastAttemptByName}</span>
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-white/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em] text-blue-700">
             {normalizeStatus(request.status)}
           </span>
           {request.lastAttemptAt ? (
-            <span className="whitespace-nowrap text-[9px] font-medium text-blue-600">{formatShortDateTime(request.lastAttemptAt)}</span>
+            <span className="shrink-0 whitespace-nowrap text-[9px] font-medium text-blue-600">{formatShortDateTime(request.lastAttemptAt)}</span>
           ) : null}
         </span>
       </span>
