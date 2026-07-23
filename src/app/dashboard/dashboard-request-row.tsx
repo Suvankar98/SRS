@@ -5,6 +5,7 @@ import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
+import { DashboardMediaPopup } from "./dashboard-media-popup";
 import {
   formatServiceBillingType,
   formatINRCurrency,
@@ -432,9 +433,14 @@ export function DashboardRequestRow({
             />
 
             {isEmployee ? (
-              <PreviousStatusButton request={request} />
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <PreviousStatusButton request={request} />
+                <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
+              </div>
             ) : (
-              <div className="mt-2 flex flex-wrap items-center gap-2" />
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
+              </div>
             )}
           </div>
         </div>
@@ -511,7 +517,7 @@ function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest
           event.stopPropagation();
           setIsOpen(true);
         }}
-        className="mt-2 inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        className="inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
       >
         Previous status
       </button>

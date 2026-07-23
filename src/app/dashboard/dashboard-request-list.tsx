@@ -5,6 +5,7 @@ import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
+import { DashboardMediaPopup } from "./dashboard-media-popup";
 import { DashboardRequestRow } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
@@ -277,6 +278,9 @@ export function DashboardRequestList({
                 {!isEmployee ? (
                   <div className="mt-2 flex flex-col items-start">
                     <AdminManagerStatusSelect request={request} />
+                    <div className="mt-2">
+                      <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -316,6 +320,7 @@ export function DashboardRequestList({
                   <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Status</p>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <StatusUpdateModal request={request} />
+                    <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
                   </div>
                 </div>
               ) : null}
