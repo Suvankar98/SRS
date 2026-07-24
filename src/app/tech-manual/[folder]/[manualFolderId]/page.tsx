@@ -134,7 +134,8 @@ export default async function TechManualFolderDetailPage({ params }: TechManualF
 }
 
 function DocumentRow({ document, canManage }: { document: TechManualDocument; canManage: boolean }) {
-  const href = document.youtubeUrl ?? document.fileUrl ?? "";
+  const fileHref = getManualFileHref(document.fileUrl);
+  const href = document.youtubeUrl ?? fileHref ?? "";
   const canOpen = href !== "";
 
   return (
@@ -153,7 +154,7 @@ function DocumentRow({ document, canManage }: { document: TechManualDocument; ca
 
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
         {canOpen ? (
-          <Link
+          <a
             href={href}
             target="_blank"
             rel="noreferrer"
@@ -161,17 +162,17 @@ function DocumentRow({ document, canManage }: { document: TechManualDocument; ca
           >
             <OpenIcon />
             Open
-          </Link>
+          </a>
         ) : null}
-        {canManage && document.fileUrl ? (
-          <Link
-            href={document.fileUrl}
-            download
+        {canManage && fileHref ? (
+          <a
+            href={fileHref}
+            download={document.fileName ?? document.name}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
           >
             <DownloadIcon />
             Download
-          </Link>
+          </a>
         ) : null}
         {canManage ? (
           <form action={deleteTechManualDocument}>
@@ -189,6 +190,32 @@ function DocumentRow({ document, canManage }: { document: TechManualDocument; ca
       </div>
     </div>
   );
+}
+
+function getManualFileHref(fileUrl: string | null) {
+  if (!fileUrl) {
+    return "";
+  }
+
+  if (fileUrl.startsWith("/api/tech-manual/file/") || /^https?:\/\//i.test(fileUrl)) {
+    return fileUrl;
+  }
+
+  const [pathOnly] = fileUrl.split("?");
+  const parts = pathOnly.split("/").filter(Boolean);
+
+  if (parts.length !== 3 || parts[0] !== "manual-uploads") {
+    return fileUrl;
+  }
+
+  try {
+    const folderId = decodeURIComponent(parts[1]);
+    const fileName = decodeURIComponent(parts[2]);
+
+    return `/api/tech-manual/file/${encodeURIComponent(folderId)}/${encodeURIComponent(fileName)}`;
+  } catch {
+    return fileUrl;
+  }
 }
 
 function getDocumentIconClass(type: string) {
