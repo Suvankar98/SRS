@@ -19,6 +19,7 @@ const CALL_HISTORY_EXPORT_COLUMNS = [
   { id: "call-type", label: "Call Type" },
   { id: "amount", label: "Amount" },
   { id: "assigned-to", label: "Assigned To" },
+  { id: "assigned-date", label: "Assigned Date" },
   { id: "status", label: "Status" },
   { id: "deleted-by", label: "Deleted By" },
   { id: "created", label: "Created" },
@@ -38,6 +39,7 @@ type ExportRequestRow = {
   deletedAt: Date | null;
   deletedByName: string | null;
   createdAt: Date;
+  assignedAt: Date | null;
   assignedTo: { name: string } | null;
 };
 
@@ -94,6 +96,7 @@ export async function GET(request: Request) {
       deletedAt: true,
       deletedByName: true,
       createdAt: true,
+      assignedAt: true,
       assignedTo: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -349,6 +352,7 @@ function getPdfTableColumns(columns: ExportColumn[], contentWidth: number) {
     "call-type": 1.25,
     amount: 0.9,
     "assigned-to": 1.1,
+    "assigned-date": 1.35,
     status: 0.95,
     "deleted-by": 1.2,
     created: 1.35,
@@ -647,6 +651,7 @@ function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId, tar
     return target === "pdf" ? formatINRPlain(amount) : formatINR(amount);
   }
   if (columnId === "assigned-to") return row.assignedTo?.name ?? "Unassigned";
+  if (columnId === "assigned-date") return row.assignedAt ? formatDateTime(row.assignedAt) : "-";
   if (columnId === "status") return row.deletedAt ? "Deleted" : normalizeStatus(row.status);
   if (columnId === "deleted-by") return row.deletedAt ? row.deletedByName || "Unknown" : "-";
   return formatDateTime(row.createdAt);

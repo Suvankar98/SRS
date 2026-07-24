@@ -11,6 +11,7 @@ import { normalizeStatus } from "../status-utils";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
+const PRIORITY_DAY_FACTOR = 10000;
 
 export type DashboardListRequest = {
   id: string;
@@ -68,6 +69,8 @@ type DashboardRequestListProps = {
   isEmployee: boolean;
 };
 
+type DaysSortMode = "default" | "asc" | "desc";
+
 export function DashboardRequestList({
   requests,
   products,
@@ -79,7 +82,13 @@ export function DashboardRequestList({
   const [items, setItems] = React.useState(requests);
   const [orderMessage, setOrderMessage] = React.useState("");
   const [starredRequestIds, setStarredRequestIds] = React.useState<Set<string>>(() => getStarredRequestIds(requests));
+  const [starredDayByRequestId, setStarredDayByRequestId] = React.useState<Map<string, number>>(() =>
+    getStarredDayByRequestId(requests, getTodayPriorityDay()),
+  );
+  const [todayPriorityDay, setTodayPriorityDay] = React.useState(() => getTodayPriorityDay());
+  const [daysSortMode, setDaysSortMode] = React.useState<DaysSortMode>("default");
   const canReorder = canEditDocket && canAssign && !isEmployee;
+  const canDragRows = canReorder && daysSortMode === "default";
 
   const normalOrderIds = React.useRef(getNormalOrderIds(requests));
   const dragItem = React.useRef<number | null>(null);
@@ -88,11 +97,27 @@ export function DashboardRequestList({
   React.useEffect(() => {
     setItems(requests);
     setStarredRequestIds(getStarredRequestIds(requests));
+    setStarredDayByRequestId(getStarredDayByRequestId(requests, todayPriorityDay));
     normalOrderIds.current = getNormalOrderIds(requests);
-  }, [requests]);
+  }, [requests, todayPriorityDay]);
+
+  React.useEffect(() => {
+    const interval = window.setInterval(() => setTodayPriorityDay(getTodayPriorityDay()), 60000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const displayedItems = React.useMemo(
+    () =>
+      sortItemsByDaysOld(
+        items,
+        daysSortMode,
+        (request) => starredRequestIds.has(request.id) && (starredDayByRequestId.get(request.id) ?? todayPriorityDay - 1) >= todayPriorityDay,
+      ),
+    [items, daysSortMode, starredRequestIds, starredDayByRequestId, todayPriorityDay],
+  );
 
   const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
-    if (!canReorder) {
+    if (!canDragRows) {
       e.preventDefault();
       return;
     }
@@ -103,7 +128,7 @@ export function DashboardRequestList({
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
-    if (!canReorder) {
+    if (!canDragRows) {
       return;
     }
 
@@ -113,7 +138,7 @@ export function DashboardRequestList({
   };
 
   const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
-    if (!canReorder) {
+    if (!canDragRows) {
       return;
     }
 
@@ -130,7 +155,7 @@ export function DashboardRequestList({
       const [moved] = copy.splice(from, 1);
       copy.splice(to, 0, moved);
       normalOrderIds.current = copy.map((item) => item.id);
-      void saveDashboardOrder(copy.map((item) => item.id), starredRequestIds);
+      void saveDashboardOrder(copy.map((item) => item.id), starredRequestIds, starredDayByRequestId);
       return copy;
     });
     dragItem.current = null;
@@ -158,6 +183,8 @@ export function DashboardRequestList({
       if (isStarred) {
         const nextStarredRequestIds = new Set(starredRequestIds);
         nextStarredRequestIds.delete(id);
+        const nextStarredDayByRequestId = new Map(starredDayByRequestId);
+        nextStarredDayByRequestId.delete(id);
 
         const moved = current[from];
         const starredItems = current.filter((item) => item.id !== id && nextStarredRequestIds.has(item.id));
@@ -175,23 +202,31 @@ export function DashboardRequestList({
         restoredUnstarredItems.splice(targetIndex, 0, moved);
         const copy = [...starredItems, ...restoredUnstarredItems];
         setStarredRequestIds(nextStarredRequestIds);
-        void saveDashboardOrder(copy.map((item) => item.id), nextStarredRequestIds);
+        setStarredDayByRequestId(nextStarredDayByRequestId);
+        void saveDashboardOrder(copy.map((item) => item.id), nextStarredRequestIds, nextStarredDayByRequestId);
         return copy;
       }
 
       const copy = [...current];
       const [moved] = copy.splice(from, 1);
       const nextStarredRequestIds = new Set(starredRequestIds);
+      const nextStarredDayByRequestId = new Map(starredDayByRequestId);
 
       copy.unshift(moved);
       nextStarredRequestIds.add(id);
+      nextStarredDayByRequestId.set(id, todayPriorityDay);
       setStarredRequestIds(nextStarredRequestIds);
-      void saveDashboardOrder(copy.map((item) => item.id), nextStarredRequestIds);
+      setStarredDayByRequestId(nextStarredDayByRequestId);
+      void saveDashboardOrder(copy.map((item) => item.id), nextStarredRequestIds, nextStarredDayByRequestId);
       return copy;
     });
   };
 
-  const saveDashboardOrder = async (requestIds: string[], nextStarredRequestIds: Set<string>) => {
+  const saveDashboardOrder = async (
+    requestIds: string[],
+    nextStarredRequestIds: Set<string>,
+    nextStarredDayByRequestId: Map<string, number>,
+  ) => {
     setOrderMessage("Saving order...");
 
     try {
@@ -201,6 +236,11 @@ export function DashboardRequestList({
         body: JSON.stringify({
           requestIds,
           starredRequestIds: Array.from(nextStarredRequestIds),
+          starredDays: Object.fromEntries(
+            Array.from(nextStarredDayByRequestId.entries()).filter(([requestId]) =>
+              nextStarredRequestIds.has(requestId),
+            ),
+          ),
         }),
       });
       const json = await response.json();
@@ -226,7 +266,7 @@ export function DashboardRequestList({
         </div>
       ) : null}
       <div className="space-y-3 p-1.5 md:hidden">
-        {items.map((request) => {
+        {displayedItems.map((request) => {
           const isCompletedRequest = isClosedStatus(request.status);
           const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
 
@@ -375,7 +415,12 @@ export function DashboardRequestList({
           <thead className="bg-blue-50 text-blue-700">
             <tr>
               <Th>Docket</Th>
-              <Th>Days Old</Th>
+            <Th>
+              <div className="flex items-center gap-1">
+                <span>Days Old</span>
+                {canReorder ? <DaysOldSortControls mode={daysSortMode} onChange={setDaysSortMode} /> : null}
+              </div>
+            </Th>
               <Th>Name</Th>
               <Th>Location</Th>
               <Th>Product</Th>
@@ -386,7 +431,7 @@ export function DashboardRequestList({
             </tr>
           </thead>
           <tbody className="divide-y divide-blue-100 bg-white">
-            {items.map((request) => (
+            {displayedItems.map((request) => (
               <DashboardRequestRow
                 key={request.id}
                 request={request}
@@ -395,13 +440,17 @@ export function DashboardRequestList({
                 canEditDocket={canEditDocket}
                 canAssign={canAssign}
                 isEmployee={isEmployee}
-                draggable={canReorder}
+                draggable={canDragRows}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onDragEnd={handleDragEnd}
                 onToggleStar={canReorder ? handleToggleStar : undefined}
                 isStarred={starredRequestIds.has(request.id)}
+                isOldPriorityStar={
+                  starredRequestIds.has(request.id) &&
+                  (starredDayByRequestId.get(request.id) ?? todayPriorityDay - 1) < todayPriorityDay
+                }
               />
             ))}
           </tbody>
@@ -411,8 +460,136 @@ export function DashboardRequestList({
   );
 }
 
+function DaysOldSortControls({
+  mode,
+  onChange,
+}: {
+  mode: DaysSortMode;
+  onChange: (mode: DaysSortMode) => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => onChange("asc")}
+        className={`inline-flex h-5 w-5 items-center justify-center rounded border text-blue-700 transition hover:bg-blue-100 ${
+          mode === "asc" ? "border-blue-400 bg-blue-100" : "border-blue-200 bg-white"
+        }`}
+        title="Sort newest first"
+        aria-label="Sort days old ascending"
+      >
+        <SortUpIcon />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("desc")}
+        className={`inline-flex h-5 w-5 items-center justify-center rounded border text-blue-700 transition hover:bg-blue-100 ${
+          mode === "desc" ? "border-blue-400 bg-blue-100" : "border-blue-200 bg-white"
+        }`}
+        title="Sort oldest first"
+        aria-label="Sort days old descending"
+      >
+        <SortDownIcon />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("default")}
+        className={`inline-flex h-5 w-5 items-center justify-center rounded border text-blue-700 transition hover:bg-blue-100 ${
+          mode === "default" ? "border-blue-400 bg-blue-100" : "border-blue-200 bg-white"
+        }`}
+        title="Reset order"
+        aria-label="Reset days old sorting"
+      >
+        <ResetSortIcon />
+      </button>
+    </span>
+  );
+}
+
+function sortItemsByDaysOld(
+  items: DashboardListRequest[],
+  mode: DaysSortMode,
+  isPinnedRecentPriority: (request: DashboardListRequest) => boolean,
+) {
+  if (mode === "default") {
+    return items;
+  }
+
+  const pinnedItems = items.filter(isPinnedRecentPriority);
+  const sortableItems = items.filter((item) => !isPinnedRecentPriority(item));
+
+  return [...pinnedItems, ...sortableItems.sort((a, b) => {
+    const aTime = getCreatedTime(a);
+    const bTime = getCreatedTime(b);
+    const comparison = mode === "asc" ? bTime - aTime : aTime - bTime;
+
+    if (comparison !== 0) {
+      return comparison;
+    }
+
+    return a.docketNumber.localeCompare(b.docketNumber, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  })];
+}
+
+function SortUpIcon() {
+  return (
+    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m7 14 5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SortDownIcon() {
+  return (
+    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m7 10 5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ResetSortIcon() {
+  return (
+    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 7h10a6 6 0 1 1-4.25 10.24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 7h4M4 7v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function getCreatedTime(request: DashboardListRequest) {
+  const createdAt = request.createdAt instanceof Date ? request.createdAt : new Date(request.createdAt);
+  return Number.isNaN(createdAt.getTime()) ? 0 : createdAt.getTime();
+}
+
 function getStarredRequestIds(requests: DashboardListRequest[]) {
   return new Set(requests.filter((request) => (request.dashboardOrder ?? 0) < 0).map((request) => request.id));
+}
+
+function getStarredDayByRequestId(requests: DashboardListRequest[], todayPriorityDay: number) {
+  return new Map(
+    requests
+      .filter((request) => (request.dashboardOrder ?? 0) < 0)
+      .map((request) => [
+        request.id,
+        getPriorityStarDay(request.dashboardOrder) ?? todayPriorityDay - 1,
+      ]),
+  );
+}
+
+function getPriorityStarDay(order: number | null) {
+  if (typeof order !== "number" || order >= 0) {
+    return null;
+  }
+
+  const absoluteOrder = Math.abs(order);
+  if (absoluteOrder < PRIORITY_DAY_FACTOR) {
+    return null;
+  }
+
+  return Math.floor(absoluteOrder / PRIORITY_DAY_FACTOR);
 }
 
 function getNormalOrderIds(requests: DashboardListRequest[]) {
@@ -442,6 +619,10 @@ function getComplaintAgeLabel(request: DashboardListRequest) {
   }
 
   return `${days} days`;
+}
+
+function getTodayPriorityDay() {
+  return getDayNumberInTimeZone(new Date(), "Asia/Kolkata");
 }
 
 function getParsedDate(value: Date | string | null | undefined) {

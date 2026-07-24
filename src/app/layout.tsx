@@ -22,12 +22,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
-  const currentUser = session
-    ? await prisma.user.findUnique({
-        where: { id: session.userId },
-        select: { name: true },
-      })
-    : null;
+  const currentUserName = session ? await getCurrentUserName(session.userId) : null;
 
   return (
     <html lang="en" className={`h-full bg-[#eef6ff] antialiased ${nunitoSans.variable}`}>
@@ -39,7 +34,7 @@ export default async function RootLayout({
           user={
             session
               ? {
-                  name: currentUser?.name ?? "User",
+                  name: currentUserName ?? "User",
                   role: session.role,
                 }
               : null
@@ -50,4 +45,18 @@ export default async function RootLayout({
       </body>
     </html>
   );
+}
+
+async function getCurrentUserName(userId: string) {
+  try {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    return currentUser?.name ?? null;
+  } catch (error) {
+    console.error("Failed to load current user for app shell", error);
+    return null;
+  }
 }

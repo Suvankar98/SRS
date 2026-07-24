@@ -75,6 +75,7 @@ type DashboardRequestRowProps = {
   canMoveDown?: boolean;
   onToggleStar?: (id: string) => void;
   isStarred?: boolean;
+  isOldPriorityStar?: boolean;
 };
 
 export function DashboardRequestRow({
@@ -92,6 +93,7 @@ export function DashboardRequestRow({
   onDragEnd,
   onToggleStar,
   isStarred = false,
+  isOldPriorityStar = false,
 }: DashboardRequestRowProps & {
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLTableRowElement>, id: string) => void;
@@ -392,10 +394,12 @@ export function DashboardRequestRow({
                   event.stopPropagation();
                   onToggleStar?.(request.id);
                 }}
-                className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-amber-300 ${
+                className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition focus:outline-none focus:ring-2 ${
                   isStarred
-                    ? "border-amber-300 bg-amber-100 text-amber-600"
-                    : "border-blue-100 bg-white text-slate-400 hover:border-amber-300 hover:text-amber-500"
+                    ? isOldPriorityStar
+                      ? "border-amber-300 bg-amber-50 text-emerald-600 focus:ring-amber-300"
+                      : "border-amber-300 bg-amber-100 text-amber-600 focus:ring-amber-300"
+                    : "border-blue-100 bg-white text-slate-400 hover:border-blue-300 hover:text-blue-500 focus:ring-blue-200"
                 }`}
                 title={isStarred ? "Move back" : "Move to top"}
                 aria-label={isStarred ? `Move ${request.docketNumber} back` : `Move ${request.docketNumber} to top`}
@@ -437,11 +441,7 @@ export function DashboardRequestRow({
                 <PreviousStatusButton request={request} />
                 <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
               </div>
-            ) : (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </td>
@@ -474,7 +474,10 @@ export function DashboardRequestRow({
             <StatusUpdateModal request={request} />
           </div>
         ) : (
-          <AdminManagerStatusSelect request={request} />
+          <div className="space-y-1">
+            <AdminManagerStatusSelect request={request} />
+            <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
+          </div>
         )}
       </td>
       {canAssign ? (
@@ -565,7 +568,13 @@ function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest
                       </span>
                     </div>
                     {entry.remark ? (
-                      <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-white px-2.5 py-2 text-[11px] leading-5 text-slate-700 ring-1 ring-inset ring-blue-100">
+                      <p
+                        className={`mt-2 whitespace-pre-wrap break-words rounded-lg px-2.5 py-2 text-[11px] leading-5 ring-1 ring-inset ${
+                          entry.isEmployeeRemark
+                            ? "border-l-4 border-amber-400 bg-amber-50 font-semibold text-amber-950 ring-amber-200"
+                            : "bg-white text-slate-700 ring-blue-100"
+                        }`}
+                      >
                         {entry.remark}
                       </p>
                     ) : null}
@@ -587,6 +596,7 @@ type PreviousStatusEntry = {
   person: string;
   status: ReturnType<typeof normalizeStatus>;
   remark: string;
+  isEmployeeRemark: boolean;
   createdAt: Date | string;
 };
 
@@ -600,6 +610,7 @@ function getPreviousStatusEntries(request: DashboardRequestRowRequest): Previous
         person: activity.employeeName || activity.actorName || "Staff",
         status: normalizeStatus(activity.status),
         remark: getPreviousStatusRemark(activity.statusReason, activity.details),
+        isEmployeeRemark: Boolean(activity.statusReason?.trim() && (activity.employeeName || activity.actorRole === "Employee")),
         createdAt: activity.createdAt,
       })) ?? [];
 
@@ -617,6 +628,7 @@ function getPreviousStatusEntries(request: DashboardRequestRowRequest): Previous
         person: assignment.employee?.name || "Employee",
         status: normalizeStatus(assignment.status),
         remark: assignment.statusReason?.trim() ?? "",
+        isEmployeeRemark: Boolean(assignment.statusReason?.trim()),
         createdAt: assignment.statusSubmittedAt ?? assignment.closedAt ?? "",
       }))
       .slice(0, 8) ?? []

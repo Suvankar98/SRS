@@ -25,6 +25,7 @@ type DashboardStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
 const COMPLETED_DASHBOARD_VISIBILITY_MS = 72 * 60 * 60 * 1000;
 const DAY_WISE_MAX_POINTS = 20;
+const PRIORITY_DAY_FACTOR = 10000;
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getSession();
@@ -1241,10 +1242,21 @@ function compareDashboardOrder(aOrder: number, bOrder: number) {
   }
 
   if (aStarred && bStarred) {
-    return Math.abs(aOrder) - Math.abs(bOrder);
+    return getDashboardPriorityRank(aOrder) - getDashboardPriorityRank(bOrder);
   }
 
   return aOrder - bOrder;
+}
+
+function getDashboardPriorityRank(order: number) {
+  const absoluteOrder = Math.abs(order);
+
+  if (absoluteOrder < PRIORITY_DAY_FACTOR) {
+    return absoluteOrder;
+  }
+
+  const encodedRank = absoluteOrder % PRIORITY_DAY_FACTOR;
+  return encodedRank === 0 ? PRIORITY_DAY_FACTOR : encodedRank;
 }
 
 function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt: Date }>(requests: T[]) {

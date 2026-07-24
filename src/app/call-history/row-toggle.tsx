@@ -14,6 +14,7 @@ type CallHistoryColumnToggleProps = {
 
 export const CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY = "srs-call-history-visible-columns";
 export const CALL_HISTORY_VISIBLE_COLUMNS_EVENT = "srs-call-history-visible-columns-change";
+const DEFAULT_VISIBLE_MIGRATION_COLUMNS = ["assigned-date"];
 
 export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryColumnToggleProps) {
   const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
@@ -31,8 +32,14 @@ export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryC
       .split(",")
       .map((id) => id.trim())
       .filter((id) => columnIds.includes(id));
-    setHiddenColumnIds(columnIds.filter((id) => !visibleIds.includes(id)));
-    dispatchVisibleColumns(visibleIds.length > 0 ? visibleIds : columnIds);
+    const migratedVisibleIds = Array.from(
+      new Set([
+        ...visibleIds,
+        ...DEFAULT_VISIBLE_MIGRATION_COLUMNS.filter((id) => columnIds.includes(id)),
+      ]),
+    );
+    setHiddenColumnIds(columnIds.filter((id) => !migratedVisibleIds.includes(id)));
+    dispatchVisibleColumns(migratedVisibleIds.length > 0 ? migratedVisibleIds : columnIds);
   }, [columns]);
 
   function toggleColumn(columnId: string) {

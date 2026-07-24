@@ -1621,6 +1621,7 @@ export async function updateServiceCallStatus(formData: FormData) {
           statusReason: true,
           statusSubmittedAt: true,
           statusPointsDelta: true,
+          dashboardOrder: true,
           closedByName: true,
           closedAt: true,
         },
@@ -1639,6 +1640,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusReason: true,
         statusSubmittedAt: true,
         statusPointsDelta: true,
+        dashboardOrder: true,
         closedByName: true,
         closedAt: true,
       },
@@ -1671,6 +1673,7 @@ export async function updateServiceCallStatus(formData: FormData) {
             statusReason: true,
             statusSubmittedAt: true,
             statusPointsDelta: true,
+            dashboardOrder: true,
             closedByName: true,
             closedAt: true,
           },
@@ -1765,6 +1768,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusSubmittedAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
         statusPointsDelta: latestAssignment?.statusPointsDelta ?? null,
         reviewPointsDelta: null,
+        dashboardOrder: null,
         lastAttemptByName: latestAssignment?.employee?.name ?? employeeName,
         lastAttemptAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
         closedByName: completedAssignment?.employee?.name ?? null,
@@ -2080,6 +2084,7 @@ export async function canCreateService(): Promise<boolean> {
 }
 
 const TECH_MANUAL_CATEGORIES = ["safety", "security", "automation"] as const;
+const TECH_MANUAL_MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 function getTechManualCategory(value: string) {
   const normalized = value.trim().toLowerCase();
@@ -2117,6 +2122,10 @@ function getTechManualCategoryPath(category: string) {
   return `/tech-manual/${category}`;
 }
 
+function getTechManualFolderPath(category: string, folderId: string) {
+  return `${getTechManualCategoryPath(category)}/${folderId}`;
+}
+
 async function getTechManualActor(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
@@ -2150,6 +2159,10 @@ export async function uploadTechManualDocument(formData: FormData) {
 
   if (!file || typeof file === "string" || file.size === 0 || !file.name) {
     throw new Error("Please select a valid document file.");
+  }
+
+  if (file.size > TECH_MANUAL_MAX_UPLOAD_BYTES) {
+    throw new Error("This file is too large. Please upload a document up to 100 MB.");
   }
 
   const folder = await prisma.techManualFolder.findUnique({
@@ -2188,6 +2201,7 @@ export async function uploadTechManualDocument(formData: FormData) {
   });
 
   revalidatePath(getTechManualCategoryPath(folder.category));
+  revalidatePath(getTechManualFolderPath(folder.category, folder.id));
 }
 
 export async function addTechManualYoutubeLink(formData: FormData) {
@@ -2222,6 +2236,7 @@ export async function addTechManualYoutubeLink(formData: FormData) {
   });
 
   revalidatePath(getTechManualCategoryPath(folder.category));
+  revalidatePath(getTechManualFolderPath(folder.category, folder.id));
 }
 
 export async function deleteTechManualDocument(formData: FormData) {
@@ -2230,7 +2245,7 @@ export async function deleteTechManualDocument(formData: FormData) {
 
   const document = await prisma.techManualDocument.findUnique({
     where: { id: documentId },
-    include: { folder: { select: { category: true } } },
+    include: { folder: { select: { id: true, category: true } } },
   });
 
   if (!document) {
@@ -2257,6 +2272,7 @@ export async function deleteTechManualDocument(formData: FormData) {
 
   await prisma.techManualDocument.delete({ where: { id: document.id } });
   revalidatePath(getTechManualCategoryPath(document.folder.category));
+  revalidatePath(getTechManualFolderPath(document.folder.category, document.folder.id));
 }
 
 export async function deleteTechManualFolder(formData: FormData) {
