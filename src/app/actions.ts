@@ -2151,57 +2151,70 @@ export async function createTechManualFolder(formData: FormData) {
   revalidatePath(getTechManualCategoryPath(category));
 }
 
-export async function uploadTechManualDocument(formData: FormData) {
-  const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
-  const folderId = getRequiredField(formData, "folderId");
-  const documentName = getRequiredField(formData, "documentName");
-  const file = formData.get("file");
+export async function uploadTechManualDocument(
+  _previousState: { ok: boolean; message: string } | undefined,
+  formData: FormData,
+) {
+  try {
+    const session = await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+    const folderId = getRequiredField(formData, "folderId");
+    const documentName = getRequiredField(formData, "documentName");
+    const file = formData.get("file");
 
-  if (!file || typeof file === "string" || file.size === 0 || !file.name) {
-    throw new Error("Please select a valid document file.");
+    if (!file || typeof file === "string" || file.size === 0 || !file.name) {
+      return { ok: false, message: "Please select a valid document file." };
+    }
+
+    if (file.size > TECH_MANUAL_MAX_UPLOAD_BYTES) {
+      return { ok: false, message: "This file is too large. Please upload a document up to 100 MB." };
+    }
+
+    const folder = await prisma.techManualFolder.findUnique({
+      where: { id: folderId },
+      select: { id: true, category: true },
+    });
+
+    if (!folder) {
+      return { ok: false, message: "Tech manual folder not found." };
+    }
+
+    const documentType = getTechManualDocumentType(file.name);
+    const path = await import("path");
+    const fs = await import("fs");
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const uploadsBase = path.join(process.cwd(), "public", "manual-uploads");
+    const folderPath = path.join(uploadsBase, folder.id);
+
+    await fs.promises.mkdir(folderPath, { recursive: true });
+
+    const safeName = `${Date.now()}-${sanitizeFileName(file.name)}`;
+    const filePath = path.join(folderPath, safeName);
+    await fs.promises.writeFile(filePath, buffer);
+
+    const actor = await getTechManualActor(session.userId);
+    await prisma.techManualDocument.create({
+      data: {
+        folderId: folder.id,
+        name: documentName,
+        documentType,
+        fileName: file.name,
+        fileUrl: `/manual-uploads/${encodeURIComponent(folder.id)}/${encodeURIComponent(safeName)}`,
+        uploadedById: session.userId,
+        uploadedByName: actor?.name ?? "Admin / Manager",
+      },
+    });
+
+    revalidatePath(getTechManualCategoryPath(folder.category));
+    revalidatePath(getTechManualFolderPath(folder.category, folder.id));
+
+    return { ok: true, message: "Document uploaded successfully." };
+  } catch (error) {
+    console.error("Tech manual upload failed", error);
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "The document could not be uploaded. Please try again.",
+    };
   }
-
-  if (file.size > TECH_MANUAL_MAX_UPLOAD_BYTES) {
-    throw new Error("This file is too large. Please upload a document up to 100 MB.");
-  }
-
-  const folder = await prisma.techManualFolder.findUnique({
-    where: { id: folderId },
-    select: { id: true, category: true },
-  });
-
-  if (!folder) {
-    throw new Error("Tech manual folder not found.");
-  }
-
-  const documentType = getTechManualDocumentType(file.name);
-  const path = await import("path");
-  const fs = await import("fs");
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const uploadsBase = path.join(process.cwd(), "public", "manual-uploads");
-  const folderPath = path.join(uploadsBase, folder.id);
-
-  await fs.promises.mkdir(folderPath, { recursive: true });
-
-  const safeName = `${Date.now()}-${sanitizeFileName(file.name)}`;
-  const filePath = path.join(folderPath, safeName);
-  await fs.promises.writeFile(filePath, buffer);
-
-  const actor = await getTechManualActor(session.userId);
-  await prisma.techManualDocument.create({
-    data: {
-      folderId: folder.id,
-      name: documentName,
-      documentType,
-      fileName: file.name,
-      fileUrl: `/manual-uploads/${encodeURIComponent(folder.id)}/${encodeURIComponent(safeName)}`,
-      uploadedById: session.userId,
-      uploadedByName: actor?.name ?? "Admin / Manager",
-    },
-  });
-
-  revalidatePath(getTechManualCategoryPath(folder.category));
-  revalidatePath(getTechManualFolderPath(folder.category, folder.id));
 }
 
 export async function addTechManualYoutubeLink(formData: FormData) {

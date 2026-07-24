@@ -51,11 +51,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const selectedServiceBillingType = getServiceBillingType(
     getSearchParamValue(resolvedSearchParams.serviceBillingType),
   );
-  const selectedArea = getSearchParamValue(resolvedSearchParams.area).trim();
   const fromDate = getSearchParamValue(resolvedSearchParams.from).trim();
   const toDate = getSearchParamValue(resolvedSearchParams.to).trim();
+  const assignedFromDate = getSearchParamValue(resolvedSearchParams.assignedFrom).trim();
+  const assignedToDate = getSearchParamValue(resolvedSearchParams.assignedTo).trim();
 
-  const [employees, callTypeOptions, areaOptions] = await Promise.all([
+  const [employees, callTypeOptions] = await Promise.all([
     prisma.user.findMany({
       where: { role: APP_ROLES.EMPLOYEE },
       select: { id: true, name: true },
@@ -66,11 +67,6 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       select: { callType: true },
       orderBy: { callType: "asc" },
     }),
-    prisma.serviceRequest.findMany({
-      distinct: ["area"],
-      select: { area: true },
-      orderBy: { area: "asc" },
-    }),
   ]);
 
   const where: Prisma.ServiceRequestWhereInput = buildReportWhere({
@@ -79,9 +75,10 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     selectedEmployee,
     selectedCallType,
     selectedServiceBillingType,
-    selectedArea,
     fromDate,
     toDate,
+    assignedFromDate,
+    assignedToDate,
     employees,
   });
 
@@ -136,7 +133,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
 
   const activeFilters = getActiveFilterCount({
@@ -145,9 +142,10 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     selectedEmployee,
     selectedCallType,
     selectedServiceBillingType,
-    selectedArea,
     fromDate,
     toDate,
+    assignedFromDate,
+    assignedToDate,
   });
   const exportParams = new URLSearchParams();
   if (searchQuery !== "") exportParams.set("q", searchQuery);
@@ -155,9 +153,10 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   if (selectedEmployee !== "") exportParams.set("employeeId", selectedEmployee);
   if (selectedCallType !== "") exportParams.set("callType", selectedCallType);
   if (selectedServiceBillingType !== "") exportParams.set("serviceBillingType", selectedServiceBillingType);
-  if (selectedArea !== "") exportParams.set("area", selectedArea);
   if (fromDate !== "") exportParams.set("from", fromDate);
   if (toDate !== "") exportParams.set("to", toDate);
+  if (assignedFromDate !== "") exportParams.set("assignedFrom", assignedFromDate);
+  if (assignedToDate !== "") exportParams.set("assignedTo", assignedToDate);
   const exportQuery = exportParams.toString();
   const isChargeableServiceFilter = selectedCallType === "Service" && selectedServiceBillingType === "chargeable";
   const chargeableTotal = isChargeableServiceFilter
@@ -191,12 +190,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           selectedEmployee={selectedEmployee}
           selectedCallType={selectedCallType}
           selectedServiceBillingType={selectedServiceBillingType}
-          selectedArea={selectedArea}
           fromDate={fromDate}
           toDate={toDate}
+          assignedFromDate={assignedFromDate}
+          assignedToDate={assignedToDate}
           employees={employees}
           callTypeOptions={callTypeOptions}
-          areaOptions={areaOptions}
         />
       </section>
 
@@ -303,9 +302,10 @@ function buildReportWhere({
   selectedEmployee,
   selectedCallType,
   selectedServiceBillingType,
-  selectedArea,
   fromDate,
   toDate,
+  assignedFromDate,
+  assignedToDate,
   employees,
 }: {
   searchQuery: string;
@@ -313,9 +313,10 @@ function buildReportWhere({
   selectedEmployee: string;
   selectedCallType: string;
   selectedServiceBillingType: string;
-  selectedArea: string;
   fromDate: string;
   toDate: string;
+  assignedFromDate: string;
+  assignedToDate: string;
   employees: Array<{ id: string; name: string }>;
 }): Prisma.ServiceRequestWhereInput {
   const andClauses: Prisma.ServiceRequestWhereInput[] = [];
@@ -350,13 +351,14 @@ function buildReportWhere({
     andClauses.push({ serviceBillingType: selectedServiceBillingType });
   }
 
-  if (selectedArea !== "") {
-    andClauses.push({ area: selectedArea });
-  }
-
-  const createdAtFilter = getCreatedAtFilter(fromDate, toDate);
+  const createdAtFilter = getDateRangeFilter(fromDate, toDate);
   if (createdAtFilter) {
     andClauses.push({ createdAt: createdAtFilter });
+  }
+
+  const assignedAtFilter = getDateRangeFilter(assignedFromDate, assignedToDate);
+  if (assignedAtFilter) {
+    andClauses.push({ assignedAt: assignedAtFilter });
   }
 
   if (andClauses.length === 0) {
@@ -396,7 +398,7 @@ function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhe
   };
 }
 
-function getCreatedAtFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
+function getDateRangeFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
   const from = parseDateInput(fromDate, false);
   const to = parseDateInput(toDate, true);
 
@@ -458,18 +460,20 @@ function getActiveFilterCount({
   selectedEmployee,
   selectedCallType,
   selectedServiceBillingType,
-  selectedArea,
   fromDate,
   toDate,
+  assignedFromDate,
+  assignedToDate,
 }: {
   searchQuery: string;
   selectedStatus: CanonicalStatus | "";
   selectedEmployee: string;
   selectedCallType: string;
   selectedServiceBillingType: string;
-  selectedArea: string;
   fromDate: string;
   toDate: string;
+  assignedFromDate: string;
+  assignedToDate: string;
 }) {
   return [
     searchQuery,
@@ -477,9 +481,10 @@ function getActiveFilterCount({
     selectedEmployee,
     selectedCallType,
     selectedServiceBillingType,
-    selectedArea,
     fromDate,
     toDate,
+    assignedFromDate,
+    assignedToDate,
   ].filter((value) => value !== "").length;
 }
 

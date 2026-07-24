@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 
 import { uploadTechManualDocument } from "@/app/actions";
 
@@ -12,7 +13,23 @@ type TechManualUploadFormProps = {
 };
 
 export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
+  const router = useRouter();
+  const formRef = React.useRef<HTMLFormElement | null>(null);
   const [fileError, setFileError] = React.useState("");
+  const [state, formAction, isPending] = React.useActionState(uploadTechManualDocument, {
+    ok: false,
+    message: "",
+  });
+
+  React.useEffect(() => {
+    if (!state.ok) {
+      return;
+    }
+
+    formRef.current?.reset();
+    setFileError("");
+    router.refresh();
+  }, [router, state.ok]);
 
   const validateFile = (file: File | null) => {
     if (!file) {
@@ -31,7 +48,8 @@ export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
 
   return (
     <form
-      action={uploadTechManualDocument}
+      ref={formRef}
+      action={formAction}
       onSubmit={(event) => {
         const form = event.currentTarget;
         const file = (form.elements.namedItem("file") as HTMLInputElement | null)?.files?.[0] ?? null;
@@ -60,13 +78,18 @@ export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
         className="block w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-blue-950 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700"
       />
       {fileError ? <p className="text-xs font-semibold text-red-600">{fileError}</p> : null}
+      {state.message ? (
+        <p className={`text-xs font-semibold ${state.ok ? "text-emerald-700" : "text-red-600"}`}>
+          {state.message}
+        </p>
+      ) : null}
       <button
         type="submit"
-        disabled={Boolean(fileError)}
+        disabled={Boolean(fileError) || isPending}
         className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0b4fb3] px-4 text-sm font-semibold text-white transition hover:bg-[#083f90] disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         <UploadIcon />
-        Upload File
+        {isPending ? "Uploading..." : "Upload File"}
       </button>
     </form>
   );

@@ -58,9 +58,10 @@ export async function GET(request: Request) {
   const selectedEmployee = (url.searchParams.get("employeeId") || "").trim();
   const selectedCallType = (url.searchParams.get("callType") || "").trim();
   const selectedServiceBillingType = getServiceBillingType(url.searchParams.get("serviceBillingType") || "");
-  const selectedArea = (url.searchParams.get("area") || "").trim();
   const fromDate = (url.searchParams.get("from") || "").trim();
   const toDate = (url.searchParams.get("to") || "").trim();
+  const assignedFromDate = (url.searchParams.get("assignedFrom") || "").trim();
+  const assignedToDate = (url.searchParams.get("assignedTo") || "").trim();
   const visibleColumns = getVisibleExportColumns(url.searchParams.get("columns"));
   const isChargeableServiceExport = selectedCallType === "Service" && selectedServiceBillingType === "chargeable";
 
@@ -76,9 +77,10 @@ export async function GET(request: Request) {
     selectedEmployee,
     selectedCallType,
     selectedServiceBillingType,
-    selectedArea,
     fromDate,
     toDate,
+    assignedFromDate,
+    assignedToDate,
     employees,
   });
 
@@ -99,7 +101,7 @@ export async function GET(request: Request) {
       assignedAt: true,
       assignedTo: { select: { name: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
 
   if (format === "pdf") {
@@ -486,9 +488,10 @@ function buildReportWhere({
   selectedEmployee,
   selectedCallType,
   selectedServiceBillingType,
-  selectedArea,
   fromDate,
   toDate,
+  assignedFromDate,
+  assignedToDate,
   employees,
 }: {
   searchQuery: string;
@@ -496,9 +499,10 @@ function buildReportWhere({
   selectedEmployee: string;
   selectedCallType: string;
   selectedServiceBillingType: string;
-  selectedArea: string;
   fromDate: string;
   toDate: string;
+  assignedFromDate: string;
+  assignedToDate: string;
   employees: Array<{ id: string; name: string }>;
 }): Prisma.ServiceRequestWhereInput {
   const andClauses: Prisma.ServiceRequestWhereInput[] = [];
@@ -533,13 +537,14 @@ function buildReportWhere({
     andClauses.push({ serviceBillingType: selectedServiceBillingType });
   }
 
-  if (selectedArea !== "") {
-    andClauses.push({ area: selectedArea });
-  }
-
-  const createdAtFilter = getCreatedAtFilter(fromDate, toDate);
+  const createdAtFilter = getDateRangeFilter(fromDate, toDate);
   if (createdAtFilter) {
     andClauses.push({ createdAt: createdAtFilter });
+  }
+
+  const assignedAtFilter = getDateRangeFilter(assignedFromDate, assignedToDate);
+  if (assignedAtFilter) {
+    andClauses.push({ assignedAt: assignedAtFilter });
   }
 
   if (andClauses.length === 0) {
@@ -579,7 +584,7 @@ function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhe
   };
 }
 
-function getCreatedAtFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
+function getDateRangeFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
   const from = parseDateInput(fromDate, false);
   const to = parseDateInput(toDate, true);
 
