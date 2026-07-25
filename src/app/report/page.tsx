@@ -338,7 +338,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.periodPoints} pts` : "-"}</p>
-                    <p className="text-xs text-blue-600">{employee ? `${employee.totalPoints} all-time` : ""}</p>
                   </div>
                 </div>
               );
@@ -372,7 +371,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-blue-900">{employee.periodPoints} pts</p>
-                        <p className="text-xs text-blue-600">{employee.totalPoints} all-time</p>
                       </div>
                     </div>
                   );
