@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { createServiceRequest } from "../actions";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
+import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 import { getProductOptions } from "@/lib/product-options";
 import { ServiceCallBillingFields } from "../service-call-billing-fields";
 import { CustomerDetailsFields, type SavedCompanyOption } from "./customer-details-fields";
 import { ProductAutocomplete } from "../product-autocomplete";
 import { PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
+import { normalizeStatus } from "../status-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,8 @@ export default async function FormPage({ searchParams }: FormPageProps) {
         phoneNumber2: true,
         area: true,
         fullAddress: true,
+        docketNumber: true,
+        status: true,
       },
     }),
     prisma.savedCustomer.findMany({
@@ -89,6 +93,9 @@ export default async function FormPage({ searchParams }: FormPageProps) {
                 className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
                 required
               />
+              <span className="mt-1.5 block text-xs font-medium text-blue-500">
+                Required. Include the issue, product condition, and any customer note.
+              </span>
             </label>
           </div>
 
@@ -114,16 +121,34 @@ type ImportedSavedCompany = {
   fullAddress: string;
 };
 
-function buildSavedCompanyOptions(requests: SavedCompanyOption[], importedCustomers: ImportedSavedCompany[]) {
+type SavedRequestCompany = SavedCompanyOption & {
+  docketNumber: string;
+  status: string | null;
+};
+
+function buildSavedCompanyOptions(requests: SavedRequestCompany[], importedCustomers: ImportedSavedCompany[]) {
   const options = new Map<string, SavedCompanyOption>();
 
   requests.forEach((request) => {
     const key = getSavedCompanyKey(request.company);
+    const openDocketNumbers = ["Completed", "Cancel"].includes(normalizeStatus(request.status))
+      ? []
+      : [formatDocketNumber(request.docketNumber)];
+
     if (!key || options.has(key)) {
+      const existingOption = key ? options.get(key) : null;
+      if (existingOption && openDocketNumbers.length > 0) {
+        existingOption.openDocketNumbers = Array.from(
+          new Set([...(existingOption.openDocketNumbers ?? []), ...openDocketNumbers]),
+        );
+      }
       return;
     }
 
-    options.set(key, request);
+    options.set(key, {
+      ...request,
+      openDocketNumbers,
+    });
   });
 
   importedCustomers.forEach((customer) => {

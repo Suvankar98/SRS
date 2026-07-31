@@ -2,6 +2,8 @@
 
 import React from "react";
 
+import { formatDocketNumber } from "@/lib/docket";
+
 type EmployeeDocketActionsProps = {
   docketNumber: string;
   fullAddress: string;
@@ -9,12 +11,13 @@ type EmployeeDocketActionsProps = {
 
 export function EmployeeDocketActions({ docketNumber, fullAddress }: EmployeeDocketActionsProps) {
   const [copied, setCopied] = React.useState(false);
+  const displayDocketNumber = formatDocketNumber(docketNumber);
 
   const handleCopy = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
 
     try {
-      await navigator.clipboard.writeText(docketNumber);
+      await navigator.clipboard.writeText(displayDocketNumber);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -36,7 +39,7 @@ export function EmployeeDocketActions({ docketNumber, fullAddress }: EmployeeDoc
 
   return (
     <span className="inline-flex max-w-full items-center gap-1.5">
-      <span className="min-w-0 break-words font-semibold text-blue-950">{docketNumber}</span>
+      <span className="min-w-0 break-words font-semibold text-blue-950">{displayDocketNumber}</span>
       <button
         type="button"
         onClick={handleCopy}

@@ -2,15 +2,18 @@
 
 import React from "react";
 
+import { formatDocketNumber } from "@/lib/docket";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 type DashboardMediaPopupProps = {
   docketNumber: string;
   mediaItems?: DashboardRequestMediaItem[];
+  variant?: "label" | "icon";
 };
 
-export function DashboardMediaPopup({ docketNumber, mediaItems = [] }: DashboardMediaPopupProps) {
+export function DashboardMediaPopup({ docketNumber, mediaItems = [], variant = "label" }: DashboardMediaPopupProps) {
   const [open, setOpen] = React.useState(false);
+  const displayDocketNumber = formatDocketNumber(docketNumber);
 
   if (mediaItems.length === 0) {
     return null;
@@ -24,9 +27,15 @@ export function DashboardMediaPopup({ docketNumber, mediaItems = [] }: Dashboard
           event.stopPropagation();
           setOpen(true);
         }}
-        className="inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        className={
+          variant === "icon"
+            ? "inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            : "inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        }
+        aria-label={`View photos for ${displayDocketNumber}`}
+        title="View photos"
       >
-        View media
+        {variant === "icon" ? <PhotoIcon /> : "View media"}
       </button>
 
       {open ? (
@@ -41,7 +50,7 @@ export function DashboardMediaPopup({ docketNumber, mediaItems = [] }: Dashboard
             <div className="flex items-start justify-between gap-3 border-b border-blue-200 px-5 py-4">
               <div>
                 <h3 className="text-base font-semibold text-blue-950">Uploaded Media</h3>
-                <p className="mt-1 text-xs font-medium text-blue-600">{docketNumber}</p>
+                <p className="mt-1 text-xs font-medium text-blue-600">{displayDocketNumber}</p>
               </div>
               <button
                 type="button"
@@ -84,6 +93,24 @@ function CloseIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PhotoIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 7.5A2.5 2.5 0 0 1 6.5 5h2l1.4-1.7A1 1 0 0 1 10.7 3h2.6a1 1 0 0 1 .8.3L15.5 5h2A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
     </svg>
   );
 }

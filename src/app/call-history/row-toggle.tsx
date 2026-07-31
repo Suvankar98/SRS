@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type CallHistoryColumnToggleItem = {
   id: string;
@@ -14,33 +14,20 @@ type CallHistoryColumnToggleProps = {
 
 export const CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY = "srs-call-history-visible-columns";
 export const CALL_HISTORY_VISIBLE_COLUMNS_EVENT = "srs-call-history-visible-columns-change";
-const DEFAULT_VISIBLE_MIGRATION_COLUMNS = ["assigned-date"];
+const DEFAULT_VISIBLE_MIGRATION_COLUMNS = ["assigned-date", "completed-by"];
 
 export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryColumnToggleProps) {
-  const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
+  const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>(() => getInitialHiddenColumnIds(columns));
   const visibleCount = columns.length - hiddenColumnIds.length;
-  const columnIds = columns.map((column) => column.id);
+  const visibleColumnIds = useMemo(
+    () => columnIds.filter((id) => !hiddenColumnIds.includes(id)),
+    [columnIds, hiddenColumnIds],
+  );
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY);
-    if (!stored) {
-      dispatchVisibleColumns(columnIds);
-      return;
-    }
-
-    const visibleIds = stored
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => columnIds.includes(id));
-    const migratedVisibleIds = Array.from(
-      new Set([
-        ...visibleIds,
-        ...DEFAULT_VISIBLE_MIGRATION_COLUMNS.filter((id) => columnIds.includes(id)),
-      ]),
-    );
-    setHiddenColumnIds(columnIds.filter((id) => !migratedVisibleIds.includes(id)));
-    dispatchVisibleColumns(migratedVisibleIds.length > 0 ? migratedVisibleIds : columnIds);
-  }, [columns]);
+    dispatchVisibleColumns(visibleColumnIds);
+  }, [visibleColumnIds]);
 
   function toggleColumn(columnId: string) {
     setHiddenColumnIds((current) => {
@@ -114,6 +101,32 @@ function dispatchVisibleColumns(visibleIds: string[]) {
       detail: { visibleIds },
     }),
   );
+}
+
+function getInitialHiddenColumnIds(columns: CallHistoryColumnToggleItem[]) {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const columnIds = columns.map((column) => column.id);
+  const stored = window.localStorage.getItem(CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY);
+
+  if (!stored) {
+    return [];
+  }
+
+  const visibleIds = stored
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => columnIds.includes(id));
+  const migratedVisibleIds = Array.from(
+    new Set([
+      ...visibleIds,
+      ...DEFAULT_VISIBLE_MIGRATION_COLUMNS.filter((id) => columnIds.includes(id)),
+    ]),
+  );
+
+  return migratedVisibleIds.length > 0 ? columnIds.filter((id) => !migratedVisibleIds.includes(id)) : [];
 }
 
 function escapeAttributeValue(value: string) {

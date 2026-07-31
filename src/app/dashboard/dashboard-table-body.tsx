@@ -6,6 +6,7 @@ import { RemarkPopup } from "../remark-popup";
 import { StatusUpdateModal } from "../status-update-modal";
 import { assignServiceCall } from "../actions";
 import { formatServiceBillingType, formatINRCurrency } from "../status-utils";
+import { formatDocketNumber } from "@/lib/docket";
 import { ServiceRequest } from "@prisma/client";
 
 type StatusPillProps = {
@@ -98,6 +99,7 @@ function DashboardTableRow({
   isClosedStatus,
 }: Omit<DashboardTableBodyProps, "requests"> & { request: DashboardTableBodyProps["requests"][number] }) {
   const openModalRef = React.useRef<() => void>(() => {});
+  const displayDocketNumber = formatDocketNumber(request.docketNumber);
 
   const rowClick = () => {
     if (canEditDocket) {
@@ -128,7 +130,7 @@ function DashboardTableRow({
               }}
               className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-600"
             >
-              {request.docketNumber}
+              {displayDocketNumber}
             </span>
           )}
         />

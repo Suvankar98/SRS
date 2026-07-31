@@ -2,6 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { formatDocketNumber } from "@/lib/docket";
 import { PHONE_VALIDATION_MESSAGE, normalizePhoneNumberForStorage } from "@/lib/phone";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
@@ -612,7 +613,7 @@ export async function createServiceRequest(formData: FormData) {
 
     const created = await transaction.serviceRequest.create({
       data: {
-        docketNumber: `srs-${nextSequence}`,
+        docketNumber: formatDocketNumber(`srs-${nextSequence}`),
         name,
         company,
         contactPerson2,
@@ -633,7 +634,7 @@ export async function createServiceRequest(formData: FormData) {
       requestId: created.id,
       type: "created",
       title: "Service Request Created",
-      details: `Created docket ${created.docketNumber}`,
+      details: `Created docket ${formatDocketNumber(created.docketNumber)}`,
       status: created.status,
       actorId: session.userId,
       actorName: creator?.name ?? "Admin / Manager",
@@ -666,7 +667,7 @@ export async function createServiceRequest(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/admin");
 
-  const redirectParams = new URLSearchParams({ created: request.docketNumber });
+  const redirectParams = new URLSearchParams({ created: formatDocketNumber(request.docketNumber) });
   if (isNewSavedCompany) {
     redirectParams.set("newCompany", "1");
   }
@@ -1166,7 +1167,7 @@ export async function deleteServiceRequest(formData: FormData) {
       requestId,
       type: "deleted",
       title: "Service Request Deleted",
-      details: `${actorName} deleted docket ${request.docketNumber}`,
+      details: `${actorName} deleted docket ${formatDocketNumber(request.docketNumber)}`,
       actorId: session.userId,
       actorName,
       actorRole,

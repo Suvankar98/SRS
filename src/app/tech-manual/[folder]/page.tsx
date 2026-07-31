@@ -25,9 +25,10 @@ const TECH_MANUAL_FOLDERS = {
 
 type TechManualFolderPageProps = {
   params: Promise<{ folder: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function TechManualFolderPage({ params }: TechManualFolderPageProps) {
+export default async function TechManualFolderPage({ params, searchParams }: TechManualFolderPageProps) {
   const session = await getSession();
 
   if (!session) {
@@ -35,6 +36,8 @@ export default async function TechManualFolderPage({ params }: TechManualFolderP
   }
 
   const { folder } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
   const manualFolder = TECH_MANUAL_FOLDERS[folder as keyof typeof TECH_MANUAL_FOLDERS];
 
   if (!manualFolder) {
@@ -43,7 +46,18 @@ export default async function TechManualFolderPage({ params }: TechManualFolderP
 
   const canManageManual = roleCanAssign(session.role);
   const folders = await prisma.techManualFolder.findMany({
-    where: { category: folder },
+    where: {
+      category: folder,
+      ...(searchQuery
+        ? {
+            OR: [
+              { name: { contains: searchQuery, mode: "insensitive" } },
+              { documents: { some: { name: { contains: searchQuery, mode: "insensitive" } } } },
+              { documents: { some: { fileName: { contains: searchQuery, mode: "insensitive" } } } },
+            ],
+          }
+        : {}),
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -97,6 +111,18 @@ export default async function TechManualFolderPage({ params }: TechManualFolderP
             </button>
           </form>
         ) : null}
+        <form className="mt-4">
+          <label>
+            <span className="sr-only">Search manuals</span>
+            <input
+              type="search"
+              name="q"
+              defaultValue={searchQuery}
+              placeholder="Search folders and documents"
+              className="h-11 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-medium text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            />
+          </label>
+        </form>
       </section>
 
       <section className="mt-5">
@@ -160,6 +186,14 @@ export default async function TechManualFolderPage({ params }: TechManualFolderP
       </section>
     </main>
   );
+}
+
+function getSearchParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
 }
 
 function FolderIcon() {

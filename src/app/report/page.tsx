@@ -191,6 +191,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const leaderboardOtherEmployees = sortedEmployeeRows.slice(3);
   const activeFilterCount = [fromDate, toDate].filter((value) => value !== "").length;
   const leaderboardSubtitle = hasDateRange ? "Selected date range" : "Current monthly points";
+  const datePresets = getReportDatePresets();
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -291,6 +292,15 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
             </label>
 
             <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+              {datePresets.map((preset) => (
+                <a
+                  key={preset.label}
+                  href={`/report?from=${preset.from}&to=${preset.to}`}
+                  className="inline-flex items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100"
+                >
+                  {preset.label}
+                </a>
+              ))}
               <button
                 type="submit"
                 className="inline-flex min-w-36 flex-1 items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800"
@@ -499,6 +509,32 @@ function getDateRange(fromDate: string, toDate: string) {
     startAt: fromDate ? new Date(`${fromDate}T00:00:00.000+05:30`) : null,
     endAt: toDate ? new Date(`${toDate}T23:59:59.999+05:30`) : null,
   };
+}
+
+function getReportDatePresets() {
+  const todayInput = getLocalDateInput(new Date());
+  const today = new Date(`${todayInput}T00:00:00.000+05:30`);
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - 6);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+  return [
+    { label: "Today", from: todayInput, to: todayInput },
+    { label: "This Week", from: getLocalDateInput(weekStart), to: todayInput },
+    { label: "This Month", from: getLocalDateInput(monthStart), to: todayInput },
+    { label: "Last Month", from: getLocalDateInput(lastMonthStart), to: getLocalDateInput(lastMonthEnd) },
+  ];
+}
+
+function getLocalDateInput(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
 }
 
 function getRollingDateRange(days: number) {

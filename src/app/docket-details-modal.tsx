@@ -8,6 +8,7 @@ import { AssignmentPicker, type AssignmentPickerAssignment } from "./dashboard/a
 import { CopyPhoneButton } from "./dashboard/copy-phone-button";
 import { ProductAutocomplete } from "./product-autocomplete";
 import { PhoneNumberInput } from "./phone-number-input";
+import { formatDocketNumber } from "@/lib/docket";
 import { formatIndianPhoneNumber, getIndianPhoneCopyValue } from "@/lib/phone";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -104,16 +105,7 @@ export function DocketDetailsModal({
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-  const openModal = () => {
-    setSubmitError("");
-    setIsOpen(true);
-  };
-
-  React.useEffect(() => {
-    if (onReady) {
-      onReady(openModal);
-    }
-  }, [onReady]);
+  const displayDocketNumber = formatDocketNumber(request.docketNumber);
   const [name, setName] = React.useState(request.name);
   const [company] = React.useState(request.company);
   const [contactPerson2, setContactPerson2] = React.useState(request.contactPerson2 || "");
@@ -135,6 +127,17 @@ export function DocketDetailsModal({
   );
   const [submitError, setSubmitError] = React.useState("");
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const openModal = React.useCallback(() => {
+    setSubmitError("");
+    setIsOpen(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (onReady) {
+      onReady(openModal);
+    }
+  }, [onReady, openModal]);
+
   const productOptions = React.useMemo(() => {
     if (products.some((option) => option.name.toLowerCase() === product.toLowerCase())) {
       return products;
@@ -209,7 +212,7 @@ export function DocketDetailsModal({
     }
 
     const shouldDelete = window.confirm(
-      `Delete ${request.docketNumber}? It will be removed from the dashboard but kept in call history.`,
+      `Delete ${displayDocketNumber}? It will be removed from the dashboard but kept in call history.`,
     );
 
     if (!shouldDelete) {
@@ -262,7 +265,7 @@ export function DocketDetailsModal({
         <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
             <h3 className="break-words text-base font-semibold text-blue-950 sm:text-lg">
-              Docket Details - {request.docketNumber}
+              Docket Details - {displayDocketNumber}
               {assignedAtLabel ? (
                 <span className="mt-1 block text-xs font-medium text-blue-600 sm:ml-2 sm:mt-0 sm:inline">
                   Assigned: {assignedAtLabel}
@@ -300,7 +303,7 @@ export function DocketDetailsModal({
                       <div className="grid gap-3">
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                           <p className="mb-3 text-xs font-semibold text-slate-700">Primary contact</p>
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-3 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                             <EditFieldLabel label="Name 1">
                               <input value={name} onChange={(e) => setName(e.target.value)} className={inputClassName} placeholder="Contact Person 1" />
                             </EditFieldLabel>
@@ -310,14 +313,14 @@ export function DocketDetailsModal({
                               value={phoneNumber1}
                               onChange={setPhoneNumber1}
                               required
-                              inputClassName="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
-                              selectClassName="w-28 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
+                              inputClassName="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              selectClassName="w-16 shrink-0 rounded-md border border-slate-300 bg-white px-1.5 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                             />
                           </div>
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                           <p className="mb-3 text-xs font-semibold text-slate-700">Secondary contact</p>
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-3 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                             <EditFieldLabel label="Name 2">
                               <input value={contactPerson2} onChange={(e) => setContactPerson2(e.target.value)} className={inputClassName} placeholder="Contact Person 2" />
                             </EditFieldLabel>
@@ -326,8 +329,8 @@ export function DocketDetailsModal({
                               name="phoneNumber2"
                               value={phoneNumber2}
                               onChange={setPhoneNumber2}
-                              inputClassName="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
-                              selectClassName="w-28 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-base"
+                              inputClassName="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              selectClassName="w-16 shrink-0 rounded-md border border-slate-300 bg-white px-1.5 py-2 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                             />
                           </div>
                         </div>
@@ -536,7 +539,7 @@ export function DocketDetailsModal({
           }}
           className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-600"
         >
-          {request.docketNumber}
+          {displayDocketNumber}
         </button>
       )}
 

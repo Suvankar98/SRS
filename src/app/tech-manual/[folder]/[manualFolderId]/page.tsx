@@ -20,6 +20,7 @@ const TECH_MANUAL_FOLDERS = {
 
 type TechManualFolderDetailPageProps = {
   params: Promise<{ folder: string; manualFolderId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type TechManualDocument = {
@@ -31,7 +32,7 @@ type TechManualDocument = {
   youtubeUrl: string | null;
 };
 
-export default async function TechManualFolderDetailPage({ params }: TechManualFolderDetailPageProps) {
+export default async function TechManualFolderDetailPage({ params, searchParams }: TechManualFolderDetailPageProps) {
   const session = await getSession();
 
   if (!session) {
@@ -39,6 +40,8 @@ export default async function TechManualFolderDetailPage({ params }: TechManualF
   }
 
   const { folder, manualFolderId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const searchQuery = getSearchParamValue(resolvedSearchParams.q).trim();
   const categoryLabel = TECH_MANUAL_FOLDERS[folder as keyof typeof TECH_MANUAL_FOLDERS];
 
   if (!categoryLabel) {
@@ -59,6 +62,12 @@ export default async function TechManualFolderDetailPage({ params }: TechManualF
   }
 
   const canManageManual = roleCanAssign(session.role);
+  const documents = searchQuery
+    ? manualFolder.documents.filter((document) =>
+        [document.name, document.fileName ?? "", document.documentType, document.youtubeUrl ?? ""]
+          .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase())),
+      )
+    : manualFolder.documents;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -112,6 +121,18 @@ export default async function TechManualFolderDetailPage({ params }: TechManualF
             </form>
           </div>
         ) : null}
+        <form className="mt-4">
+          <label>
+            <span className="sr-only">Search documents</span>
+            <input
+              type="search"
+              name="q"
+              defaultValue={searchQuery}
+              placeholder="Search documents in this folder"
+              className="h-11 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-medium text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            />
+          </label>
+        </form>
       </section>
 
       <section className="mt-5 rounded-2xl border border-blue-200 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)]">
@@ -119,10 +140,14 @@ export default async function TechManualFolderDetailPage({ params }: TechManualF
           <p className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 px-4 py-8 text-center text-sm font-medium text-blue-600">
             No documents uploaded in this folder.
           </p>
+        ) : documents.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 px-4 py-8 text-center text-sm font-medium text-blue-600">
+            No documents match this search.
+          </p>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white">
             <div className="divide-y divide-blue-100">
-              {manualFolder.documents.map((document) => (
+              {documents.map((document) => (
                 <DocumentRow key={document.id} document={document} canManage={canManageManual} />
               ))}
             </div>
@@ -131,6 +156,14 @@ export default async function TechManualFolderDetailPage({ params }: TechManualF
       </section>
     </main>
   );
+}
+
+function getSearchParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
 }
 
 function DocumentRow({ document, canManage }: { document: TechManualDocument; canManage: boolean }) {

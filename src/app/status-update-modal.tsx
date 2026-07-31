@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateServiceCallStatus } from "./actions";
 import { getStatusLabel } from "./status-utils";
 import { EmployeeMediaUpload } from "./dashboard/employee-media-upload";
+import { formatDocketNumber } from "@/lib/docket";
 
 type StatusRequest = {
   id: string;
@@ -41,6 +42,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [hasUploadedMedia, setHasUploadedMedia] = React.useState(Boolean(request.mediaUploadedAt));
   const currentStatusLabel = getStatusLabel(request.status);
+  const displayDocketNumber = formatDocketNumber(request.docketNumber);
   const showWorkDoneInput = status === "In Process";
   const showCancelReasonInput = status === "Cancel";
   const showCompletedRemarkInput = status === "Completed";
@@ -137,7 +139,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 Update Call Status
               </h3>
               <p className="mt-1 text-sm text-blue-600">
-                Docket: {request.docketNumber} <span className="mx-2 text-blue-300">|</span> Current status: {currentStatusLabel}
+                Docket: {displayDocketNumber} <span className="mx-2 text-blue-300">|</span> Current status: {currentStatusLabel}
               </p>
             </div>
 

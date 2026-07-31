@@ -13,6 +13,7 @@ export type SavedCompanyOption = {
   phoneNumber2: string | null;
   area: string;
   fullAddress: string;
+  openDocketNumbers?: string[];
 };
 
 type CustomerDetailsFieldsProps = {
@@ -45,6 +46,10 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
       })
       .slice(0, 10);
   }, [company, savedCompanies]);
+  const duplicateWarning = React.useMemo(
+    () => getDuplicateWarning(savedCompanies, { company, phoneNumber1, phoneNumber2 }),
+    [company, phoneNumber1, phoneNumber2, savedCompanies],
+  );
 
   const handleSelectCompany = (option: SavedCompanyOption) => {
     setCompany(option.company);
@@ -96,9 +101,20 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
                 <span className="mt-1 block break-words text-xs leading-5 text-blue-700">
                   {formatSavedCustomerLocation(option)}
                 </span>
+                {option.openDocketNumbers && option.openDocketNumbers.length > 0 ? (
+                  <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
+                    Open: {option.openDocketNumbers.join(", ")}
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>
+        ) : null}
+        <FieldHint text="Required. Start typing to select an existing customer and auto-fill details." />
+        {duplicateWarning ? (
+          <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800">
+            {duplicateWarning}
+          </p>
         ) : null}
       </div>
 
@@ -150,6 +166,7 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
           className="w-full min-h-[3.5rem] max-h-56 resize-y rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
           required
         />
+        <FieldHint text="Required. Add landmark/building details so employees can reach the site quickly." />
       </label>
     </>
   );
@@ -185,6 +202,35 @@ function formatSavedCustomerLocation(option: SavedCompanyOption) {
   return [area, option.fullAddress].filter(Boolean).join(" | ") || "No address saved";
 }
 
+function getDuplicateWarning(
+  savedCompanies: SavedCompanyOption[],
+  draft: { company: string; phoneNumber1: string; phoneNumber2: string },
+) {
+  const companyKey = getSavedCompanySearchKey(draft.company);
+  const draftPhones = [draft.phoneNumber1, draft.phoneNumber2].map(getPhoneKey).filter(Boolean);
+  const matchingOpenDockets = savedCompanies
+    .filter((option) => option.openDocketNumbers && option.openDocketNumbers.length > 0)
+    .filter((option) => {
+      const optionPhones = [option.phoneNumber1, option.phoneNumber2 ?? ""].map(getPhoneKey).filter(Boolean);
+      return (
+        (companyKey !== "" && getSavedCompanySearchKey(option.company) === companyKey) ||
+        draftPhones.some((phone) => optionPhones.includes(phone))
+      );
+    })
+    .flatMap((option) => option.openDocketNumbers ?? []);
+
+  const uniqueDockets = Array.from(new Set(matchingOpenDockets));
+  if (uniqueDockets.length === 0) {
+    return "";
+  }
+
+  return `Possible duplicate: open service ${uniqueDockets.join(", ")} already exists for this customer/phone.`;
+}
+
+function getPhoneKey(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 type FieldProps = {
   label: string;
   name: string;
@@ -209,6 +255,11 @@ function Field({ label, name, value, onChange, placeholder, type = "text", requi
         className="w-full rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
         required={required}
       />
+      {required ? <FieldHint text="Required" /> : null}
     </label>
   );
+}
+
+function FieldHint({ text }: { text: string }) {
+  return <span className="mt-1.5 block text-xs font-medium text-blue-500">{text}</span>;
 }

@@ -56,6 +56,7 @@ export default function ReportFilters({
             <option value="In Process">In Process</option>
             <option value="Completed">Completed</option>
             <option value="Cancel">Cancel</option>
+            <option value="Deleted">Deleted</option>
           </select>
         </label>
 

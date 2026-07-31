@@ -1,3 +1,4 @@
+import { formatDocketNumber } from "./docket";
 import { normalizePhoneNumberForStorage } from "./phone";
 
 type AssignmentWhatsAppPayload = {
@@ -42,7 +43,7 @@ function buildAssignmentMessage(payload: AssignmentWhatsAppPayload) {
   return [
     `Hello ${payload.employeeName},`,
     `A new service call has been allocated to you.`,
-    `Docket: ${payload.docketNumber}`,
+    `Docket: ${formatDocketNumber(payload.docketNumber)}`,
     `Customer: ${payload.customerName}`,
     `Company: ${payload.company}`,
     `Primary Phone: ${payload.phoneNumber1}`,
@@ -62,7 +63,7 @@ function buildCustomerComplaintRegisteredMessage(payload: CustomerComplaintRegis
   return [
     `Hello ${payload.customerName},`,
     `Your complaint has been registered successfully.`,
-    `Docket Number: ${payload.docketNumber}`,
+    `Docket Number: ${formatDocketNumber(payload.docketNumber)}`,
     `Please keep this docket number for future reference.`,
   ]
     .filter((line): line is string => Boolean(line))

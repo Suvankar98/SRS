@@ -3,6 +3,7 @@ import type {
   EmployeeReportPointCell,
   EmployeeReportRow,
 } from "@/lib/employee-report";
+import { formatDocketNumber } from "@/lib/docket";
 import { EmployeeReportDownloadButton } from "./employee-report-download-button";
 
 const DAY_WISE_MAX_POINTS = 20;
@@ -128,7 +129,7 @@ function EmployeeReportCompanyDockets({ companyDockets }: { companyDockets: Empl
       {companyDockets.map((entry) => (
         <div key={`${entry.companyName}-${entry.docketNumber}`}>
           <p className="break-words font-semibold text-blue-950">{entry.companyName}</p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{entry.docketNumber}</p>
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{formatDocketNumber(entry.docketNumber)}</p>
         </div>
       ))}
     </div>
@@ -265,7 +266,7 @@ function formatCompanyDocketsForExport(companyDockets: EmployeeReportCompanyDock
     return "-";
   }
 
-  return companyDockets.map((entry) => `${entry.companyName} / ${entry.docketNumber}`).join("; ");
+  return companyDockets.map((entry) => `${entry.companyName} / ${formatDocketNumber(entry.docketNumber)}`).join("; ");
 }
 
 function formatPointDelta(value: number | null) {

@@ -32,6 +32,8 @@ export type EmployeeReportPointAdjustment = {
   createdAt: Date;
 };
 
+import { formatDocketNumber } from "@/lib/docket";
+
 export type EmployeeReportPointCell = {
   label: string;
   points: number | null;
@@ -133,12 +135,13 @@ function getOrCreateEmployeeReportRow(rows: Map<string, EmployeeReportRow>, date
 }
 
 function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: EmployeeReportRequest) {
-  const exists = row.companyDockets.some((entry) => entry.docketNumber === request.docketNumber);
+  const docketNumber = formatDocketNumber(request.docketNumber);
+  const exists = row.companyDockets.some((entry) => entry.docketNumber === docketNumber);
 
   if (!exists) {
     row.companyDockets.push({
       companyName: request.company,
-      docketNumber: request.docketNumber,
+      docketNumber,
     });
   }
 }

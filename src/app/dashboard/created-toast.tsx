@@ -2,6 +2,8 @@
 
 import React from "react";
 
+import { formatDocketNumber } from "@/lib/docket";
+
 export default function CreatedToast({
   docket,
   newCompanyStored = false,
@@ -11,11 +13,11 @@ export default function CreatedToast({
 }) {
   React.useEffect(() => {
     if (!docket && !newCompanyStored) return;
+    const displayDocket = formatDocketNumber(docket);
     const el = document.createElement("div");
     el.className = "fixed top-6 right-6 z-50 rounded-md bg-emerald-600 px-4 py-2 text-white shadow-lg";
-    el.textContent = newCompanyStored
-      ? `New service created: ${docket}. New company data stored.`
-      : `New service created: ${docket}`;
+    const createdMessage = displayDocket ? `New service created: ${displayDocket}` : "New service created";
+    el.textContent = newCompanyStored ? `${createdMessage}. New company data stored.` : createdMessage;
     document.body.appendChild(el);
     const t = setTimeout(() => {
       el.remove();

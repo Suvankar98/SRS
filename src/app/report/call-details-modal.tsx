@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 
+import { formatDocketNumber } from "@/lib/docket";
+
 type Activity = {
   id: string;
   type: string;
@@ -69,6 +71,7 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
 
   const timelineEvents = getTimelineEvents(request);
   const lastAttendedBy = getLastAttendedBy(request);
+  const displayDocketNumber = formatDocketNumber(request.docketNumber);
 
   return (
     <>
@@ -95,7 +98,7 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <h2 className="min-w-0 break-words text-2xl font-semibold leading-tight text-blue-950">{request.company}</h2>
                     <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
-                      {request.docketNumber}
+                      {displayDocketNumber}
                     </span>
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-600">{request.name}</p>
@@ -210,7 +213,7 @@ function getTimelineEvents(request: TimelineRequest): TimelineEvent[] {
       type: "created",
       label: "Service Request Created",
       timestamp: request.createdAt,
-      details: `Created docket ${request.docketNumber}`,
+      details: `Created docket ${formatDocketNumber(request.docketNumber)}`,
       color: "blue",
     },
   ];

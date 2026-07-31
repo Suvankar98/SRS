@@ -7,6 +7,7 @@ import { EmployeeReportPopup } from "./employee-report-popup";
 import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
+import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 import { getProductOptions } from "@/lib/product-options";
 import { ATTENDANCE_IN_POINTS, ATTENDANCE_OUT_POINTS } from "@/lib/employee-performance-rules";
@@ -562,7 +563,7 @@ function EmployeeReportCompanyDockets({ companyDockets }: { companyDockets: Empl
       {companyDockets.map((entry) => (
         <div key={`${entry.companyName}-${entry.docketNumber}`}>
           <p className="break-words font-semibold text-blue-950">{entry.companyName}</p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{entry.docketNumber}</p>
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-blue-500">{formatDocketNumber(entry.docketNumber)}</p>
         </div>
       ))}
     </div>
@@ -771,12 +772,13 @@ function getOrCreateEmployeeReportRow(rows: Map<string, EmployeeReportRow>, date
 }
 
 function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: EmployeeReportRequest) {
-  const exists = row.companyDockets.some((entry) => entry.docketNumber === request.docketNumber);
+  const docketNumber = formatDocketNumber(request.docketNumber);
+  const exists = row.companyDockets.some((entry) => entry.docketNumber === docketNumber);
 
   if (!exists) {
     row.companyDockets.push({
       companyName: request.company,
-      docketNumber: request.docketNumber,
+      docketNumber,
     });
   }
 }
@@ -1063,6 +1065,11 @@ function filterRequests<
     fullAddress: string;
     status: string | null;
     assignedToId: string | null;
+    closedByName?: string | null;
+    lastAttemptByName?: string | null;
+    assignments?: Array<{
+      employee?: { name: string } | null;
+    }>;
   },
 >(requests: T[], searchQuery: string, selectedStatuses: DashboardStatus[]) {
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -1074,6 +1081,7 @@ function filterRequests<
       normalizedQuery === "" ||
       [
         request.docketNumber,
+        formatDocketNumber(request.docketNumber),
         request.name,
         request.company,
         request.contactPerson2 || "",
@@ -1084,6 +1092,9 @@ function filterRequests<
         request.phoneNumber2 || "",
         request.complaintDetails || "",
         request.fullAddress,
+        request.closedByName || "",
+        request.lastAttemptByName || "",
+        ...(request.assignments?.map((assignment) => assignment.employee?.name || "") ?? []),
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
 
     return matchesStatus && matchesSearch;

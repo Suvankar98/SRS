@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { normalizeStatus } from "@/app/status-utils";
 import { getSession, roleCanAssign } from "@/lib/auth";
+import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -84,7 +85,7 @@ export async function GET(_request: Request, context: RouteContext) {
   return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${safeFileName(serviceRequest.docketNumber)}-details.pdf"`,
+      "Content-Disposition": `attachment; filename="${safeFileName(formatDocketNumber(serviceRequest.docketNumber))}-details.pdf"`,
       "Cache-Control": "no-store",
     },
   });
@@ -137,7 +138,7 @@ async function buildServiceRequestPdf(request: {
 
   drawText("SRS Service Request Details", { size: 16, font: boldFont, color: rgb(0.02, 0.08, 0.22) });
   y -= 22;
-  drawText(`${request.company} | ${request.docketNumber}`, { size: 12, font: boldFont, color: rgb(0.04, 0.2, 0.55) });
+  drawText(`${request.company} | ${formatDocketNumber(request.docketNumber)}`, { size: 12, font: boldFont, color: rgb(0.04, 0.2, 0.55) });
   y -= 18;
   drawText(`Generated: ${formatDateTime(new Date())}`, { size: 8.5, color: rgb(0.35, 0.42, 0.52) });
   y -= 22;
@@ -193,7 +194,7 @@ async function buildServiceRequestPdf(request: {
     : [{
         type: "created",
         title: "Service Request Created",
-        details: `Created docket ${request.docketNumber}`,
+        details: `Created docket ${formatDocketNumber(request.docketNumber)}`,
         status: request.status,
         statusReason: null,
         actorName: null,

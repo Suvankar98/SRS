@@ -2,19 +2,22 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 
 import ReportFilters from "../report/report-filters";
+import { DashboardMediaPopup } from "../dashboard/dashboard-media-popup";
 import { ReportCallDetailsModal } from "../report/call-details-modal";
 import { CallHistoryExportLinks } from "./export-links";
 import { CallHistoryColumnToggle } from "./row-toggle";
 import { normalizeStatus, getStatusPillClass, getStatusLabel } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
+import { formatDocketNumber } from "@/lib/docket";
+import { getDashboardMediaItemsByRequestIds } from "@/lib/gallery";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
+type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel" | "Deleted";
 
-const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
+const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel", "Deleted"];
 const CALL_HISTORY_COLUMNS = [
   { id: "docket", label: "Docket" },
   { id: "customer", label: "Company" },
@@ -22,6 +25,7 @@ const CALL_HISTORY_COLUMNS = [
   { id: "call-type", label: "Call Type" },
   { id: "amount", label: "Amount" },
   { id: "assigned-to", label: "Assigned To" },
+  { id: "completed-by", label: "Completed By" },
   { id: "assigned-date", label: "Assigned Date" },
   { id: "status", label: "Status" },
   { id: "deleted-by", label: "Deleted By" },
@@ -117,6 +121,21 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           name: true,
         },
       },
+      assignments: {
+        orderBy: { assignedAt: "asc" },
+        select: {
+          assignedAt: true,
+          status: true,
+          closedAt: true,
+          statusSubmittedAt: true,
+          employee: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
       activities: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -135,6 +154,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     },
     orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
+  const mediaByRequestId = await getDashboardMediaItemsByRequestIds(calls.map((request) => request.id));
 
   const activeFilters = getActiveFilterCount({
     searchQuery,
@@ -227,6 +247,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                     <th data-call-history-column="call-type" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
                     <th data-call-history-column="amount" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
                     <th data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
+                    <th data-call-history-column="completed-by" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Completed By</th>
                     <th data-call-history-column="assigned-date" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned Date</th>
                     <th data-call-history-column="status" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
                     <th data-call-history-column="deleted-by" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Deleted By</th>
@@ -237,10 +258,15 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                   {calls.map((request) => {
                     const status = normalizeStatus(request.status);
                     const isDeleted = Boolean(request.deletedAt);
+                    const isCompleted = !isDeleted && status === "Completed";
+                    const assignedEmployeeChips = getCallHistoryEmployeeChips(request);
+                    const completedEmployeeChips = getCallHistoryCompletedByChips(request);
+                    const assignedAt = getCallHistoryAssignedAt(request);
+                    const mediaItems = isCompleted ? mediaByRequestId.get(request.id) ?? [] : [];
 
                     return (
                       <tr key={request.id}>
-                        <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{request.docketNumber}</td>
+                        <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{formatDocketNumber(request.docketNumber)}</td>
                         <td data-call-history-column="customer" className="px-2.5 py-2.5 text-blue-900">
                           <div>
                             <ReportCallDetailsModal request={request} triggerContent={request.company} />
@@ -259,18 +285,36 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                         <td data-call-history-column="amount" className="px-2.5 py-2.5 font-medium text-blue-900">
                           {request.serviceBillingType === "chargeable" ? formatINR(request.chargeableAmount || 0) : formatINR(0)}
                         </td>
-                        <td data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-blue-900">{request.assignedTo?.name ?? "Unassigned"}</td>
+                        <td data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-blue-900">
+                          {assignedEmployeeChips.length > 0 ? (
+                            <EmployeeFilterChips chips={assignedEmployeeChips} baseQuery={exportQuery} />
+                          ) : (
+                            "Unassigned"
+                          )}
+                        </td>
+                        <td data-call-history-column="completed-by" className="px-2.5 py-2.5 text-blue-900">
+                          {completedEmployeeChips.length > 0 ? (
+                            <EmployeeFilterChips chips={completedEmployeeChips} baseQuery={exportQuery} />
+                          ) : (
+                            <span className="text-blue-400">-</span>
+                          )}
+                        </td>
                         <td data-call-history-column="assigned-date" className="px-2.5 py-2.5 text-blue-900">
-                          {request.assignedAt ? formatDateTime(request.assignedAt) : <span className="text-blue-400">-</span>}
+                          {assignedAt ? formatDateTime(assignedAt) : <span className="text-blue-400">-</span>}
                         </td>
                         <td data-call-history-column="status" className="px-2.5 py-2.5">
-                          <span
-                            className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-                              isDeleted ? "bg-rose-100 text-rose-800 ring-rose-300" : getStatusPillClass(status)
-                            }`}
-                          >
-                            {isDeleted ? "Deleted" : getStatusLabel(status)}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                                isDeleted ? "bg-rose-100 text-rose-800 ring-rose-300" : getStatusPillClass(status)
+                              }`}
+                            >
+                              {isDeleted ? "Deleted" : getStatusLabel(status)}
+                            </span>
+                            {mediaItems.length > 0 ? (
+                              <DashboardMediaPopup docketNumber={formatDocketNumber(request.docketNumber)} mediaItems={mediaItems} variant="icon" />
+                            ) : null}
+                          </div>
                         </td>
                         <td data-call-history-column="deleted-by" className="px-2.5 py-2.5 text-blue-900">
                           {isDeleted ? (
@@ -327,8 +371,18 @@ function buildReportWhere({
         { docketNumber: { contains: searchQuery, mode: "insensitive" } },
         { name: { contains: searchQuery, mode: "insensitive" } },
         { company: { contains: searchQuery, mode: "insensitive" } },
+        { contactPerson2: { contains: searchQuery, mode: "insensitive" } },
+        { phoneNumber1: { contains: searchQuery, mode: "insensitive" } },
+        { phoneNumber2: { contains: searchQuery, mode: "insensitive" } },
+        { fullAddress: { contains: searchQuery, mode: "insensitive" } },
         { area: { contains: searchQuery, mode: "insensitive" } },
+        { product: { contains: searchQuery, mode: "insensitive" } },
         { callType: { contains: searchQuery, mode: "insensitive" } },
+        { serviceBillingType: { contains: searchQuery, mode: "insensitive" } },
+        { closedByName: { contains: searchQuery, mode: "insensitive" } },
+        { deletedByName: { contains: searchQuery, mode: "insensitive" } },
+        { assignments: { some: { employee: { name: { contains: searchQuery, mode: "insensitive" } } } } },
+        { activities: { some: { employeeName: { contains: searchQuery, mode: "insensitive" } } } },
       ],
     });
   }
@@ -338,9 +392,26 @@ function buildReportWhere({
   }
 
   if (selectedEmployee === "unassigned") {
-    andClauses.push({ assignedToId: null });
-  } else if (selectedEmployee !== "" && employees.some((employee) => employee.id === selectedEmployee)) {
-    andClauses.push({ assignedToId: selectedEmployee });
+    andClauses.push({
+      assignedToId: null,
+      assignments: { none: {} },
+      closedByName: null,
+    });
+  } else if (selectedEmployee !== "") {
+    const employee = employees.find((employeeOption) => employeeOption.id === selectedEmployee);
+    if (!employee) {
+      return { docketNumber: "__no_matching_employee__" };
+    }
+
+    andClauses.push({
+      OR: [
+        { assignedToId: selectedEmployee },
+        { assignments: { some: { employeeId: selectedEmployee } } },
+        { closedByName: { equals: employee.name, mode: "insensitive" } },
+        { lastAttemptByName: { equals: employee.name, mode: "insensitive" } },
+        { activities: { some: { employeeName: { equals: employee.name, mode: "insensitive" } } } },
+      ],
+    });
   }
 
   if (selectedCallType !== "") {
@@ -358,7 +429,12 @@ function buildReportWhere({
 
   const assignedAtFilter = getDateRangeFilter(assignedFromDate, assignedToDate);
   if (assignedAtFilter) {
-    andClauses.push({ assignedAt: assignedAtFilter });
+    andClauses.push({
+      OR: [
+        { assignedAt: assignedAtFilter },
+        { assignments: { some: { assignedAt: assignedAtFilter } } },
+      ],
+    });
   }
 
   if (andClauses.length === 0) {
@@ -369,14 +445,20 @@ function buildReportWhere({
 }
 
 function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhereInput {
+  if (status === "Deleted") {
+    return { deletedAt: { not: null } };
+  }
+
   if (status === "New Call") {
     return {
+      deletedAt: null,
       OR: [{ status: null }, { status: "New Call" }, { status: "Pending" }, { status: "New" }],
     };
   }
 
   if (status === "In Process") {
     return {
+      deletedAt: null,
       OR: [
         { status: "In Process" },
         { status: "in process" },
@@ -389,11 +471,13 @@ function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhe
 
   if (status === "Completed") {
     return {
+      deletedAt: null,
       OR: [{ status: "Completed" }, { status: "Close" }, { status: "Closed" }],
     };
   }
 
   return {
+    deletedAt: null,
     OR: [{ status: "Cancel" }, { status: "Cancelled" }, { status: "Canceled" }],
   };
 }
@@ -417,13 +501,9 @@ function parseDateInput(value: string, endOfDay: boolean): Date | null {
     return null;
   }
 
-  const date = new Date(`${value}T00:00:00.000Z`);
+  const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+05:30`);
   if (Number.isNaN(date.getTime())) {
     return null;
-  }
-
-  if (endOfDay) {
-    date.setUTCHours(23, 59, 59, 999);
   }
 
   return date;
@@ -486,6 +566,142 @@ function getActiveFilterCount({
     assignedFromDate,
     assignedToDate,
   ].filter((value) => value !== "").length;
+}
+
+type CallHistoryAssignmentDisplay = {
+  assignedAt: Date | null;
+  status: string | null;
+  closedAt: Date | null;
+  statusSubmittedAt: Date | null;
+  employee: { id: string; name: string } | null;
+};
+
+type CallHistoryRequestDisplay = {
+  status: string | null;
+  assignedAt: Date | null;
+  closedByName: string | null;
+  closedAt?: Date | null;
+  assignedToId?: string | null;
+  assignedTo: { name: string } | null;
+  assignments?: CallHistoryAssignmentDisplay[];
+};
+
+type EmployeeFilterChip = {
+  id: string | null;
+  name: string;
+};
+
+function EmployeeFilterChips({ chips, baseQuery }: { chips: EmployeeFilterChip[]; baseQuery: string }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {chips.map((chip) =>
+        chip.id ? (
+          <a
+            key={`${chip.id}:${chip.name}`}
+            href={getEmployeeFilterHref(chip.id, baseQuery)}
+            className="inline-flex max-w-36 items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100"
+            title={`Filter by ${chip.name}`}
+          >
+            <span className="truncate">{chip.name}</span>
+          </a>
+        ) : (
+          <span
+            key={`name:${chip.name}`}
+            className="inline-flex max-w-36 items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700"
+          >
+            <span className="truncate">{chip.name}</span>
+          </span>
+        ),
+      )}
+    </div>
+  );
+}
+
+function getCallHistoryEmployeeChips(request: CallHistoryRequestDisplay) {
+  const assignments = request.assignments ?? [];
+  const chips = assignments
+    .map((assignment) => getEmployeeChip(assignment.employee?.name, assignment.employee?.id ?? null))
+    .filter((chip): chip is EmployeeFilterChip => Boolean(chip));
+
+  if (chips.length === 0) {
+    const fallbackChip = getEmployeeChip(request.assignedTo?.name, request.assignedToId ?? null);
+    if (fallbackChip) {
+      chips.push(fallbackChip);
+    }
+  }
+
+  return getUniqueEmployeeChips(chips);
+}
+
+function getCallHistoryCompletedByChips(request: CallHistoryRequestDisplay) {
+  const isCompleted = normalizeStatus(request.status) === "Completed" || Boolean(request.closedAt);
+
+  if (!isCompleted) {
+    return [];
+  }
+
+  const assignments = request.assignments ?? [];
+  const completedAssignments = assignments.filter((assignment) => {
+    return normalizeStatus(assignment.status) === "Completed" || Boolean(assignment.closedAt || assignment.statusSubmittedAt);
+  });
+  const preferredAssignments = completedAssignments.length > 0 ? completedAssignments : assignments;
+  const chips = preferredAssignments
+    .map((assignment) => getEmployeeChip(assignment.employee?.name, assignment.employee?.id ?? null))
+    .filter((chip): chip is EmployeeFilterChip => Boolean(chip));
+
+  if (chips.length === 0) {
+    const fallbackChip = getEmployeeChip(request.closedByName, null);
+    if (fallbackChip) {
+      chips.push(fallbackChip);
+    }
+  }
+
+  return getUniqueEmployeeChips(chips);
+}
+
+function getCallHistoryAssignedAt(request: CallHistoryRequestDisplay) {
+  const assignmentDates = (request.assignments ?? [])
+    .map((assignment) => assignment.assignedAt)
+    .filter((date): date is Date => Boolean(date))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  return assignmentDates[0] ?? request.assignedAt;
+}
+
+function getEmployeeChip(name: string | null | undefined, id: string | null): EmployeeFilterChip | null {
+  const trimmedName = name?.trim();
+
+  if (!trimmedName) {
+    return null;
+  }
+
+  return {
+    id,
+    name: trimmedName,
+  };
+}
+
+function getUniqueEmployeeChips(chips: EmployeeFilterChip[]) {
+  const seen = new Set<string>();
+  const uniqueChips: EmployeeFilterChip[] = [];
+
+  for (const chip of chips) {
+    const key = chip.id || chip.name.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    uniqueChips.push(chip);
+  }
+
+  return uniqueChips;
+}
+
+function getEmployeeFilterHref(employeeId: string, baseQuery: string) {
+  const params = new URLSearchParams(baseQuery);
+  params.set("employeeId", employeeId);
+  return `/call-history?${params.toString()}`;
 }
 
 function formatDateTime(value: Date) {

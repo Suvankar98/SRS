@@ -5,13 +5,14 @@ import { NextResponse } from "next/server";
 import { normalizeStatus } from "@/app/status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
+import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel";
+type CanonicalStatus = "New Call" | "In Process" | "Completed" | "Cancel" | "Deleted";
 
-const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel"];
+const STATUS_ORDER: CanonicalStatus[] = ["New Call", "In Process", "Completed", "Cancel", "Deleted"];
 const CALL_HISTORY_EXPORT_COLUMNS = [
   { id: "docket", label: "Docket" },
   { id: "customer", label: "Company" },
@@ -19,6 +20,7 @@ const CALL_HISTORY_EXPORT_COLUMNS = [
   { id: "call-type", label: "Call Type" },
   { id: "amount", label: "Amount" },
   { id: "assigned-to", label: "Assigned To" },
+  { id: "completed-by", label: "Completed By" },
   { id: "assigned-date", label: "Assigned Date" },
   { id: "status", label: "Status" },
   { id: "deleted-by", label: "Deleted By" },
@@ -40,7 +42,15 @@ type ExportRequestRow = {
   deletedByName: string | null;
   createdAt: Date;
   assignedAt: Date | null;
+  closedByName: string | null;
   assignedTo: { name: string } | null;
+  assignments: Array<{
+    assignedAt: Date;
+    status: string | null;
+    closedAt: Date | null;
+    statusSubmittedAt: Date | null;
+    employee: { name: string } | null;
+  }>;
 };
 
 export async function GET(request: Request) {
@@ -99,7 +109,18 @@ export async function GET(request: Request) {
       deletedByName: true,
       createdAt: true,
       assignedAt: true,
+      closedByName: true,
       assignedTo: { select: { name: true } },
+      assignments: {
+        orderBy: { assignedAt: "asc" },
+        select: {
+          assignedAt: true,
+          status: true,
+          closedAt: true,
+          statusSubmittedAt: true,
+          employee: { select: { name: true } },
+        },
+      },
     },
     orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
@@ -354,6 +375,7 @@ function getPdfTableColumns(columns: ExportColumn[], contentWidth: number) {
     "call-type": 1.25,
     amount: 0.9,
     "assigned-to": 1.1,
+    "completed-by": 1.1,
     "assigned-date": 1.35,
     status: 0.95,
     "deleted-by": 1.2,
@@ -513,8 +535,17 @@ function buildReportWhere({
         { docketNumber: { contains: searchQuery, mode: "insensitive" } },
         { name: { contains: searchQuery, mode: "insensitive" } },
         { company: { contains: searchQuery, mode: "insensitive" } },
+        { contactPerson2: { contains: searchQuery, mode: "insensitive" } },
+        { phoneNumber1: { contains: searchQuery, mode: "insensitive" } },
+        { phoneNumber2: { contains: searchQuery, mode: "insensitive" } },
+        { fullAddress: { contains: searchQuery, mode: "insensitive" } },
         { area: { contains: searchQuery, mode: "insensitive" } },
+        { product: { contains: searchQuery, mode: "insensitive" } },
         { callType: { contains: searchQuery, mode: "insensitive" } },
+        { serviceBillingType: { contains: searchQuery, mode: "insensitive" } },
+        { closedByName: { contains: searchQuery, mode: "insensitive" } },
+        { deletedByName: { contains: searchQuery, mode: "insensitive" } },
+        { assignments: { some: { employee: { name: { contains: searchQuery, mode: "insensitive" } } } } },
       ],
     });
   }
@@ -524,9 +555,25 @@ function buildReportWhere({
   }
 
   if (selectedEmployee === "unassigned") {
-    andClauses.push({ assignedToId: null });
-  } else if (selectedEmployee !== "" && employees.some((employee) => employee.id === selectedEmployee)) {
-    andClauses.push({ assignedToId: selectedEmployee });
+    andClauses.push({
+      assignedToId: null,
+      assignments: { none: {} },
+      closedByName: null,
+    });
+  } else if (selectedEmployee !== "") {
+    const employee = employees.find((employeeOption) => employeeOption.id === selectedEmployee);
+    if (!employee) {
+      return { docketNumber: "__no_matching_employee__" };
+    }
+
+    andClauses.push({
+      OR: [
+        { assignedToId: selectedEmployee },
+        { assignments: { some: { employeeId: selectedEmployee } } },
+        { closedByName: { equals: employee.name, mode: "insensitive" } },
+        { lastAttemptByName: { equals: employee.name, mode: "insensitive" } },
+      ],
+    });
   }
 
   if (selectedCallType !== "") {
@@ -544,7 +591,12 @@ function buildReportWhere({
 
   const assignedAtFilter = getDateRangeFilter(assignedFromDate, assignedToDate);
   if (assignedAtFilter) {
-    andClauses.push({ assignedAt: assignedAtFilter });
+    andClauses.push({
+      OR: [
+        { assignedAt: assignedAtFilter },
+        { assignments: { some: { assignedAt: assignedAtFilter } } },
+      ],
+    });
   }
 
   if (andClauses.length === 0) {
@@ -555,14 +607,20 @@ function buildReportWhere({
 }
 
 function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhereInput {
+  if (status === "Deleted") {
+    return { deletedAt: { not: null } };
+  }
+
   if (status === "New Call") {
     return {
+      deletedAt: null,
       OR: [{ status: null }, { status: "New Call" }, { status: "Pending" }, { status: "New" }],
     };
   }
 
   if (status === "In Process") {
     return {
+      deletedAt: null,
       OR: [
         { status: "In Process" },
         { status: "in process" },
@@ -575,11 +633,13 @@ function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhe
 
   if (status === "Completed") {
     return {
+      deletedAt: null,
       OR: [{ status: "Completed" }, { status: "Close" }, { status: "Closed" }],
     };
   }
 
   return {
+    deletedAt: null,
     OR: [{ status: "Cancel" }, { status: "Cancelled" }, { status: "Canceled" }],
   };
 }
@@ -603,13 +663,9 @@ function parseDateInput(value: string, endOfDay: boolean): Date | null {
     return null;
   }
 
-  const date = new Date(`${value}T00:00:00.000Z`);
+  const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+05:30`);
   if (Number.isNaN(date.getTime())) {
     return null;
-  }
-
-  if (endOfDay) {
-    date.setUTCHours(23, 59, 59, 999);
   }
 
   return date;
@@ -643,7 +699,7 @@ function getVisibleExportColumns(value: string | null): ExportColumn[] {
 }
 
 function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId, target: "csv" | "pdf" = "csv") {
-  if (columnId === "docket") return row.docketNumber;
+  if (columnId === "docket") return formatDocketNumber(row.docketNumber);
   if (columnId === "customer") return `${row.company} / ${row.name}`;
   if (columnId === "area") return row.area;
   if (columnId === "call-type") {
@@ -655,11 +711,58 @@ function getExportCellValue(row: ExportRequestRow, columnId: ExportColumnId, tar
     const amount = row.serviceBillingType === "chargeable" ? row.chargeableAmount ?? 0 : 0;
     return target === "pdf" ? formatINRPlain(amount) : formatINR(amount);
   }
-  if (columnId === "assigned-to") return row.assignedTo?.name ?? "Unassigned";
-  if (columnId === "assigned-date") return row.assignedAt ? formatDateTime(row.assignedAt) : "-";
+  if (columnId === "assigned-to") return getExportEmployeeNames(row).join(", ") || "Unassigned";
+  if (columnId === "completed-by") return getExportCompletedByNames(row).join(", ") || "-";
+  if (columnId === "assigned-date") {
+    const assignedAt = getExportAssignedAt(row);
+    return assignedAt ? formatDateTime(assignedAt) : "-";
+  }
   if (columnId === "status") return row.deletedAt ? "Deleted" : normalizeStatus(row.status);
   if (columnId === "deleted-by") return row.deletedAt ? row.deletedByName || "Unknown" : "-";
   return formatDateTime(row.createdAt);
+}
+
+function getExportEmployeeNames(row: ExportRequestRow) {
+  const names = row.assignments
+    .map((assignment) => assignment.employee?.name)
+    .filter((name): name is string => Boolean(name?.trim()));
+
+  if (names.length === 0 && row.assignedTo?.name) {
+    names.push(row.assignedTo.name);
+  }
+
+  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+}
+
+function getExportCompletedByNames(row: ExportRequestRow) {
+  const isCompleted = normalizeStatus(row.status) === "Completed" || Boolean(row.closedByName);
+
+  if (!isCompleted) {
+    return [];
+  }
+
+  const completedAssignments = row.assignments.filter((assignment) => {
+    return normalizeStatus(assignment.status) === "Completed" || Boolean(assignment.closedAt || assignment.statusSubmittedAt);
+  });
+  const preferredAssignments = completedAssignments.length > 0 ? completedAssignments : row.assignments;
+  const names = preferredAssignments
+    .map((assignment) => assignment.employee?.name)
+    .filter((name): name is string => Boolean(name?.trim()));
+
+  if (names.length === 0 && row.closedByName) {
+    names.push(row.closedByName);
+  }
+
+  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+}
+
+function getExportAssignedAt(row: ExportRequestRow) {
+  const assignmentDates = row.assignments
+    .map((assignment) => assignment.assignedAt)
+    .filter((date): date is Date => Boolean(date))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  return assignmentDates[0] ?? row.assignedAt;
 }
 
 function getChargeableTotal(requests: ExportRequestRow[]) {

@@ -8,6 +8,7 @@ import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardMediaPopup } from "./dashboard-media-popup";
 import { DashboardRequestRow } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
+import { formatDocketNumber } from "@/lib/docket";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -287,15 +288,14 @@ export function DashboardRequestList({
         {paginatedItems.map((request) => {
           const isCompletedRequest = isClosedStatus(request.status);
           const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
+          const priority = getDashboardPriority(request);
+          const assignedEmployeeNames = getAssignedEmployeeNames(request);
+          const displayDocketNumber = formatDocketNumber(request.docketNumber);
 
           return (
           <article
             key={request.id}
-            className={`rounded-2xl border p-3 text-sm text-blue-900 shadow-sm ${
-              !isEmployee && isClosedStatus(request.status)
-                ? "border-emerald-300 bg-emerald-50"
-                : "border-blue-200 bg-white"
-            }`}
+            className={`rounded-2xl border p-3 text-sm text-blue-900 shadow-sm ${priority.cardClassName}`}
           >
             <div className="mb-3 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -314,18 +314,19 @@ export function DashboardRequestList({
                           open();
                         }}
                         className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-300 bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-800 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        aria-label={`Open docket details for ${request.docketNumber}`}
+                        aria-label={`Open docket details for ${displayDocketNumber}`}
                       >
-                        <span className="min-w-0">{request.docketNumber}</span>
+                        <span className="min-w-0">{displayDocketNumber}</span>
                         <OpenDocketIcon />
                       </button>
                     )}
                   />
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <span className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] bg-red-100 text-red-800 ring-1 ring-inset ring-red-300">
-                    {getComplaintAgeLabel(request)}
+                  <span className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] ring-1 ring-inset ${priority.badgeClassName}`}>
+                    {priority.label}
                   </span>
+                  <span className="text-[10px] font-semibold text-slate-500">{getComplaintAgeLabel(request)}</span>
                   {isEmployee && request.assignedToId ? <EmployeeCountdownBadge request={request} /> : null}
                 </div>
               </div>
@@ -374,20 +375,29 @@ export function DashboardRequestList({
                 </>
               ) : null}
               {isEmployee ? (
-                <div className="col-span-2 flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50/70 px-2.5 py-2 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Status</p>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <StatusUpdateModal request={request} />
-                    <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
+                  <div className="col-span-2 flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50/70 px-2.5 py-2 shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Status</p>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <StatusUpdateModal request={request} />
+                      <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-2">
               <div className="flex-1" />
               {canAssign ? (
                 <div className="space-y-2">
+                  {assignedEmployeeNames.length > 1 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {assignedEmployeeNames.map((name) => (
+                        <span key={name} className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
                     <p className="text-xs font-semibold text-blue-900">
                       <span className="text-[10px] uppercase tracking-[0.08em] text-blue-600">Assigned to:</span> {request.assignedTo?.name ?? "Unassigned"}
@@ -893,6 +903,89 @@ function getDayNumberInTimeZone(value: Date, timeZone: string) {
 
 function isClosedStatus(status: string | null) {
   return normalizeStatus(status) === "Completed";
+}
+
+function getAssignedEmployeeNames(request: DashboardListRequest) {
+  const names = request.assignments
+    ?.map((assignment) => assignment.employee?.name)
+    .filter((name): name is string => Boolean(name?.trim())) ?? [];
+
+  if (names.length === 0 && request.assignedTo?.name) {
+    names.push(request.assignedTo.name);
+  }
+
+  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+}
+
+function getDashboardPriority(request: DashboardListRequest) {
+  const status = normalizeStatus(request.status);
+
+  if (status === "Completed") {
+    return {
+      label: "Completed",
+      cardClassName: "border-emerald-300 bg-emerald-50",
+      badgeClassName: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+    };
+  }
+
+  if (isDashboardRequestOverdue(request)) {
+    return {
+      label: "Overdue",
+      cardClassName: "border-rose-300 bg-rose-50",
+      badgeClassName: "bg-rose-100 text-rose-800 ring-rose-300",
+    };
+  }
+
+  const createdAt = getParsedDate(request.createdAt);
+  if (createdAt && getLocalDateKey(createdAt) === getLocalDateKey(new Date())) {
+    return {
+      label: "Today",
+      cardClassName: "border-sky-300 bg-sky-50",
+      badgeClassName: "bg-sky-100 text-sky-800 ring-sky-300",
+    };
+  }
+
+  return {
+    label: "Pending",
+    cardClassName: "border-blue-200 bg-white",
+    badgeClassName: "bg-amber-100 text-amber-800 ring-amber-300",
+  };
+}
+
+function isDashboardRequestOverdue(request: DashboardListRequest) {
+  if (["Completed", "Cancel"].includes(normalizeStatus(request.status))) {
+    return false;
+  }
+
+  const assignedDates = [
+    getParsedDate(request.assignedAt),
+    ...(request.assignments ?? []).map((assignment) =>
+      ["Completed", "Cancel"].includes(normalizeStatus(assignment.status))
+        ? null
+        : getParsedDate(assignment.assignedAt),
+    ),
+  ].filter((date): date is Date => Boolean(date));
+  const earliestAssignedAt = assignedDates.sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+
+  if (!earliestAssignedAt) {
+    return false;
+  }
+
+  return Date.now() > getAssignmentDeadline(earliestAssignedAt).getTime();
+}
+
+function getAssignmentDeadline(assignedAt: Date) {
+  const assignedDay = new Date(assignedAt);
+  return new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate(), 24, 0, 0);
+}
+
+function getLocalDateKey(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

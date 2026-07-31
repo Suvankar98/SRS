@@ -2,6 +2,8 @@
 
 import React from "react";
 
+import { formatDocketNumber } from "@/lib/docket";
+
 import { deleteGalleryMedia } from "../actions";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 
@@ -21,10 +23,19 @@ export type GalleryClientItem = {
 
 export function GalleryClient({ items }: { items: GalleryClientItem[] }) {
   const [query, setQuery] = React.useState("");
-  const filteredItems = React.useMemo(() => filterGalleryItems(items, query), [items, query]);
+  const [employeeFilter, setEmployeeFilter] = React.useState("");
+  const [dateFilter, setDateFilter] = React.useState("");
+  const filteredItems = React.useMemo(
+    () => filterGalleryItems(items, { query, employeeFilter, dateFilter }),
+    [dateFilter, employeeFilter, items, query],
+  );
   const totalImages = items.filter((item) => item.type === "image").length;
   const totalVideos = items.length - totalImages;
   const companyCount = new Set(items.map((item) => item.company)).size;
+  const employeeOptions = React.useMemo(
+    () => Array.from(new Set(items.map((item) => item.uploadedByName).filter(Boolean))).sort(),
+    [items],
+  );
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -43,6 +54,32 @@ export function GalleryClient({ items }: { items: GalleryClientItem[] }) {
               placeholder="Type employee name, docket, company, or file name"
               className="mt-4 min-h-11 w-full max-w-2xl rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-medium text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white"
             />
+            <div className="mt-3 grid max-w-2xl gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.12em] text-blue-600">Employee</span>
+                <select
+                  value={employeeFilter}
+                  onChange={(event) => setEmployeeFilter(event.currentTarget.value)}
+                  className="min-h-10 w-full rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
+                >
+                  <option value="">All employees</option>
+                  {employeeOptions.map((employee) => (
+                    <option key={employee} value={employee}>
+                      {employee}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.12em] text-blue-600">Upload Date</span>
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(event) => setDateFilter(event.currentTarget.value)}
+                  className="min-h-10 w-full rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-blue-400 focus:bg-white"
+                />
+              </label>
+            </div>
           </div>
           <div className="grid grid-cols-4 overflow-hidden rounded-xl border border-blue-100 bg-blue-50/70 text-center">
             <GalleryStat label="Files" value={items.length} />
@@ -100,7 +137,7 @@ function GalleryCard({ item }: { item: GalleryClientItem }) {
     <article className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.12)]">
       <div className="border-b border-blue-100 bg-blue-50/70 px-3.5 py-2.5">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-500">Docket</p>
-        <p className="mt-0.5 text-sm font-extrabold text-blue-950">{item.docketNumber}</p>
+        <p className="mt-0.5 text-sm font-extrabold text-blue-950">{formatDocketNumber(item.docketNumber)}</p>
       </div>
       <a href={item.url} target="_blank" rel="noreferrer noopener" className="group block" title="Open full size">
         <div className="relative aspect-[4/3] overflow-hidden bg-slate-950 text-white">
@@ -176,17 +213,38 @@ function EmptyGallery() {
   );
 }
 
-function filterGalleryItems(items: GalleryClientItem[], query: string) {
-  const normalizedQuery = query.trim().toLowerCase();
+function filterGalleryItems(
+  items: GalleryClientItem[],
+  filters: { query: string; employeeFilter: string; dateFilter: string },
+) {
+  const normalizedQuery = filters.query.trim().toLowerCase();
+  const normalizedEmployee = filters.employeeFilter.trim().toLowerCase();
 
-  if (!normalizedQuery) {
-    return items;
+  return items.filter((item) => {
+    const matchesQuery =
+      normalizedQuery === "" ||
+      [item.uploadedByName, item.docketNumber, item.company, item.fileName, item.requestId]
+        .some((value) => value.toLowerCase().includes(normalizedQuery));
+    const matchesEmployee =
+      normalizedEmployee === "" || item.uploadedByName.trim().toLowerCase() === normalizedEmployee;
+    const matchesDate = filters.dateFilter === "" || getGalleryDateInput(item.uploadedAt) === filters.dateFilter;
+
+    return matchesQuery && matchesEmployee && matchesDate;
+  });
+}
+
+function getGalleryDateInput(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
   }
 
-  return items.filter((item) =>
-    [item.uploadedByName, item.docketNumber, item.company, item.fileName, item.requestId]
-      .some((value) => value.toLowerCase().includes(normalizedQuery)),
-  );
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function ImageIcon() {

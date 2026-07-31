@@ -11,6 +11,7 @@ import {
   formatINRCurrency,
   normalizeStatus,
 } from "../status-utils";
+import { formatDocketNumber } from "@/lib/docket";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -103,6 +104,7 @@ export function DashboardRequestRow({
 }) {
   const openModalRef = React.useRef<() => void>(() => {});
   const showReorderControls = Boolean(canEditDocket && !isEmployee && draggable);
+  const displayDocketNumber = formatDocketNumber(request.docketNumber);
 
   const getComplaintAgeLabel = (request: DashboardRequestRowRequest) => {
     const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
@@ -352,6 +354,8 @@ export function DashboardRequestRow({
   };
   const isCompletedRequest = isClosedStatus(request.status);
   const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
+  const priority = getDashboardPriority(request);
+  const assignedEmployeeNames = getAssignedEmployeeNames(request);
 
   return (
     <tr
@@ -382,7 +386,7 @@ export function DashboardRequestRow({
         }
       }}
       tabIndex={canEditDocket ? 0 : -1}
-      className={`align-top text-blue-900 ${!isEmployee && isClosedStatus(request.status) ? "bg-emerald-50/80" : ""} ${canEditDocket ? "cursor-pointer" : ""}`}
+      className={`align-top text-blue-900 ${priority.rowClassName} ${canEditDocket ? "cursor-pointer" : ""}`}
     >
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs font-semibold text-blue-950">
         <div className="flex items-start gap-2">
@@ -402,7 +406,7 @@ export function DashboardRequestRow({
                     : "border-blue-100 bg-white text-slate-400 hover:border-blue-300 hover:text-blue-500 focus:ring-blue-200"
                 }`}
                 title={isStarred ? "Move back" : "Move to top"}
-                aria-label={isStarred ? `Move ${request.docketNumber} back` : `Move ${request.docketNumber} to top`}
+                aria-label={isStarred ? `Move ${displayDocketNumber} back` : `Move ${displayDocketNumber} to top`}
                 aria-pressed={isStarred}
               >
                 <StarIcon filled={isStarred} />
@@ -428,9 +432,9 @@ export function DashboardRequestRow({
                     open();
                   }}
                   className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-300 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-800 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  aria-label={`Open docket details for ${request.docketNumber}`}
+                  aria-label={`Open docket details for ${displayDocketNumber}`}
                 >
-                  <span className="min-w-0 truncate">{request.docketNumber}</span>
+                  <span className="min-w-0 truncate">{displayDocketNumber}</span>
                   <OpenDocketIcon />
                 </button>
               )}
@@ -447,7 +451,10 @@ export function DashboardRequestRow({
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
         <div className="flex flex-col gap-2">
-          <span className="inline-flex max-w-full rounded-md bg-red-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.04em] text-red-800 ring-1 ring-inset ring-red-300">{getComplaintAgeLabel(request)}</span>
+          <span className={`inline-flex max-w-full rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.04em] ring-1 ring-inset ${priority.badgeClassName}`}>
+            {priority.label}
+          </span>
+          <span className="text-[10px] font-semibold text-slate-500">{getComplaintAgeLabel(request)}</span>
           {isEmployee && request.assignedToId ? renderAssignmentBadge(request) : renderLastAttemptBadge()}
         </div>
       </td>
@@ -470,7 +477,7 @@ export function DashboardRequestRow({
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
         {isEmployee ? (
-          <div className="whitespace-nowrap">
+          <div className="space-y-1 whitespace-nowrap">
             <StatusUpdateModal request={request} />
           </div>
         ) : (
@@ -483,6 +490,15 @@ export function DashboardRequestRow({
       {canAssign ? (
         <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
           <div className="space-y-2">
+            {assignedEmployeeNames.length > 1 ? (
+              <div className="flex flex-wrap gap-1">
+                {assignedEmployeeNames.map((name) => (
+                  <span key={name} className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {isClosedStatus(request.status) ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
                 <p className="text-xs font-semibold text-emerald-900">
@@ -508,9 +524,93 @@ export function DashboardRequestRow({
   );
 }
 
+function getAssignedEmployeeNames(request: DashboardRequestRowRequest) {
+  const names = request.assignments
+    ?.map((assignment) => assignment.employee?.name)
+    .filter((name): name is string => Boolean(name?.trim())) ?? [];
+
+  if (names.length === 0 && request.assignedTo?.name) {
+    names.push(request.assignedTo.name);
+  }
+
+  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+}
+
+function getDashboardPriority(request: DashboardRequestRowRequest) {
+  const status = normalizeStatus(request.status);
+
+  if (status === "Completed") {
+    return {
+      label: "Completed",
+      rowClassName: "bg-emerald-50/80",
+      badgeClassName: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+    };
+  }
+
+  if (isDashboardRequestOverdue(request)) {
+    return {
+      label: "Overdue",
+      rowClassName: "bg-rose-50/60",
+      badgeClassName: "bg-rose-100 text-rose-800 ring-rose-300",
+    };
+  }
+
+  const createdAt = getParsedDate(request.createdAt);
+  if (createdAt && getLocalDateKey(createdAt) === getLocalDateKey(new Date())) {
+    return {
+      label: "Today",
+      rowClassName: "bg-sky-50/60",
+      badgeClassName: "bg-sky-100 text-sky-800 ring-sky-300",
+    };
+  }
+
+  return {
+    label: "Pending",
+    rowClassName: "",
+    badgeClassName: "bg-amber-100 text-amber-800 ring-amber-300",
+  };
+}
+
+function isDashboardRequestOverdue(request: DashboardRequestRowRequest) {
+  if (["Completed", "Cancel"].includes(normalizeStatus(request.status))) {
+    return false;
+  }
+
+  const assignedDates = [
+    getParsedDate(request.assignedAt),
+    ...(request.assignments ?? []).map((assignment) =>
+      ["Completed", "Cancel"].includes(normalizeStatus(assignment.status))
+        ? null
+        : getParsedDate(assignment.assignedAt),
+    ),
+  ].filter((date): date is Date => Boolean(date));
+  const earliestAssignedAt = assignedDates.sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+
+  if (!earliestAssignedAt) {
+    return false;
+  }
+
+  return Date.now() > getAssignmentDeadline(earliestAssignedAt).getTime();
+}
+
+function getAssignmentDeadline(assignedAt: Date) {
+  const assignedDay = new Date(assignedAt);
+  return new Date(assignedDay.getFullYear(), assignedDay.getMonth(), assignedDay.getDate(), 24, 0, 0);
+}
+
+function getLocalDateKey(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
 function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const entries = getPreviousStatusEntries(request);
+  const displayDocketNumber = formatDocketNumber(request.docketNumber);
 
   return (
     <>
@@ -537,7 +637,7 @@ function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest
             <div className="flex items-start justify-between gap-3 border-b border-blue-200 px-5 py-4">
               <div>
                 <h3 className="text-base font-semibold text-blue-950">Previous Status</h3>
-                <p className="mt-1 text-xs font-medium text-blue-600">{request.docketNumber}</p>
+                <p className="mt-1 text-xs font-medium text-blue-600">{displayDocketNumber}</p>
               </div>
               <button
                 type="button"

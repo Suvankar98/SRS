@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 
 type DashboardGalleryItem = {
@@ -89,7 +90,7 @@ export async function getDashboardGalleryItems(): Promise<DashboardGalleryItem[]
         }
 
         const stat = await fs.promises.stat(path.join(folder.requestPath, file.name));
-        const docketNumber = request?.docketNumber ?? folder.requestId;
+        const docketNumber = formatDocketNumber(request?.docketNumber ?? folder.requestId);
         const company = request?.company ?? "Unknown Company";
 
         items.push({
