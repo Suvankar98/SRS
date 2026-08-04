@@ -1616,6 +1616,7 @@ export async function updateServiceCallStatus(formData: FormData) {
       request: {
         select: {
           createdAt: true,
+          docketNumber: true,
           assignedAt: true,
           assignedToId: true,
           status: true,
@@ -1635,6 +1636,7 @@ export async function updateServiceCallStatus(formData: FormData) {
       where: { id: requestId },
       select: {
         createdAt: true,
+        docketNumber: true,
         assignedAt: true,
         assignedToId: true,
         status: true,
@@ -1668,6 +1670,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         request: {
           select: {
             createdAt: true,
+            docketNumber: true,
             assignedAt: true,
             assignedToId: true,
             status: true,
@@ -1751,6 +1754,8 @@ export async function updateServiceCallStatus(formData: FormData) {
             .filter((updatedAssignment) => normalizeStatus(updatedAssignment.status) === "Completed")
             .sort((a, b) => (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0))[0] ?? latestAssignment
         : null;
+    const shouldClearPriorityStar = aggregateStatus === "Completed" || aggregateStatus === "Cancel";
+    const hadPriorityStar = (assignment.request.dashboardOrder ?? 0) < 0;
 
     await transaction.serviceRequest.update({
       where: { id: requestId },
@@ -1769,7 +1774,7 @@ export async function updateServiceCallStatus(formData: FormData) {
         statusSubmittedAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
         statusPointsDelta: latestAssignment?.statusPointsDelta ?? null,
         reviewPointsDelta: null,
-        dashboardOrder: null,
+        dashboardOrder: shouldClearPriorityStar ? null : undefined,
         lastAttemptByName: latestAssignment?.employee?.name ?? employeeName,
         lastAttemptAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
         closedByName: completedAssignment?.employee?.name ?? null,
@@ -1791,6 +1796,22 @@ export async function updateServiceCallStatus(formData: FormData) {
       employeeName,
       createdAt: submittedAt,
     });
+
+    if (shouldClearPriorityStar && hadPriorityStar) {
+      await addServiceActivity(transaction, {
+        requestId,
+        type: "priority-unstarred",
+        title: "Priority Star Removed",
+        details: `${employeeName} removed the priority star from ${formatDocketNumber(assignment.request.docketNumber)} by marking the call ${aggregateStatus}`,
+        status: aggregateStatus,
+        actorId: session.userId,
+        actorName: employeeName,
+        actorRole: getActorRoleLabel(session.role),
+        employeeId: session.userId,
+        employeeName,
+        createdAt: submittedAt,
+      });
+    }
 
     if (performancePointsIncrement !== 0) {
       await transaction.user.update({
@@ -1821,12 +1842,31 @@ export async function updateManagerServiceStatus(formData: FormData) {
   const submittedAt = status === "New Call" ? null : new Date();
   const closedAt = status === "Completed" ? submittedAt : null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { name: true },
-  });
-  const closedByName = status === "Completed" ? user?.name || "Admin / Manager" : null;
+  const [user, previousRequest] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    }),
+    prisma.serviceRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        docketNumber: true,
+        dashboardOrder: true,
+        deletedAt: true,
+      },
+    }),
+  ]);
 
+  if (!previousRequest || previousRequest.deletedAt) {
+    redirect("/dashboard");
+  }
+
+  const actorName = user?.name || "Admin / Manager";
+  const actorRole = getActorRoleLabel(session.role);
+  const closedByName = status === "Completed" ? actorName : null;
+  const shouldClearPriorityStar = status === "Completed" || status === "Cancel";
+  const hadPriorityStar = (previousRequest.dashboardOrder ?? 0) < 0;
+  const statusActivityAt = submittedAt ?? new Date();
   await prisma.$transaction(async (transaction) => {
     await transaction.serviceRequest.update({
       where: { id: requestId },
@@ -1838,6 +1878,7 @@ export async function updateManagerServiceStatus(formData: FormData) {
         statusSubmittedAt: submittedAt,
         customerReview: null,
         reviewPointsDelta: null,
+        dashboardOrder: shouldClearPriorityStar ? null : undefined,
         closedByName,
         closedAt,
       },
@@ -1847,14 +1888,28 @@ export async function updateManagerServiceStatus(formData: FormData) {
       requestId,
       type: status === "Completed" ? "completed" : "manager-status",
       title: status === "Completed" ? "Service Request Completed" : "Status Updated by Admin / Manager",
-      details: `${user?.name || "Admin / Manager"} changed status to ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
+      details: `${actorName} changed status to ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
       status,
       statusReason: reasonValue || null,
       actorId: session.userId,
-      actorName: user?.name || "Admin / Manager",
-      actorRole: getActorRoleLabel(session.role),
-      createdAt: submittedAt ?? new Date(),
+      actorName,
+      actorRole,
+      createdAt: statusActivityAt,
     });
+
+    if (shouldClearPriorityStar && hadPriorityStar) {
+      await addServiceActivity(transaction, {
+        requestId,
+        type: "priority-unstarred",
+        title: "Priority Star Removed",
+        details: `${actorName} removed the priority star from ${formatDocketNumber(previousRequest.docketNumber)} by changing status to ${status}`,
+        status,
+        actorId: session.userId,
+        actorName,
+        actorRole,
+        createdAt: statusActivityAt,
+      });
+    }
 
     await transaction.serviceAssignment.updateMany({
       where: { requestId },

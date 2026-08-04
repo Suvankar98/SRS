@@ -280,6 +280,7 @@ function getActivityColor(type: string) {
   if (type === "assigned") return "green";
   if (type === "completed" || type === "closed") return "purple";
   if (type === "deleted") return "rose";
+  if (type === "priority-starred" || type === "priority-unstarred") return "green";
   if (type === "status" || type === "manager-status") return "amber";
   return "slate";
 }
@@ -311,6 +312,8 @@ function getIconForType(type: string) {
     completed: "CL",
     closed: "CL",
     deleted: "DL",
+    "priority-starred": "PS",
+    "priority-unstarred": "PU",
   };
 
   return icons[type] || "EV";

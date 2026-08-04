@@ -401,7 +401,7 @@ export function DashboardRequestRow({
                 className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition focus:outline-none focus:ring-2 ${
                   isStarred
                     ? isOldPriorityStar
-                      ? "border-amber-300 bg-amber-50 text-emerald-600 focus:ring-amber-300"
+                      ? "border-emerald-300 bg-emerald-100 text-emerald-700 focus:ring-emerald-300"
                       : "border-amber-300 bg-amber-100 text-amber-600 focus:ring-amber-300"
                     : "border-blue-100 bg-white text-slate-400 hover:border-blue-300 hover:text-blue-500 focus:ring-blue-200"
                 }`}

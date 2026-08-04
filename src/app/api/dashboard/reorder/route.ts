@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession, roleCanAssign } from "@/lib/auth";
+import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 
 const PRIORITY_DAY_FACTOR = 10000;
@@ -46,6 +47,10 @@ function getTodayPriorityDay() {
   return Math.floor(Date.UTC(year, month - 1, day) / (1000 * 60 * 60 * 24));
 }
 
+function getActorRoleLabel(role: string) {
+  return role === "ADMIN" ? "Admin" : role === "MANAGER" ? "Manager" : "Employee";
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
 
@@ -64,18 +69,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "No requests supplied" }, { status: 400 });
     }
 
-    await prisma.$transaction(
-      requestIds.map((requestId, index) =>
-        prisma.serviceRequest.update({
+    const actor = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    });
+    const actorName = actor?.name ?? "Admin / Manager";
+    const actorRole = getActorRoleLabel(session.role);
+
+    await prisma.$transaction(async (transaction) => {
+      const previousRequests = await transaction.serviceRequest.findMany({
+        where: { id: { in: requestIds } },
+        select: {
+          id: true,
+          docketNumber: true,
+          dashboardOrder: true,
+          status: true,
+        },
+      });
+      const previousRequestById = new Map(previousRequests.map((entry) => [entry.id, entry]));
+
+      for (const [index, requestId] of requestIds.entries()) {
+        await transaction.serviceRequest.update({
           where: { id: requestId },
           data: {
             dashboardOrder: starredRequestIds.has(requestId)
               ? -((starredDays.get(requestId) ?? todayPriorityDay) * PRIORITY_DAY_FACTOR + index + 1)
               : index + 1,
           },
-        }),
-      ),
-    );
+        });
+
+        const previousRequest = previousRequestById.get(requestId);
+        if (!previousRequest) {
+          continue;
+        }
+
+        const wasStarred = (previousRequest.dashboardOrder ?? 0) < 0;
+        const isStarred = starredRequestIds.has(requestId);
+        if (wasStarred === isStarred) {
+          continue;
+        }
+
+        await transaction.serviceRequestActivity.create({
+          data: {
+            requestId,
+            type: isStarred ? "priority-starred" : "priority-unstarred",
+            title: isStarred ? "Priority Star Marked" : "Priority Star Unmarked",
+            details: isStarred
+              ? `${actorName} marked ${formatDocketNumber(previousRequest.docketNumber)} as priority`
+              : `${actorName} removed priority star from ${formatDocketNumber(previousRequest.docketNumber)}`,
+            status: previousRequest.status,
+            actorId: session.userId,
+            actorName,
+            actorRole,
+          },
+        });
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
