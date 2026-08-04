@@ -167,22 +167,32 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     assignedFromDate,
     assignedToDate,
   });
-  const exportParams = new URLSearchParams();
-  if (searchQuery !== "") exportParams.set("q", searchQuery);
-  if (selectedStatus !== "") exportParams.set("status", selectedStatus);
-  if (selectedEmployee !== "") exportParams.set("employeeId", selectedEmployee);
-  if (selectedCallType !== "") exportParams.set("callType", selectedCallType);
-  if (selectedServiceBillingType !== "") exportParams.set("serviceBillingType", selectedServiceBillingType);
-  if (fromDate !== "") exportParams.set("from", fromDate);
-  if (toDate !== "") exportParams.set("to", toDate);
-  if (assignedFromDate !== "") exportParams.set("assignedFrom", assignedFromDate);
-  if (assignedToDate !== "") exportParams.set("assignedTo", assignedToDate);
+  const baseParams = new URLSearchParams();
+  if (searchQuery !== "") baseParams.set("q", searchQuery);
+  if (selectedStatus !== "") baseParams.set("status", selectedStatus);
+  if (selectedEmployee !== "") baseParams.set("employeeId", selectedEmployee);
+  if (selectedCallType !== "") baseParams.set("callType", selectedCallType);
+  if (selectedServiceBillingType !== "") baseParams.set("serviceBillingType", selectedServiceBillingType);
+  if (fromDate !== "") baseParams.set("from", fromDate);
+  if (toDate !== "") baseParams.set("to", toDate);
+  if (assignedFromDate !== "") baseParams.set("assignedFrom", assignedFromDate);
+  if (assignedToDate !== "") baseParams.set("assignedTo", assignedToDate);
+  const baseQuery = baseParams.toString();
+  const firstServiceDate = getEarliestCreatedAt(calls);
+  const reportFromDate = fromDate || (firstServiceDate ? getDateInputValue(firstServiceDate) : "");
+  const reportToDate = toDate || getDateInputValue(new Date());
+  const exportParams = new URLSearchParams(baseQuery);
+  if (reportFromDate !== "") exportParams.set("from", reportFromDate);
+  if (reportToDate !== "") exportParams.set("to", reportToDate);
   const exportQuery = exportParams.toString();
   const isChargeableServiceFilter = selectedCallType === "Service" && selectedServiceBillingType === "chargeable";
   const chargeableTotal = isChargeableServiceFilter
     ? calls.reduce((total, request) => total + (request.chargeableAmount ?? 0), 0)
     : 0;
   const serviceCountLabel = calls.length === 1 ? "1 service" : `${calls.length} services`;
+  const reportRangeLabel = reportFromDate
+    ? `From ${formatDateInputLabel(reportFromDate)} to ${formatDateInputLabel(reportToDate)}`
+    : `Till ${formatDateInputLabel(reportToDate)}`;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -240,9 +250,14 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           <CallHistoryColumnToggle
             columns={CALL_HISTORY_COLUMNS}
             centerContent={
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
-                {serviceCountLabel}
-              </span>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+                  {serviceCountLabel}
+                </span>
+                <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                  {reportRangeLabel}
+                </span>
+              </div>
             }
           >
             <div className="mt-3 overflow-x-auto">
@@ -295,14 +310,14 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                         </td>
                         <td data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-blue-900">
                           {assignedEmployeeChips.length > 0 ? (
-                            <EmployeeFilterChips chips={assignedEmployeeChips} baseQuery={exportQuery} />
+                            <EmployeeFilterChips chips={assignedEmployeeChips} baseQuery={baseQuery} />
                           ) : (
                             "Unassigned"
                           )}
                         </td>
                         <td data-call-history-column="completed-by" className="px-2.5 py-2.5 text-blue-900">
                           {completedEmployeeChips.length > 0 ? (
-                            <EmployeeFilterChips chips={completedEmployeeChips} baseQuery={exportQuery} />
+                            <EmployeeFilterChips chips={completedEmployeeChips} baseQuery={baseQuery} />
                           ) : (
                             <span className="text-blue-400">-</span>
                           )}
@@ -488,6 +503,40 @@ function getStatusWhereClause(status: CanonicalStatus): Prisma.ServiceRequestWhe
     deletedAt: null,
     OR: [{ status: "Cancel" }, { status: "Cancelled" }, { status: "Canceled" }],
   };
+}
+
+function getEarliestCreatedAt(requests: Array<{ createdAt: Date }>) {
+  return requests.reduce<Date | null>((earliest, request) => {
+    if (!earliest || request.createdAt.getTime() < earliest.getTime()) {
+      return request.createdAt;
+    }
+
+    return earliest;
+  }, null);
+}
+
+function getDateInputValue(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
+function formatDateInputLabel(value: string) {
+  const parsed = parseDateInput(value, false);
+
+  if (!parsed) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(parsed);
 }
 
 function getDateRangeFilter(fromDate: string, toDate: string): Prisma.DateTimeFilter | undefined {
