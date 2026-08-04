@@ -182,6 +182,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const chargeableTotal = isChargeableServiceFilter
     ? calls.reduce((total, request) => total + (request.chargeableAmount ?? 0), 0)
     : 0;
+  const serviceCountLabel = calls.length === 1 ? "1 service" : `${calls.length} services`;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -232,7 +233,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       ) : null}
 
       <section className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+            {serviceCountLabel}
+          </span>
+        </div>
         {calls.length === 0 ? (
           <p className="mt-3 text-sm text-blue-700">No call history found for selected filters.</p>
         ) : (
