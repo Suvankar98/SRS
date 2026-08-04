@@ -10,13 +10,14 @@ type CallHistoryColumnToggleItem = {
 type CallHistoryColumnToggleProps = {
   children: ReactNode;
   columns: CallHistoryColumnToggleItem[];
+  centerContent?: ReactNode;
 };
 
 export const CALL_HISTORY_VISIBLE_COLUMNS_STORAGE_KEY = "srs-call-history-visible-columns";
 export const CALL_HISTORY_VISIBLE_COLUMNS_EVENT = "srs-call-history-visible-columns-change";
 const DEFAULT_VISIBLE_MIGRATION_COLUMNS = ["assigned-date", "completed-by"];
 
-export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryColumnToggleProps) {
+export function CallHistoryColumnToggle({ children, columns = [], centerContent }: CallHistoryColumnToggleProps) {
   const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
   const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>(() => getInitialHiddenColumnIds(columns));
   const visibleCount = columns.length - hiddenColumnIds.length;
@@ -50,11 +51,12 @@ export function CallHistoryColumnToggle({ children, columns = [] }: CallHistoryC
             .join("\n")}
         </style>
       ) : null}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <p className="text-sm font-medium text-blue-700">
           {visibleCount} of {columns.length} columns visible
         </p>
-        <details className="relative">
+        <div className="justify-self-start sm:justify-self-center">{centerContent}</div>
+        <details className="relative justify-self-start sm:justify-self-end">
           <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-blue-700 outline-none transition hover:bg-blue-100 focus:ring-2 focus:ring-blue-200">
             Heads
             <span aria-hidden="true" className="text-sm leading-none">&gt;</span>

@@ -233,16 +233,18 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       ) : null}
 
       <section className="rounded-[1.6rem] border border-blue-200 bg-white p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
-          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
-            {serviceCountLabel}
-          </span>
-        </div>
+        <h2 className="text-lg font-semibold text-blue-950">Call History</h2>
         {calls.length === 0 ? (
           <p className="mt-3 text-sm text-blue-700">No call history found for selected filters.</p>
         ) : (
-          <CallHistoryColumnToggle columns={CALL_HISTORY_COLUMNS}>
+          <CallHistoryColumnToggle
+            columns={CALL_HISTORY_COLUMNS}
+            centerContent={
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+                {serviceCountLabel}
+              </span>
+            }
+          >
             <div className="mt-3 overflow-x-auto">
               <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
                 <thead className="bg-blue-50 text-blue-700">
