@@ -41,3 +41,439 @@ body {
   background: #dc2626;
   border-color: #f87171;
 }
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root.dark {
+  --background: #07111f;
+  --foreground: #dbeafe;
+  color-scheme: dark;
+}
+
+.dark body {
+  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 34%), linear-gradient(180deg, #07111f 0%, #0b1220 100%) !important;
+  color: #dbeafe !important;
+}
+
+.dark ::selection {
+  background: rgba(56, 189, 248, 0.32);
+  color: #f8fbff;
+}
+
+.dark .theme-toggle {
+  border-color: rgba(125, 211, 252, 0.36) !important;
+  background: rgba(15, 23, 42, 0.92) !important;
+  color: #e0f2fe !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38) !important;
+}
+
+.dark .theme-toggle > span:first-child {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border-color: rgba(125, 211, 252, 0.28) !important;
+}
+
+.dark .theme-toggle > span:first-child > span {
+  background: #38bdf8 !important;
+  color: #082f49 !important;
+}
+
+.dark .bg-white,
+.dark .bg-white\/95,
+.dark .bg-slate-50,
+.dark .bg-slate-50\/70,
+.dark .bg-blue-50,
+.dark .bg-blue-50\/40,
+.dark .bg-blue-50\/50,
+.dark .bg-blue-50\/60,
+.dark .bg-blue-50\/70,
+.dark .bg-\[\#f4f9ff\],
+.dark .bg-\[\#eef6ff\] {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-emerald-50,
+.dark .bg-emerald-100 {
+  background-color: rgba(6, 78, 59, 0.34) !important;
+}
+
+.dark .bg-red-50,
+.dark .bg-rose-50,
+.dark .bg-rose-100 {
+  background-color: rgba(127, 29, 29, 0.36) !important;
+}
+
+.dark .bg-amber-50,
+.dark .bg-amber-100,
+.dark .bg-yellow-50,
+.dark .bg-yellow-100 {
+  background-color: rgba(113, 63, 18, 0.34) !important;
+}
+
+.dark .bg-blue-100,
+.dark .bg-sky-50,
+.dark .bg-sky-100 {
+  background-color: rgba(30, 64, 175, 0.28) !important;
+}
+
+.dark [class~="bg-[#0170C3]"],
+.dark [class~="bg-[#0759b8]"] {
+  background-color: #0759b8 !important;
+}
+
+.dark aside .bg-white,
+.dark header .bg-white,
+.dark summary.bg-\[\#0759b8\] {
+  background-color: #f8fbff !important;
+}
+
+.dark aside .text-\[\#0759b8\],
+.dark header .text-\[\#0759b8\] {
+  color: #0759b8 !important;
+}
+
+.dark .border-blue-100,
+.dark .border-blue-200,
+.dark .border-blue-300,
+.dark .border-slate-200,
+.dark .border-slate-300,
+.dark .border-white,
+.dark .border-white\/25,
+.dark .border-white\/10 {
+  border-color: rgba(125, 211, 252, 0.26) !important;
+}
+
+.dark .border-emerald-200 {
+  border-color: rgba(52, 211, 153, 0.38) !important;
+}
+
+.dark .border-red-200,
+.dark .border-rose-200,
+.dark .border-rose-300 {
+  border-color: rgba(251, 113, 133, 0.42) !important;
+}
+
+.dark .border-amber-200,
+.dark .border-amber-300 {
+  border-color: rgba(251, 191, 36, 0.42) !important;
+}
+
+.dark .text-\[\#003d73\],
+.dark .text-blue-950,
+.dark .text-blue-900,
+.dark .text-slate-950,
+.dark .text-slate-900 {
+  color: #eaf2ff !important;
+}
+
+.dark .text-blue-800,
+.dark .text-blue-700,
+.dark .text-blue-600,
+.dark .text-blue-500,
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #bfdbfe !important;
+}
+
+.dark .text-emerald-950,
+.dark .text-emerald-800,
+.dark .text-emerald-700 {
+  color: #a7f3d0 !important;
+}
+
+.dark .text-red-700,
+.dark .text-rose-700,
+.dark .text-rose-800,
+.dark .text-rose-500 {
+  color: #fecdd3 !important;
+}
+
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-yellow-700,
+.dark .text-yellow-800 {
+  color: #fde68a !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0b1220 !important;
+  border-color: rgba(125, 211, 252, 0.32) !important;
+  color: #eaf2ff !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(191, 219, 254, 0.58) !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.16) !important;
+}
+
+.dark table,
+.dark tbody,
+.dark tr,
+.dark .divide-blue-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(125, 211, 252, 0.18) !important;
+}
+
+.dark thead,
+.dark .bg-blue-50.text-blue-700 {
+  background-color: rgba(15, 23, 42, 0.96) !important;
+  color: #bfdbfe !important;
+}
+
+.dark .shadow-sm,
+.dark .shadow-xl,
+.dark .shadow-2xl,
+.dark [class*="shadow-["] {
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28) !important;
+}
+
+.dark .ring-blue-100,
+.dark .ring-blue-200,
+.dark .ring-blue-300 {
+  --tw-ring-color: rgba(56, 189, 248, 0.28) !important;
+}
+
+.dark .danger-btn {
+  background: #b91c1c;
+  border-color: rgba(252, 165, 165, 0.46);
+}
+
+/* Dark-mode polish pass for gradient/opacity utility combinations used across dashboards and modals. */
+.dark .bg-white\/80,
+.dark .bg-white\/70,
+.dark .bg-white\/60,
+.dark .bg-white\/50,
+.dark .bg-white\/40,
+.dark .bg-slate-100,
+.dark .bg-slate-100\/70,
+.dark .bg-slate-100\/80,
+.dark .bg-blue-100\/70,
+.dark .bg-blue-100\/80,
+.dark .bg-cyan-50,
+.dark .bg-cyan-50\/70,
+.dark .bg-indigo-50,
+.dark .bg-indigo-50\/70,
+.dark .bg-violet-50,
+.dark .bg-violet-100 {
+  background-color: #111c30 !important;
+}
+
+.dark .bg-gradient-to-br,
+.dark .bg-gradient-to-r {
+  background-image: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.92), rgba(8, 47, 73, 0.72)) !important;
+}
+
+.dark main.bg-\[radial-gradient\(circle_at_top_left\,_rgba\(59\,130\,246\,0\.16\)\,_transparent_40\%\)\,linear-gradient\(135deg\,_\#f8fbff_0\%\,_\#eef6ff_100\%\)\] {
+  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 42%), linear-gradient(135deg, #07111f 0%, #0b1220 100%) !important;
+}
+
+.dark aside.bg-gradient-to-b {
+  background-image: linear-gradient(180deg, #0759b8 0%, #064f9f 48%, #042a5f 100%) !important;
+}
+
+.dark .bg-rose-50\/60,
+.dark tr.bg-rose-50\/60,
+.dark .bg-red-50\/60,
+.dark tr.bg-red-50\/60 {
+  background-color: rgba(76, 29, 49, 0.64) !important;
+}
+
+.dark .bg-emerald-50\/80,
+.dark tr.bg-emerald-50\/80,
+.dark .bg-emerald-50\/70,
+.dark .bg-emerald-50\/60 {
+  background-color: rgba(6, 78, 59, 0.44) !important;
+}
+
+.dark .bg-sky-50\/60,
+.dark tr.bg-sky-50\/60,
+.dark .bg-sky-50\/70,
+.dark .bg-cyan-50\/70 {
+  background-color: rgba(8, 47, 73, 0.52) !important;
+}
+
+.dark .bg-amber-50\/60,
+.dark .bg-amber-50\/70,
+.dark .bg-yellow-50\/60,
+.dark .bg-yellow-50\/70 {
+  background-color: rgba(113, 63, 18, 0.42) !important;
+}
+
+.dark .bg-blue-950 {
+  background-color: #172554 !important;
+}
+
+.dark .bg-blue-700,
+.dark .bg-blue-800,
+.dark .bg-blue-600,
+.dark .bg-cyan-600,
+.dark .bg-indigo-600 {
+  background-color: #2563eb !important;
+}
+
+.dark .text-cyan-700,
+.dark .text-cyan-800,
+.dark .text-indigo-700,
+.dark .text-indigo-800,
+.dark .text-violet-700,
+.dark .text-violet-800,
+.dark .text-sky-700,
+.dark .text-sky-800 {
+  color: #bae6fd !important;
+}
+
+.dark .text-red-800,
+.dark .text-red-900,
+.dark .text-rose-900,
+.dark .text-rose-950 {
+  color: #fecdd3 !important;
+}
+
+.dark .text-amber-800,
+.dark .text-amber-900,
+.dark .text-amber-950,
+.dark .text-yellow-900 {
+  color: #fde68a !important;
+}
+
+.dark .text-emerald-900,
+.dark .text-emerald-950 {
+  color: #bbf7d0 !important;
+}
+
+.dark .ring-emerald-200,
+.dark .ring-emerald-300 {
+  --tw-ring-color: rgba(52, 211, 153, 0.38) !important;
+}
+
+.dark .ring-rose-200,
+.dark .ring-rose-300,
+.dark .ring-red-200,
+.dark .ring-red-300 {
+  --tw-ring-color: rgba(251, 113, 133, 0.42) !important;
+}
+
+.dark .ring-amber-200,
+.dark .ring-amber-300,
+.dark .ring-yellow-200,
+.dark .ring-yellow-300 {
+  --tw-ring-color: rgba(251, 191, 36, 0.42) !important;
+}
+
+.dark .ring-sky-200,
+.dark .ring-sky-300,
+.dark .ring-cyan-200,
+.dark .ring-cyan-300 {
+  --tw-ring-color: rgba(125, 211, 252, 0.38) !important;
+}
+
+.dark .hover\:bg-blue-50:hover,
+.dark .hover\:bg-blue-100:hover,
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-red-100:hover,
+.dark .hover\:bg-rose-100:hover {
+  background-color: rgba(30, 64, 175, 0.32) !important;
+}
+
+.dark .disabled\:opacity-50:disabled,
+.dark .disabled\:opacity-70:disabled {
+  opacity: 0.58 !important;
+}
+
+/* Targeted dark-mode fixes for report numbers, assigned-date filters, and compact filter controls. */
+.dark .bg-red-100 {
+  background-color: rgba(127, 29, 29, 0.58) !important;
+}
+
+.dark .bg-red-100.text-red-800,
+.dark .bg-red-100 .text-red-800,
+.dark .border-red-200.bg-red-100 {
+  color: #fecdd3 !important;
+}
+
+.dark .bg-slate-100.text-slate-700,
+.dark .border-slate-200.bg-slate-100 {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+  color: #dbeafe !important;
+}
+
+.dark .bg-emerald-50\/75,
+.dark .border-emerald-200.bg-emerald-50\/75 {
+  background-color: rgba(6, 78, 59, 0.34) !important;
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+
+.dark .border-emerald-200.bg-emerald-50\/75 input[type="date"] {
+  background-color: #07111f !important;
+  border-color: rgba(52, 211, 153, 0.55) !important;
+  color: #ecfdf5 !important;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.35);
+  opacity: 0.86;
+}
+
+.dark input[type="checkbox"] {
+  accent-color: #38bdf8;
+}
+
+.dark .dark-filter-shell {
+  background: rgba(15, 23, 42, 0.72) !important;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .dark-filter-search {
+  background-color: #07111f !important;
+  border-color: rgba(125, 211, 252, 0.38) !important;
+  color: #eaf2ff !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18) !important;
+}
+
+.dark .dark-filter-search::placeholder {
+  color: rgba(191, 219, 254, 0.5) !important;
+}
+
+.dark .dark-filter-option {
+  background-color: rgba(15, 23, 42, 0.88) !important;
+  border-color: rgba(125, 211, 252, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+.dark .dark-filter-option[data-selected="true"] {
+  background-color: rgba(37, 99, 235, 0.32) !important;
+  border-color: rgba(96, 165, 250, 0.68) !important;
+  color: #f8fbff !important;
+}
+
+.dark .dark-filter-checkbox {
+  background-color: #07111f !important;
+  border-color: rgba(147, 197, 253, 0.58) !important;
+}
+
+.dark .dark-filter-checkbox:checked {
+  background-color: #38bdf8 !important;
+  border-color: #7dd3fc !important;
+}
+
+.dark .dark-filter-search:-webkit-autofill,
+.dark .dark-filter-search:-webkit-autofill:hover,
+.dark .dark-filter-search:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: 0 0 0 1000px #020617 inset, 0 0 0 4px rgba(56, 189, 248, 0.18) !important;
+  caret-color: #7dd3fc !important;
+}
+
+.dark .dark-filter-search::-webkit-search-cancel-button {
+  filter: invert(1) brightness(1.4);
+  opacity: 0.8;
+}

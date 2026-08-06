@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito_Sans } from "next/font/google";
 import { AppShell } from "./app-shell";
+import { ThemeToggle } from "./theme-toggle";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import "./globals.css";
@@ -25,11 +26,27 @@ export default async function RootLayout({
   const currentUserName = session ? await getCurrentUserName(session.userId) : null;
 
   return (
-    <html lang="en" className={`h-full bg-[#eef6ff] antialiased ${nunitoSans.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`h-full bg-[#eef6ff] antialiased ${nunitoSans.variable}`}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var storedTheme = localStorage.getItem("srs-theme");
+                var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                var theme = storedTheme || (prefersDark ? "dark" : "light");
+                document.documentElement.classList.toggle("dark", theme === "dark");
+                document.documentElement.dataset.theme = theme;
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
       <body
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.16),_transparent_34%),linear-gradient(180deg,_#eef6ff_0%,_#ffffff_100%)] text-[#003d73]"
       >
+        <ThemeToggle />
         <AppShell
           user={
             session
