@@ -17,6 +17,7 @@ import { getSession, roleCanAssign } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SRTEC_PRODUCT_NAMES } from "@/lib/product-options";
 import { PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
+import { formatPerformancePoints } from "@/lib/points";
 
 export const dynamic = "force-dynamic";
 
@@ -261,7 +262,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             </span>
                           </div>
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <p className="text-xs text-blue-700">Points: {member.performancePoints}</p>
+                            <p className="text-xs text-blue-700">Points: {formatPerformancePoints(member.performancePoints)}</p>
                             <p className="text-xs text-blue-700">Phone 1: {member.phoneNumber1 ?? member.whatsappNumber ?? "Not provided"}</p>
                             <p className="text-xs text-blue-700">Phone 2: {member.phoneNumber2 ?? "Not provided"}</p>
                             <p className="text-xs text-blue-700">Department: {formatStaffDepartment(member.department)}</p>

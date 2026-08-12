@@ -82,7 +82,7 @@ function getLocalDateTimeParts(value: Date, timeZone: string) {
   };
 }
 
-function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
+function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date, assignedCallCount: number) {
   const assignedParts = getLocalDateTimeParts(assignedAt, STATUS_SCORING_TIME_ZONE);
   const submittedParts = getLocalDateTimeParts(submittedAt, STATUS_SCORING_TIME_ZONE);
 
@@ -96,7 +96,8 @@ function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date) {
   }
 
   const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
-  return submittedMinutes <= 21 * 60 ? 4 : 2;
+  const dailySubmissionPoints = submittedMinutes <= 21 * 60 ? 10 : 6;
+  return dailySubmissionPoints / Math.max(1, assignedCallCount);
 }
 
 function getLocalDateKey(value: Date, timeZone: string) {
@@ -115,48 +116,27 @@ function getLocalDayRange(value: Date, timeZone: string) {
   };
 }
 
-async function shouldAwardStatusSubmissionPoints({
+async function getAssignedCallCountForStatusSubmission({
   transaction,
   employeeId,
-  employeeName,
   assignedAt,
 }: {
   transaction: Prisma.TransactionClient;
   employeeId: string;
-  employeeName: string;
   assignedAt: Date;
 }) {
   const allocationDayRange = getLocalDayRange(assignedAt, STATUS_SCORING_TIME_ZONE);
 
-  const [remainingAssignedServices, alreadyScoredRequests] = await Promise.all([
-    transaction.serviceAssignment.count({
-      where: {
-        employeeId,
-        assignedAt: {
-          gte: allocationDayRange.startAt,
-          lte: allocationDayRange.endAt,
-        },
-        statusSubmittedAt: null,
-        request: { deletedAt: null },
+  return transaction.serviceAssignment.count({
+    where: {
+      employeeId,
+      assignedAt: {
+        gte: allocationDayRange.startAt,
+        lte: allocationDayRange.endAt,
       },
-    }),
-    transaction.serviceRequest.count({
-      where: {
-        deletedAt: null,
-        statusPointsDelta: { not: null },
-        statusSubmittedAt: {
-          gte: allocationDayRange.startAt,
-          lte: allocationDayRange.endAt,
-        },
-        OR: [
-          { lastAttemptByName: { equals: employeeName, mode: "insensitive" } },
-          { closedByName: { equals: employeeName, mode: "insensitive" } },
-        ],
-      },
-    }),
-  ]);
-
-  return remainingAssignedServices <= 1 && alreadyScoredRequests === 0;
+      request: { deletedAt: null },
+    },
+  });
 }
 
 type AssignmentStatusSummaryInput = {
@@ -1705,28 +1685,29 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   const employee = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { name: true },
+    select: { name: true, monthlyPerformancePoints: true, lastMonthlyResetDate: true },
   });
 
   const submittedAt = new Date();
-  const firstStatusPointsDelta = getStatusSubmissionPoints(assignment.assignedAt ?? assignment.request.createdAt, submittedAt);
   const employeeName = employee?.name || "Unknown";
 
   await prisma.$transaction(async (transaction) => {
-    const shouldAwardPoints =
-      !alreadyUpdatedForCurrentAllocation &&
-      (await shouldAwardStatusSubmissionPoints({
-        transaction,
-        employeeId: session.userId,
-        employeeName,
-        assignedAt: assignment.assignedAt ?? assignment.request.createdAt,
-      }));
+    const assignedCallCount = alreadyUpdatedForCurrentAllocation
+      ? 1
+      : await getAssignedCallCountForStatusSubmission({
+          transaction,
+          employeeId: session.userId,
+          assignedAt: assignment.assignedAt ?? assignment.request.createdAt,
+        });
+    const firstStatusPointsDelta = getStatusSubmissionPoints(
+      assignment.assignedAt ?? assignment.request.createdAt,
+      submittedAt,
+      assignedCallCount,
+    );
     const statusPointsDelta = alreadyUpdatedForCurrentAllocation
       ? assignment.statusPointsDelta
-      : shouldAwardPoints
-        ? firstStatusPointsDelta
-        : null;
-    const performancePointsIncrement = shouldAwardPoints ? firstStatusPointsDelta : 0;
+      : firstStatusPointsDelta;
+    const performancePointsIncrement = alreadyUpdatedForCurrentAllocation ? 0 : firstStatusPointsDelta;
 
     await transaction.serviceAssignment.update({
       where: { id: assignment.id },
@@ -1814,18 +1795,35 @@ export async function updateServiceCallStatus(formData: FormData) {
     }
 
     if (performancePointsIncrement !== 0) {
+      if (employee) {
+        await handleMonthlyPointsReset(
+          transaction,
+          session.userId,
+          employee.monthlyPerformancePoints,
+          employee.lastMonthlyResetDate,
+        );
+      }
+
       await transaction.user.update({
         where: { id: session.userId },
         data: {
           performancePoints: {
             increment: performancePointsIncrement,
           },
+          ...(isCurrentPerformanceMonth(submittedAt)
+            ? {
+                monthlyPerformancePoints: {
+                  increment: performancePointsIncrement,
+                },
+              }
+            : {}),
         },
       });
     }
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/report");
 }
 
 export async function updateManagerServiceStatus(formData: FormData) {

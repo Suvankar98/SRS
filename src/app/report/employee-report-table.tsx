@@ -4,6 +4,7 @@ import type {
   EmployeeReportRow,
 } from "@/lib/employee-report";
 import { formatDocketNumber } from "@/lib/docket";
+import { formatPerformancePoints, formatPointDelta } from "@/lib/points";
 import { EmployeeReportDownloadButton } from "./employee-report-download-button";
 
 const DAY_WISE_MAX_POINTS = 20;
@@ -38,7 +39,7 @@ export function EmployeeReportTable({
         <div className="flex flex-wrap items-center gap-2">
           <EmployeeReportDownloadButton employeeName={employeeName} totalPoints={totalPoints} rows={pdfRows} />
           <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">
-            Total Points: {totalPoints}
+            Total Points: {formatPerformancePoints(totalPoints)}
           </div>
         </div>
       </div>
@@ -269,13 +270,6 @@ function formatCompanyDocketsForExport(companyDockets: EmployeeReportCompanyDock
   return companyDockets.map((entry) => `${entry.companyName} / ${formatDocketNumber(entry.docketNumber)}`).join("; ");
 }
 
-function formatPointDelta(value: number | null) {
-  if (typeof value !== "number") {
-    return "-";
-  }
-
-  return value > 0 ? `+${value}` : String(value);
-}
 
 function formatEmployeeReportPoint(value: EmployeeReportPointCell) {
   return formatPointDelta(value.points);

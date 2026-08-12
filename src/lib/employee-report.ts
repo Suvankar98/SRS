@@ -2,6 +2,7 @@ import {
   ATTENDANCE_IN_POINTS,
   ATTENDANCE_OUT_POINTS,
 } from "@/lib/employee-performance-rules";
+import { formatDocketNumber } from "@/lib/docket";
 
 export type EmployeeReportRequest = {
   id: string;
@@ -31,8 +32,6 @@ export type EmployeeReportPointAdjustment = {
   materialHandoverPoints: number;
   createdAt: Date;
 };
-
-import { formatDocketNumber } from "@/lib/docket";
 
 export type EmployeeReportPointCell = {
   label: string;
@@ -85,7 +84,7 @@ export function buildEmployeeReportRows({
     addCompanyDocketToEmployeeReportRow(row, request);
 
     if (typeof request.statusPointsDelta === "number") {
-      setEmployeeReportWorkSubmissionPoints(row.workSubmission, request.statusPointsDelta);
+      addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
     }
 
     countedRequestIds.add(request.id);
@@ -148,10 +147,6 @@ function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: Em
 
 function addEmployeeReportPoints(cell: EmployeeReportPointCell, points: number) {
   cell.points = (cell.points ?? 0) + points;
-}
-
-function setEmployeeReportWorkSubmissionPoints(cell: EmployeeReportPointCell, points: number) {
-  cell.points = typeof cell.points === "number" ? Math.min(cell.points, points) : points;
 }
 
 function getEmployeeReportAttendancePoints(adjustment: EmployeeReportPointAdjustment) {

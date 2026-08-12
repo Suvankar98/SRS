@@ -15,6 +15,7 @@ import {
   type MaterialHandoverOption,
   type ReviewOption,
 } from "@/lib/employee-performance-rules";
+import { formatPerformancePoints, formatPointDelta } from "@/lib/points";
 
 type EmployeePointsPopupProps = {
   employeeId: string;
@@ -176,7 +177,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
                   </label>
                 </div>
                 <h3 className="mt-1 text-xl font-semibold text-blue-950">{employeeName}</h3>
-                <p className="mt-1 text-sm text-blue-700">Current monthly points: {currentPoints}</p>
+                <p className="mt-1 text-sm text-blue-700">Current monthly points: {formatPerformancePoints(currentPoints)}</p>
               </div>
               <button
                 type="button"
@@ -223,7 +224,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
             </div>
 
             <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
-              <p className="text-sm font-medium text-blue-800">Todays Point: {totalDelta >= 0 ? `+${totalDelta}` : totalDelta}</p>
+              <p className="text-sm font-medium text-blue-800">Todays Point: {formatPointDelta(totalDelta)}</p>
             </div>
 
             {errorMessage ? <p className="mt-3 text-sm text-rose-700">{errorMessage}</p> : null}
@@ -289,6 +290,21 @@ function buildSavedAdjustmentsByDate(adjustments: EmployeePerformanceAdjustment[
   return savedAdjustments;
 }
 
+function getDocumentSubmissionOption(value: string) {
+  if (value === "submitAfterOneDay" || value === "notSubmitWithinTwoDays") {
+    return "notSubmitNextDay";
+  }
+
+  return getOptionValue(value, DOCUMENT_OPTIONS);
+}
+
+function getMaterialHandoverOption(value: string) {
+  if (value === "handoverAfterOneDay" || value === "notSubmitWithinTwoDays") {
+    return "notHandoverNextDay";
+  }
+
+  return getOptionValue(value, MATERIAL_OPTIONS);
+}
 function parseSavedAttendanceOptions(value: string): {
   inOption: AttendanceInOption | "";
   outOption: AttendanceOutOption | "";

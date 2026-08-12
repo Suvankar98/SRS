@@ -18,8 +18,8 @@ model User {
   phoneNumber1              String?
   phoneNumber2              String?
   department                String?
-  performancePoints         Int      @default(0)
-  monthlyPerformancePoints  Int      @default(0)
+  performancePoints         Float    @default(0)
+  monthlyPerformancePoints  Float    @default(0)
   lastMonthlyResetDate      DateTime?
   assignedCalls             ServiceRequest[] @relation("AssignedToRequests")
   serviceAssignments        ServiceAssignment[] @relation("ServiceAssignmentEmployee")
@@ -83,7 +83,7 @@ model ServiceRequest {
   statusReason String?
   customerReview String?
   statusSubmittedAt DateTime?
-  statusPointsDelta Int?
+  statusPointsDelta Float?
   reviewPointsDelta Int?
   lastAttemptByName String?
   lastAttemptAt DateTime?
@@ -103,7 +103,7 @@ model ServiceAssignment {
   status              String?  @default("New Call")
   statusReason        String?
   statusSubmittedAt   DateTime?
-  statusPointsDelta   Int?
+  statusPointsDelta   Float?
   mediaUploadedAt     DateTime?
   closedByName        String?
   closedAt            DateTime?
@@ -149,7 +149,7 @@ model EmployeePointAdjustment {
   materialHandoverPoints     Int
   teamworkOption             String
   teamworkPoints             Int
-  totalDelta                 Int
+  totalDelta                 Float
   createdAt                  DateTime @default(now())
 
   employee                   User     @relation("EmployeePointAdjustments", fields: [employeeId], references: [id])
@@ -161,7 +161,7 @@ model MonthlyPerformanceHistory {
   employeeId         String   @db.Uuid
   year               Int
   month              Int
-  totalPoints        Int      @default(0)
+  totalPoints        Float    @default(0)
   createdAt          DateTime @default(now())
   
   employee           User     @relation("MonthlyHistoryEmployee", fields: [employeeId], references: [id])

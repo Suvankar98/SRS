@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPerformancePoints } from "@/lib/points";
+
 type ReportPdfRow = {
   companyDocket: string;
   date: string;
@@ -72,7 +74,7 @@ export function EmployeeReportDownloadButton({
         font: boldFont,
         color: rgb(0.02, 0.16, 0.38),
       });
-      page.drawText(`Total Points: ${totalPoints}`, {
+      page.drawText(`Total Points: ${formatPerformancePoints(totalPoints)}`, {
         x: 690,
         y,
         size: 11,

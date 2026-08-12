@@ -11,6 +11,7 @@
     "db:bootstrap": "node scripts/bootstrapAuthData.js",
     "db:normalize-statuses": "node scripts/normalizeStatuses.js",
     "db:normalize-statuses:apply": "node scripts/normalizeStatuses.js --apply",
+    "db:ensure-point-floats": "node scripts/ensurePointFloatColumns.js",
     "db:seed": "node scripts/seedDummy.js",
     "db:distribute-samples": "node scripts/distributeSampleCalls.js",
     "db:update-dashboard": "node scripts/updateDashboardDummy.js",

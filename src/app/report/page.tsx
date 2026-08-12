@@ -12,6 +12,7 @@ import {
   type EmployeeReportRequest,
   type EmployeeReportRow,
 } from "@/lib/employee-report";
+import { formatPerformancePoints } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -249,9 +250,9 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                           pointAdjustments={row.pointAdjustments}
                         />
                       </td>
-                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{row.last7DaysPoints}</td>
-                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{row.last30DaysPoints}</td>
-                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{row.last90DaysPoints}</td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{formatPerformancePoints(row.last7DaysPoints)}</td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{formatPerformancePoints(row.last30DaysPoints)}</td>
+                      <td className="px-2.5 py-2.5 font-semibold text-blue-900">{formatPerformancePoints(row.last90DaysPoints)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -347,7 +348,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-blue-900">{employee ? `${employee.periodPoints} pts` : "-"}</p>
+                    <p className="text-sm font-semibold text-blue-900">{employee ? `${formatPerformancePoints(employee.periodPoints)} pts` : "-"}</p>
                   </div>
                 </div>
               );
@@ -380,7 +381,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                         </EmployeeReportPopup>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-blue-900">{employee.periodPoints} pts</p>
+                        <p className="text-sm font-semibold text-blue-900">{formatPerformancePoints(employee.periodPoints)} pts</p>
                       </div>
                     </div>
                   );

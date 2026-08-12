@@ -19,16 +19,14 @@ export const REVIEW_POINTS = {
 } as const;
 
 export const DOCUMENT_SUBMISSION_POINTS = {
-  submitNextDay: { label: "Bill / Challan / Service Report submit next day", points: 4 },
-  submitAfterOneDay: { label: "Bill / Challan / Service Report submit after 1 day", points: 1 },
-  notSubmitWithinTwoDays: { label: "Bill / Challan / Service Report not submit within 2 days", points: -4 },
+  submitNextDay: { label: "Bill / Challan / Service Report submit next day", points: 0 },
+  notSubmitNextDay: { label: "Bill / Challan / Service Report not submit next day", points: -4 },
   na: { label: "N/A", points: 0 },
 } as const;
 
 export const MATERIAL_HANDOVER_POINTS = {
-  handoverNextDay: { label: "Material Handover next day", points: 4 },
-  handoverAfterOneDay: { label: "Material Handover after 1 day", points: 1 },
-  notSubmitWithinTwoDays: { label: "Material Handover not submit within 2 days", points: -4 },
+  handoverNextDay: { label: "Material Handover next day", points: 0 },
+  notHandoverNextDay: { label: "Material Handover not submit next day", points: -4 },
   na: { label: "N/A", points: 0 },
 } as const;
 
@@ -56,4 +54,28 @@ export function isDocumentSubmissionOption(value: string): value is DocumentSubm
 
 export function isMaterialHandoverOption(value: string): value is MaterialHandoverOption {
   return value in MATERIAL_HANDOVER_POINTS;
+}
+
+export function getDocumentSubmissionPoints(value: string, fallbackPoints = 0) {
+  if (value in DOCUMENT_SUBMISSION_POINTS) {
+    return DOCUMENT_SUBMISSION_POINTS[value as DocumentSubmissionOption].points;
+  }
+
+  if (value === "submitAfterOneDay" || value === "notSubmitWithinTwoDays") {
+    return -4;
+  }
+
+  return fallbackPoints;
+}
+
+export function getMaterialHandoverPoints(value: string, fallbackPoints = 0) {
+  if (value in MATERIAL_HANDOVER_POINTS) {
+    return MATERIAL_HANDOVER_POINTS[value as MaterialHandoverOption].points;
+  }
+
+  if (value === "handoverAfterOneDay" || value === "notSubmitWithinTwoDays") {
+    return -4;
+  }
+
+  return fallbackPoints;
 }

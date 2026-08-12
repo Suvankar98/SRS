@@ -8,9 +8,15 @@ import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { formatDocketNumber } from "@/lib/docket";
+import { formatPerformancePoints, formatPointDelta } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 import { getProductOptions } from "@/lib/product-options";
-import { ATTENDANCE_IN_POINTS, ATTENDANCE_OUT_POINTS } from "@/lib/employee-performance-rules";
+import {
+  ATTENDANCE_IN_POINTS,
+  ATTENDANCE_OUT_POINTS,
+  getDocumentSubmissionPoints,
+  getMaterialHandoverPoints,
+} from "@/lib/employee-performance-rules";
 import {
   getDashboardMediaItemsByRequestIds,
   type DashboardRequestMediaItem,
@@ -441,7 +447,7 @@ function EmployeeReportTable({
           <p className="mt-0.5 text-xs text-blue-600">Work submission and performance points summary</p>
         </div>
         <div className="rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-900 shadow-sm">
-          Total Points: {totalPoints}
+          Total Points: {formatPerformancePoints(totalPoints)}
         </div>
       </div>
       <form action="/dashboard" className="grid gap-3 border-b border-blue-100 bg-white px-4 py-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
@@ -721,7 +727,7 @@ function buildEmployeeReportRows({
     addCompanyDocketToEmployeeReportRow(row, request);
 
     if (typeof request.statusPointsDelta === "number") {
-      setEmployeeReportWorkSubmissionPoints(row.workSubmission, request.statusPointsDelta);
+      addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
     }
 
     countedRequestIds.add(request.id);
@@ -733,8 +739,14 @@ function buildEmployeeReportRows({
     addEmployeeReportPoints(row.attendanceIn, attendancePoints.inPoints);
     addEmployeeReportPoints(row.attendanceOut, attendancePoints.outPoints);
     addEmployeeReportPoints(row.review, adjustment.reviewPoints);
-    addEmployeeReportPoints(row.documentSubmission, adjustment.documentSubmissionPoints);
-    addEmployeeReportPoints(row.materialHandover, adjustment.materialHandoverPoints);
+    addEmployeeReportPoints(
+      row.documentSubmission,
+      getDocumentSubmissionPoints(adjustment.documentSubmissionOption, adjustment.documentSubmissionPoints),
+    );
+    addEmployeeReportPoints(
+      row.materialHandover,
+      getMaterialHandoverPoints(adjustment.materialHandoverOption, adjustment.materialHandoverPoints),
+    );
   }
 
   const sortedRows = Array.from(rows.values())
@@ -787,9 +799,6 @@ function addEmployeeReportPoints(cell: EmployeeReportPointCell, points: number) 
   cell.points = (cell.points ?? 0) + points;
 }
 
-function setEmployeeReportWorkSubmissionPoints(cell: EmployeeReportPointCell, points: number) {
-  cell.points = typeof cell.points === "number" ? Math.min(cell.points, points) : points;
-}
 
 function getEmployeeReportAttendancePoints(adjustment: EmployeeReportPointAdjustment) {
   try {
@@ -888,13 +897,6 @@ function formatEmployeeReportDate(value: Date | null) {
   }).format(value);
 }
 
-function formatPointDelta(value: number | null) {
-  if (typeof value !== "number") {
-    return "-";
-  }
-
-  return value > 0 ? `+${value}` : String(value);
-}
 
 function formatEmployeeReportPoint(value: EmployeeReportPointCell) {
   return formatPointDelta(value.points);
