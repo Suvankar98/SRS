@@ -2,9 +2,10 @@
 
 import React from "react";
 
-import { updateManagerServiceStatus } from "../actions";
+import { updateAssignmentStatusPointApproval, updateManagerServiceStatus } from "../actions";
 import { RemarkPopup } from "../remark-popup";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
+import { formatPointDelta } from "@/lib/points";
 
 const STATUS_OPTIONS = ["New Call", "In Process", "Completed", "Cancel"] as const;
 
@@ -19,6 +20,10 @@ type AdminManagerStatusSelectProps = {
       status?: string | null;
       statusReason?: string | null;
       statusSubmittedAt?: Date | string | null;
+      statusPointsDelta?: number | null;
+      statusPointsApproval?: string | null;
+      statusPointsReviewedAt?: Date | string | null;
+      statusPointsReviewedByName?: string | null;
       employee?: { name: string } | null;
     }>;
   };
@@ -66,6 +71,10 @@ type AssignmentRemark = {
   status: ReturnType<typeof normalizeStatus>;
   remark: string;
   submittedAt: Date | string | null | undefined;
+  points: number | null | undefined;
+  approval: string | null | undefined;
+  reviewedAt: Date | string | null | undefined;
+  reviewedByName: string | null | undefined;
 };
 
 function getAssignmentRemarks(assignments: NonNullable<AdminManagerStatusSelectProps["request"]["assignments"]>) {
@@ -78,6 +87,10 @@ function getAssignmentRemarks(assignments: NonNullable<AdminManagerStatusSelectP
       status: normalizeStatus(assignment.status),
       remark: assignment.statusReason?.trim() ?? "",
       submittedAt: assignment.statusSubmittedAt,
+      points: assignment.statusPointsDelta,
+      approval: assignment.statusPointsApproval ?? (typeof assignment.statusPointsDelta === "number" ? "approved" : "pending"),
+      reviewedAt: assignment.statusPointsReviewedAt,
+      reviewedByName: assignment.statusPointsReviewedByName,
     }));
 }
 
@@ -120,18 +133,62 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
             <div className="space-y-3">
               {remarks.map((remark) => (
                 <div key={remark.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-bold text-blue-950">{remark.employeeName}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${getStatusPillClass(remark.status)}`}>
-                      {remark.status}
-                    </span>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-blue-950">{remark.employeeName}</p>
+                      {remark.submittedAt ? (
+                        <p className="mt-1 text-[11px] font-medium text-blue-600">{formatRemarkDateTime(remark.submittedAt)}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${getStatusPillClass(remark.status)}`}>
+                        {remark.status}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${getApprovalPillClass(remark.approval)}`}>
+                        {getApprovalLabel(remark.approval)}
+                      </span>
+                    </div>
                   </div>
-                  {remark.submittedAt ? (
-                    <p className="mt-1 text-[11px] font-medium text-blue-600">{formatRemarkDateTime(remark.submittedAt)}</p>
-                  ) : null}
                   <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-blue-900">
                     {remark.remark}
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-blue-100 pt-3">
+                    <p className="text-[11px] font-semibold text-blue-700">
+                      {remark.approval === "approved"
+                        ? `Points: ${formatPointDelta(remark.points)}`
+                        : remark.approval === "not_approved"
+                          ? "Points: 0"
+                          : "Points pending"}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <form action={updateAssignmentStatusPointApproval}>
+                        <input type="hidden" name="assignmentId" value={remark.id} />
+                        <input type="hidden" name="approval" value="approved" />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700"
+                        >
+                          Approved
+                        </button>
+                      </form>
+                      <form action={updateAssignmentStatusPointApproval}>
+                        <input type="hidden" name="assignmentId" value={remark.id} />
+                        <input type="hidden" name="approval" value="not_approved" />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold uppercase text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Not Approved
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  {remark.reviewedByName || remark.reviewedAt ? (
+                    <p className="mt-2 text-[10px] font-medium text-blue-500">
+                      Reviewed {remark.reviewedByName ? `by ${remark.reviewedByName}` : ""}
+                      {remark.reviewedAt ? ` on ${formatRemarkDateTime(remark.reviewedAt)}` : ""}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -142,6 +199,29 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
   );
 }
 
+function getApprovalLabel(value: string | null | undefined) {
+  if (value === "approved") {
+    return "Approved";
+  }
+
+  if (value === "not_approved") {
+    return "Not Approved";
+  }
+
+  return "Pending";
+}
+
+function getApprovalPillClass(value: string | null | undefined) {
+  if (value === "approved") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (value === "not_approved") {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  return "bg-amber-100 text-amber-700";
+}
 function getDateTime(value: Date | string | null | undefined) {
   if (!value) {
     return 0;

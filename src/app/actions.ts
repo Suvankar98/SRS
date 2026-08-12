@@ -270,6 +270,71 @@ function isCurrentPerformanceMonth(value: Date) {
   return target.year === current.year && target.month === current.month;
 }
 
+async function applyEmployeePerformancePointsIncrement({
+  transaction,
+  employee,
+  employeeId,
+  pointsDelta,
+  performanceDate,
+}: {
+  transaction: Prisma.TransactionClient;
+  employee: { monthlyPerformancePoints: number; lastMonthlyResetDate: Date | null };
+  employeeId: string;
+  pointsDelta: number;
+  performanceDate: Date;
+}) {
+  if (pointsDelta === 0) {
+    return;
+  }
+
+  await handleMonthlyPointsReset(
+    transaction,
+    employeeId,
+    employee.monthlyPerformancePoints,
+    employee.lastMonthlyResetDate,
+  );
+
+  await transaction.user.update({
+    where: { id: employeeId },
+    data: {
+      performancePoints: {
+        increment: pointsDelta,
+      },
+      ...(isCurrentPerformanceMonth(performanceDate)
+        ? {
+            monthlyPerformancePoints: {
+              increment: pointsDelta,
+            },
+          }
+        : {}),
+    },
+  });
+
+  if (!isCurrentPerformanceMonth(performanceDate)) {
+    const adjustmentParts = getLocalDateTimeParts(performanceDate, PERFORMANCE_TIME_ZONE);
+    await transaction.monthlyPerformanceHistory.upsert({
+      where: {
+        employeeId_year_month: {
+          employeeId,
+          year: adjustmentParts.year,
+          month: adjustmentParts.month,
+        },
+      },
+      update: {
+        totalPoints: {
+          increment: pointsDelta,
+        },
+      },
+      create: {
+        employeeId,
+        year: adjustmentParts.year,
+        month: adjustmentParts.month,
+        totalPoints: pointsDelta,
+      },
+    });
+  }
+}
+
 const DASHBOARD_STATUSES = ["New Call", "In Process", "Completed", "Cancel"] as const;
 const STAFF_DEPARTMENTS = ["sales", "service", "backoffice"] as const;
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -1685,37 +1750,23 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   const employee = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { name: true, monthlyPerformancePoints: true, lastMonthlyResetDate: true },
+    select: { name: true },
   });
 
   const submittedAt = new Date();
   const employeeName = employee?.name || "Unknown";
 
   await prisma.$transaction(async (transaction) => {
-    const assignedCallCount = alreadyUpdatedForCurrentAllocation
-      ? 1
-      : await getAssignedCallCountForStatusSubmission({
-          transaction,
-          employeeId: session.userId,
-          assignedAt: assignment.assignedAt ?? assignment.request.createdAt,
-        });
-    const firstStatusPointsDelta = getStatusSubmissionPoints(
-      assignment.assignedAt ?? assignment.request.createdAt,
-      submittedAt,
-      assignedCallCount,
-    );
-    const statusPointsDelta = alreadyUpdatedForCurrentAllocation
-      ? assignment.statusPointsDelta
-      : firstStatusPointsDelta;
-    const performancePointsIncrement = alreadyUpdatedForCurrentAllocation ? 0 : firstStatusPointsDelta;
-
     await transaction.serviceAssignment.update({
       where: { id: assignment.id },
       data: {
         status,
         statusReason: reasonValue || null,
         statusSubmittedAt: submittedAt,
-        statusPointsDelta,
+        statusPointsDelta: alreadyUpdatedForCurrentAllocation ? assignment.statusPointsDelta : null,
+        statusPointsApproval: alreadyUpdatedForCurrentAllocation ? undefined : "pending",
+        statusPointsReviewedAt: alreadyUpdatedForCurrentAllocation ? undefined : null,
+        statusPointsReviewedByName: alreadyUpdatedForCurrentAllocation ? undefined : null,
         closedByName: status === "Completed" ? employeeName : null,
         closedAt: status === "Completed" ? submittedAt : null,
       },
@@ -1794,32 +1845,108 @@ export async function updateServiceCallStatus(formData: FormData) {
       });
     }
 
-    if (performancePointsIncrement !== 0) {
-      if (employee) {
-        await handleMonthlyPointsReset(
-          transaction,
-          session.userId,
-          employee.monthlyPerformancePoints,
-          employee.lastMonthlyResetDate,
-        );
-      }
 
-      await transaction.user.update({
-        where: { id: session.userId },
-        data: {
-          performancePoints: {
-            increment: performancePointsIncrement,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/report");
+}
+
+export async function updateAssignmentStatusPointApproval(formData: FormData) {
+  const session = await requireSession();
+
+  if (!roleCanAssign(session.role)) {
+    redirect("/dashboard");
+  }
+
+  const assignmentId = getRequiredField(formData, "assignmentId");
+  const approval = getRequiredField(formData, "approval");
+
+  if (approval !== "approved" && approval !== "not_approved") {
+    throw new Error("Invalid approval status");
+  }
+
+  const reviewer = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true },
+  });
+  const reviewedAt = new Date();
+
+  await prisma.$transaction(async (transaction) => {
+    const assignment = await transaction.serviceAssignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            monthlyPerformancePoints: true,
+            lastMonthlyResetDate: true,
           },
-          ...(isCurrentPerformanceMonth(submittedAt)
-            ? {
-                monthlyPerformancePoints: {
-                  increment: performancePointsIncrement,
-                },
-              }
-            : {}),
         },
-      });
+        request: {
+          select: {
+            id: true,
+            deletedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!assignment || assignment.request.deletedAt || !assignment.statusSubmittedAt) {
+      throw new Error("Submitted remark not found");
     }
+
+    const previousPoints = assignment.statusPointsDelta ?? 0;
+    const assignedAt = assignment.assignedAt;
+    const nextPoints =
+      approval === "approved"
+        ? getStatusSubmissionPoints(
+            assignedAt,
+            assignment.statusSubmittedAt,
+            await getAssignedCallCountForStatusSubmission({
+              transaction,
+              employeeId: assignment.employeeId,
+              assignedAt,
+            }),
+          )
+        : 0;
+    const pointsDelta = nextPoints - previousPoints;
+
+    await transaction.serviceAssignment.update({
+      where: { id: assignment.id },
+      data: {
+        statusPointsDelta: approval === "approved" ? nextPoints : null,
+        statusPointsApproval: approval,
+        statusPointsReviewedAt: reviewedAt,
+        statusPointsReviewedByName: reviewer?.name ?? "Admin / Manager",
+      },
+    });
+
+    await applyEmployeePerformancePointsIncrement({
+      transaction,
+      employee: assignment.employee,
+      employeeId: assignment.employeeId,
+      pointsDelta,
+      performanceDate: assignment.statusSubmittedAt,
+    });
+
+    const latestApprovedAssignment =
+      (await transaction.serviceAssignment.findMany({
+        where: {
+          requestId: assignment.requestId,
+          statusPointsDelta: { not: null },
+        },
+        orderBy: { statusSubmittedAt: "desc" },
+        take: 1,
+        select: { statusPointsDelta: true },
+      }))[0] ?? null;
+
+    await transaction.serviceRequest.update({
+      where: { id: assignment.requestId },
+      data: {
+        statusPointsDelta: latestApprovedAssignment?.statusPointsDelta ?? null,
+      },
+    });
   });
 
   revalidatePath("/dashboard");
@@ -1916,6 +2043,9 @@ export async function updateManagerServiceStatus(formData: FormData) {
         statusReason: reasonValue || null,
         statusSubmittedAt: submittedAt,
         statusPointsDelta: null,
+        statusPointsApproval: status === "New Call" ? "pending" : "not_required",
+        statusPointsReviewedAt: submittedAt,
+        statusPointsReviewedByName: actorName,
         closedByName,
         closedAt,
       },
@@ -2076,47 +2206,13 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
 
       const pointsDelta = totalDelta - previousDayDelta;
 
-      if (pointsDelta !== 0) {
-        await transaction.user.update({
-          where: { id: employeeId },
-          data: {
-            performancePoints: {
-              increment: pointsDelta,
-            },
-            ...(isCurrentPerformanceMonth(adjustmentDate)
-              ? {
-                  monthlyPerformancePoints: {
-                    increment: pointsDelta,
-                  },
-                }
-              : {}),
-          },
-        });
-      }
-
-      if (pointsDelta !== 0 && !isCurrentPerformanceMonth(adjustmentDate)) {
-        const adjustmentParts = getLocalDateTimeParts(adjustmentDate, PERFORMANCE_TIME_ZONE);
-        await transaction.monthlyPerformanceHistory.upsert({
-          where: {
-            employeeId_year_month: {
-              employeeId,
-              year: adjustmentParts.year,
-              month: adjustmentParts.month,
-            },
-          },
-          update: {
-            totalPoints: {
-              increment: pointsDelta,
-            },
-          },
-          create: {
-            employeeId,
-            year: adjustmentParts.year,
-            month: adjustmentParts.month,
-            totalPoints: pointsDelta,
-          },
-        });
-      }
+      await applyEmployeePerformancePointsIncrement({
+        transaction,
+        employee,
+        employeeId,
+        pointsDelta,
+        performanceDate: adjustmentDate,
+      });
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to update points";

@@ -104,6 +104,9 @@ model ServiceAssignment {
   statusReason        String?
   statusSubmittedAt   DateTime?
   statusPointsDelta   Float?
+  statusPointsApproval String   @default("pending")
+  statusPointsReviewedAt DateTime?
+  statusPointsReviewedByName String?
   mediaUploadedAt     DateTime?
   closedByName        String?
   closedAt            DateTime?
