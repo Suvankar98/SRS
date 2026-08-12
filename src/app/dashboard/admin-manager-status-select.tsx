@@ -3,7 +3,6 @@
 import React from "react";
 
 import { updateAssignmentStatusPointApproval, updateManagerServiceStatus } from "../actions";
-import { RemarkPopup } from "../remark-popup";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 import { formatPointDelta } from "@/lib/points";
 
@@ -14,6 +13,9 @@ type AdminManagerStatusSelectProps = {
     id: string;
     status: string | null;
     statusReason: string | null;
+    statusSubmittedAt?: Date | string | null;
+    statusPointsDelta?: number | null;
+    lastAttemptByName?: string | null;
     assignments?: Array<{
       id?: string;
       employeeId: string;
@@ -32,6 +34,7 @@ type AdminManagerStatusSelectProps = {
 export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectProps) {
   const status = getStatusLabel(request.status);
   const assignmentRemarks = getAssignmentRemarks(request.assignments ?? []);
+  const remarks = assignmentRemarks.length > 0 ? assignmentRemarks : getRequestFallbackRemarks(request);
 
   return (
     <div className="space-y-1">
@@ -54,13 +57,7 @@ export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectPr
           ))}
         </select>
       </form>
-      {assignmentRemarks.length > 0 ? (
-        <AssignmentRemarksPopup remarks={assignmentRemarks} />
-      ) : request.statusReason ? (
-        <div className="mt-1">
-          <RemarkPopup remark={request.statusReason} />
-        </div>
-      ) : null}
+      {remarks.length > 0 ? <AssignmentRemarksPopup remarks={remarks} /> : null}
     </div>
   );
 }
@@ -75,6 +72,7 @@ type AssignmentRemark = {
   approval: string | null | undefined;
   reviewedAt: Date | string | null | undefined;
   reviewedByName: string | null | undefined;
+  canReview: boolean;
 };
 
 function getAssignmentRemarks(assignments: NonNullable<AdminManagerStatusSelectProps["request"]["assignments"]>) {
@@ -91,9 +89,30 @@ function getAssignmentRemarks(assignments: NonNullable<AdminManagerStatusSelectP
       approval: assignment.statusPointsApproval ?? (typeof assignment.statusPointsDelta === "number" ? "approved" : "pending"),
       reviewedAt: assignment.statusPointsReviewedAt,
       reviewedByName: assignment.statusPointsReviewedByName,
+      canReview: Boolean(assignment.id),
     }));
 }
 
+function getRequestFallbackRemarks(request: AdminManagerStatusSelectProps["request"]): AssignmentRemark[] {
+  if (!request.statusReason?.trim()) {
+    return [];
+  }
+
+  return [
+    {
+      id: `request-${request.id}`,
+      employeeName: request.lastAttemptByName ?? "Recent update",
+      status: normalizeStatus(request.status),
+      remark: request.statusReason.trim(),
+      submittedAt: request.statusSubmittedAt,
+      points: request.statusPointsDelta,
+      approval: "legacy",
+      reviewedAt: null,
+      reviewedByName: null,
+      canReview: false,
+    },
+  ];
+}
 function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
   const [open, setOpen] = React.useState(false);
 
@@ -161,26 +180,32 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
                           : "Points pending"}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <form action={updateAssignmentStatusPointApproval}>
-                        <input type="hidden" name="assignmentId" value={remark.id} />
-                        <input type="hidden" name="approval" value="approved" />
-                        <button
-                          type="submit"
-                          className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700"
-                        >
-                          Approved
-                        </button>
-                      </form>
-                      <form action={updateAssignmentStatusPointApproval}>
-                        <input type="hidden" name="assignmentId" value={remark.id} />
-                        <input type="hidden" name="approval" value="not_approved" />
-                        <button
-                          type="submit"
-                          className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold uppercase text-rose-700 transition hover:bg-rose-100"
-                        >
-                          Not Approved
-                        </button>
-                      </form>
+                      {remark.canReview ? (
+                        <>
+                          <form action={updateAssignmentStatusPointApproval}>
+                            <input type="hidden" name="assignmentId" value={remark.id} />
+                            <input type="hidden" name="approval" value="approved" />
+                            <button
+                              type="submit"
+                              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700"
+                            >
+                              Approved
+                            </button>
+                          </form>
+                          <form action={updateAssignmentStatusPointApproval}>
+                            <input type="hidden" name="assignmentId" value={remark.id} />
+                            <input type="hidden" name="approval" value="not_approved" />
+                            <button
+                              type="submit"
+                              className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold uppercase text-rose-700 transition hover:bg-rose-100"
+                            >
+                              Not Approved
+                            </button>
+                          </form>
+                        </>
+                      ) : (
+                        <span className="rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-blue-700">Assignment history unavailable</span>
+                      )}
                     </div>
                   </div>
                   {remark.reviewedByName || remark.reviewedAt ? (
@@ -222,6 +247,7 @@ function getApprovalPillClass(value: string | null | undefined) {
 
   return "bg-amber-100 text-amber-700";
 }
+
 function getDateTime(value: Date | string | null | undefined) {
   if (!value) {
     return 0;
