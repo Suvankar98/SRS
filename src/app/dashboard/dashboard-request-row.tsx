@@ -1212,13 +1212,7 @@ function formatAttemptDateTime(value: Date | string) {
   return new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  })
-    .format(date)
-    .replace(",", "")
-    .replace(/\s(am|pm)$/i, (match) => match.trim().slice(0, 1).toLowerCase());
+  }).format(date);
 }
 
 function formatPreviousStatusDateTime(value: Date | string) {
