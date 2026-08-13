@@ -230,7 +230,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </article>
           ) : null}
 
-          <div className={`grid gap-6 ${isAdmin ? "xl:grid-cols-[1.08fr_0.92fr]" : ""}`}>
+          <div className={`grid items-start gap-6 ${isAdmin ? "xl:grid-cols-[1.08fr_0.92fr]" : ""}`}>
             {isAdmin ? (
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -566,5 +566,3 @@ function formatInstallationDate(value: Date | null) {
 function getSavedCustomerCompanyKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
-
-

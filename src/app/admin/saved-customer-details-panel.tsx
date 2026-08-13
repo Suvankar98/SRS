@@ -41,8 +41,30 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
   const [isImporting, startImportTransition] = React.useTransition();
   const [importMessage, setImportMessage] = React.useState<string | null>(null);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const [searchInput, setSearchInput] = React.useState("");
 
   const selectedDetail = selectedCompany?.detail;
+  const normalizedSearchQuery = searchInput.trim().toLowerCase();
+  const filteredCompanies = React.useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return companies;
+    }
+
+    return companies.filter((company) => {
+      const detail = company.detail;
+      return [
+        company.company,
+        detail.name,
+        detail.contactPerson2 ?? "",
+        detail.phoneNumber1,
+        detail.phoneNumber2 ?? "",
+        detail.area,
+        detail.fullAddress,
+        detail.installationDateInputValue,
+        detail.installationDateLabel,
+      ].some((value) => String(value ?? "").toLowerCase().includes(normalizedSearchQuery));
+    });
+  }, [companies, normalizedSearchQuery]);
 
   function downloadCustomerCsv() {
     const csvRows = [
@@ -72,6 +94,10 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
   function handleUploadClick() {
     setImportMessage(null);
     fileInputRef.current?.click();
+  }
+
+  function clearSearch() {
+    setSearchInput("");
   }
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -182,13 +208,51 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
         </p>
       ) : null}
 
+      {companies.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          <label className="relative block">
+            <span className="sr-only">Search saved customer details</span>
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-blue-500">
+              <SearchIcon />
+            </span>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.currentTarget.value)}
+              placeholder="Search company, name, phone, area"
+              className="h-11 w-full rounded-full border border-blue-200 bg-blue-50 px-11 text-sm font-medium text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            />
+            {searchInput ? (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                aria-label="Clear saved customer search"
+                title="Clear"
+              >
+                <ClearIcon />
+              </button>
+            ) : null}
+          </label>
+          {normalizedSearchQuery ? (
+            <p className="text-xs font-semibold text-blue-600">
+              Showing {filteredCompanies.length} of {companies.length}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {companies.length === 0 ? (
         <p className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
           No saved customer details yet.
         </p>
+      ) : filteredCompanies.length === 0 ? (
+        <p className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          No saved customer details match your search.
+        </p>
       ) : (
         <div className="mt-5 max-h-[34rem] space-y-2 overflow-y-auto pr-2">
-          {companies.map((company) => {
+          {filteredCompanies.map((company) => {
             const missingCount = getMissingFieldCount(company);
 
             return (
@@ -408,6 +472,23 @@ function UploadIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
       <path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m16 16 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
