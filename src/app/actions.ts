@@ -1947,7 +1947,7 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
         statusPointsDelta: latestApprovedAssignment?.statusPointsDelta ?? null,
       },
     });
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   revalidatePath("/dashboard");
   revalidatePath("/report");

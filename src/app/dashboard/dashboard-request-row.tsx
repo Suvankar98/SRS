@@ -48,8 +48,24 @@ type DashboardRequestRowRequest = {
   activities?: DashboardServiceActivity[];
   createdBy?: { name: string } | null;
   mediaItems?: DashboardRequestMediaItem[];
+  companyHistoryRequests?: DashboardCompanyHistoryRequest[];
 };
 
+type DashboardCompanyHistoryRequest = {
+  id: string;
+  docketNumber: string;
+  company: string;
+  name: string;
+  status: string | null;
+  statusReason: string | null;
+  createdAt: Date | string;
+  assignedAt?: Date | string | null;
+  statusSubmittedAt?: Date | string | null;
+  closedAt: Date | string | null;
+  closedByName: string | null;
+  assignedTo?: { name: string } | null;
+  activities?: DashboardServiceActivity[];
+};
 type DashboardServiceActivity = {
   id: string;
   type: string;
@@ -461,6 +477,13 @@ export function DashboardRequestRow({
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">
         <p className={`break-words text-[13px] leading-snug text-blue-700 ${isEmployee ? "font-extrabold" : "font-semibold"}`}>{request.company}</p>
         <p className="mt-1.5 break-words text-[12px] font-bold leading-snug text-slate-950">{request.name}</p>
+        {!isEmployee ? (
+          <CompanyHistoryButton
+            company={request.company}
+            currentRequestId={request.id}
+            requests={request.companyHistoryRequests ?? [request]}
+          />
+        ) : null}
       </td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.area}</td>
       <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs">{request.product}</td>
@@ -607,6 +630,257 @@ function getLocalDateKey(value: Date) {
   }).format(value);
 }
 
+function CompanyHistoryButton({
+  company,
+  currentRequestId,
+  requests,
+}: {
+  company: string;
+  currentRequestId: string;
+  requests: DashboardCompanyHistoryRequest[];
+}) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
+  const historyRequests = React.useMemo(() => getUniqueHistoryRequests(requests), [requests]);
+  const selectedRequest = selectedRequestId
+    ? historyRequests.find((request) => request.id === selectedRequestId) ?? null
+    : null;
+  const selectedEvents = selectedRequest ? getCompanyHistoryEvents(selectedRequest) : [];
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          setSelectedRequestId(null);
+          setIsOpen(true);
+        }}
+        className="mt-2 inline-flex w-fit items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+        History
+      </button>
+
+      {isOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-blue-200 px-5 py-4">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-blue-950">Company History</h3>
+                <p className="mt-1 break-words text-sm font-semibold text-blue-700">{company}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">{historyRequests.length} docket{historyRequests.length === 1 ? "" : "s"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+                aria-label="Close company history"
+                title="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="flex flex-wrap gap-2">
+                  {historyRequests.map((historyRequest) => {
+                    const isSelected = selectedRequest?.id === historyRequest.id;
+                    const isCurrent = historyRequest.id === currentRequestId;
+
+                    return (
+                      <button
+                        key={historyRequest.id}
+                        type="button"
+                        onClick={() => setSelectedRequestId(historyRequest.id)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                            : "border-blue-200 bg-white text-blue-700 hover:border-blue-400 hover:bg-blue-50"
+                        }`}
+                      >
+                        {formatDocketNumber(historyRequest.docketNumber)}
+                        {isCurrent ? (
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${isSelected ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"}`}>
+                            Current
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedRequest ? (
+                <section className="mt-5">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-950">Activity History</h4>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {formatDocketNumber(selectedRequest.docketNumber)} - {selectedEvents.length} event{selectedEvents.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${getPreviousStatusClass(normalizeStatus(selectedRequest.status))}`}>
+                      {normalizeStatus(selectedRequest.status)}
+                    </span>
+                  </div>
+
+                  <ol className="relative space-y-3 before:absolute before:bottom-2 before:left-4 before:top-2 before:w-px before:bg-blue-100">
+                    {selectedEvents.map((event) => (
+                      <li key={event.id} className="relative pl-11">
+                        <span className="absolute left-0 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 ring-4 ring-white">
+                          {event.code}
+                        </span>
+                        <article className="rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="text-sm font-semibold text-slate-950">{event.title}</p>
+                            <time className="text-xs font-medium text-slate-500">{formatPreviousStatusDateTime(event.createdAt)}</time>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{event.details}</p>
+                          {event.meta ? <p className="mt-2 break-words text-xs font-medium text-slate-500">{event.meta}</p> : null}
+                        </article>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-blue-200 bg-white px-4 py-10 text-center">
+                  <p className="text-sm font-semibold text-blue-950">Select a docket number to view its activity history.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+type CompanyHistoryEvent = {
+  id: string;
+  code: string;
+  title: string;
+  details: string;
+  meta: string;
+  createdAt: Date | string;
+};
+
+function getUniqueHistoryRequests(requests: DashboardCompanyHistoryRequest[]) {
+  const byId = new Map<string, DashboardCompanyHistoryRequest>();
+
+  for (const request of requests) {
+    byId.set(request.id, request);
+  }
+
+  return Array.from(byId.values()).sort((a, b) => getDateTime(b.assignedAt ?? b.createdAt) - getDateTime(a.assignedAt ?? a.createdAt));
+}
+
+function getCompanyHistoryEvents(request: DashboardCompanyHistoryRequest) {
+  const activityEvents =
+    request.activities?.map((activity) => ({
+      id: `activity-${activity.id}`,
+      code: getHistoryEventCode(activity.type),
+      title: activity.title,
+      details: getHistoryActivityDetails(activity),
+      meta: [
+        activity.employeeName ? `Employee: ${activity.employeeName}` : null,
+        activity.actorName ? `By: ${activity.actorName}${activity.actorRole ? ` (${activity.actorRole})` : ""}` : null,
+        activity.status ? `Status: ${activity.status}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+      createdAt: activity.createdAt,
+    })) ?? [];
+
+  if (activityEvents.length > 0) {
+    return activityEvents.sort((a, b) => getDateTime(a.createdAt) - getDateTime(b.createdAt));
+  }
+
+  const fallbackEvents: CompanyHistoryEvent[] = [
+    {
+      id: `created-${request.id}`,
+      code: "CR",
+      title: "Service Request Created",
+      details: `Created docket ${formatDocketNumber(request.docketNumber)}`,
+      meta: "",
+      createdAt: request.createdAt,
+    },
+  ];
+
+  if (request.assignedAt) {
+    fallbackEvents.push({
+      id: `assigned-${request.id}`,
+      code: "AS",
+      title: "Service Request Assigned",
+      details: `Assigned to ${request.assignedTo?.name || "Unassigned"}`,
+      meta: "",
+      createdAt: request.assignedAt,
+    });
+  }
+
+  if (request.statusSubmittedAt) {
+    fallbackEvents.push({
+      id: `status-${request.id}`,
+      code: "ST",
+      title: "Status Updated",
+      details: `Status: ${request.status || "New Call"}${request.statusReason ? ` - ${request.statusReason}` : ""}`,
+      meta: request.closedByName ? `Last attended by: ${request.closedByName}` : "",
+      createdAt: request.statusSubmittedAt,
+    });
+  }
+
+  if (request.closedAt) {
+    fallbackEvents.push({
+      id: `closed-${request.id}`,
+      code: "CL",
+      title: "Service Request Closed",
+      details: `Closed by ${request.closedByName || "Unknown"}`,
+      meta: "",
+      createdAt: request.closedAt,
+    });
+  }
+
+  return fallbackEvents;
+}
+
+function getHistoryActivityDetails(activity: DashboardServiceActivity) {
+  if (activity.details?.trim()) {
+    return activity.details.trim();
+  }
+
+  if (activity.statusReason?.trim()) {
+    return `${activity.status || "Status"}: ${activity.statusReason.trim()}`;
+  }
+
+  if (activity.employeeName?.trim()) {
+    return `Employee: ${activity.employeeName.trim()}`;
+  }
+
+  return activity.status ? `Status: ${activity.status}` : "Activity recorded";
+}
+
+function getHistoryEventCode(type: string) {
+  const codes: Record<string, string> = {
+    created: "CR",
+    assigned: "AS",
+    unassigned: "RM",
+    status: "ST",
+    "manager-status": "AM",
+    completed: "CL",
+    closed: "CL",
+    deleted: "DL",
+    "priority-starred": "PS",
+    "priority-unstarred": "PU",
+  };
+
+  return codes[type] || "EV";
+}
 function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const entries = getPreviousStatusEntries(request);

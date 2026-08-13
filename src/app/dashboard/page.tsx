@@ -255,6 +255,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
     ? await getDashboardMediaItemsByRequestIds(allRequests.map((request) => request.id))
     : new Map();
+  const allRequestsByCompany = groupRequestsByCompany(allRequests);
   const dashboardRequests = allRequests.map((request) => {
     const assignmentSummary = getDashboardAssignmentSummary(request.assignments ?? []);
 
@@ -272,6 +273,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           }
         : {}),
       mediaItems: mediaByRequestId.get(request.id) ?? [],
+      companyHistoryRequests: allRequestsByCompany.get(getCompanyKey(request.company)) ?? [request],
     };
   });
 
@@ -377,6 +379,41 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   );
 }
 
+function groupRequestsByCompany<T extends { company: string; createdAt: Date; assignedAt?: Date | string | null }>(requests: T[]) {
+  const groups = new Map<string, T[]>();
+
+  for (const request of requests) {
+    const companyKey = getCompanyKey(request.company);
+    const existingGroup = groups.get(companyKey) ?? [];
+    existingGroup.push(request);
+    groups.set(companyKey, existingGroup);
+  }
+
+  for (const [companyKey, group] of groups.entries()) {
+    groups.set(companyKey, [...group].sort((a, b) => getRequestSortTime(b) - getRequestSortTime(a)));
+  }
+
+  return groups;
+}
+
+function getCompanyKey(company: string) {
+  return company.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function getRequestSortTime(request: { createdAt: Date; assignedAt?: Date | string | null }) {
+  const assignedAt = parseTime(request.assignedAt);
+  const createdAt = parseTime(request.createdAt);
+  return assignedAt || createdAt;
+}
+
+function parseTime(value: Date | string | null | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
 type EmployeeReportRequest = {
   id: string;
   docketNumber: string;

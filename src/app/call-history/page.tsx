@@ -32,6 +32,70 @@ const CALL_HISTORY_COLUMNS = [
   { id: "created", label: "Created" },
 ];
 
+const CALL_HISTORY_REQUEST_SELECT = {
+  id: true,
+  docketNumber: true,
+  name: true,
+  company: true,
+  contactPerson2: true,
+  phoneNumber1: true,
+  phoneNumber2: true,
+  fullAddress: true,
+  complaintDetails: true,
+  product: true,
+  status: true,
+  statusReason: true,
+  statusPointsDelta: true,
+  assignedToId: true,
+  createdAt: true,
+  assignedAt: true,
+  statusSubmittedAt: true,
+  closedAt: true,
+  closedByName: true,
+  deletedAt: true,
+  deletedByName: true,
+  deletedByRole: true,
+  callType: true,
+  area: true,
+  serviceBillingType: true,
+  chargeableAmount: true,
+  customerReview: true,
+  assignedTo: {
+    select: {
+      name: true,
+    },
+  },
+  assignments: {
+    orderBy: { assignedAt: "asc" },
+    select: {
+      assignedAt: true,
+      status: true,
+      closedAt: true,
+      statusSubmittedAt: true,
+      employee: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+  activities: {
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      type: true,
+      title: true,
+      details: true,
+      status: true,
+      statusReason: true,
+      actorName: true,
+      actorRole: true,
+      employeeName: true,
+      createdAt: true,
+    },
+  },
+} satisfies Prisma.ServiceRequestSelect;
 type CallHistoryPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -88,73 +152,24 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
   const calls = await prisma.serviceRequest.findMany({
     where,
-    select: {
-      id: true,
-      docketNumber: true,
-      name: true,
-      company: true,
-      contactPerson2: true,
-      phoneNumber1: true,
-      phoneNumber2: true,
-      fullAddress: true,
-      complaintDetails: true,
-      product: true,
-      status: true,
-      statusReason: true,
-      statusPointsDelta: true,
-      assignedToId: true,
-      createdAt: true,
-      assignedAt: true,
-      statusSubmittedAt: true,
-      closedAt: true,
-      closedByName: true,
-      deletedAt: true,
-      deletedByName: true,
-      deletedByRole: true,
-      callType: true,
-      area: true,
-      serviceBillingType: true,
-      chargeableAmount: true,
-      customerReview: true,
-      assignedTo: {
-        select: {
-          name: true,
-        },
-      },
-      assignments: {
-        orderBy: { assignedAt: "asc" },
-        select: {
-          assignedAt: true,
-          status: true,
-          closedAt: true,
-          statusSubmittedAt: true,
-          employee: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      },
-      activities: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          details: true,
-          status: true,
-          statusReason: true,
-          actorName: true,
-          actorRole: true,
-          employeeName: true,
-          createdAt: true,
-        },
-      },
-    },
+    select: CALL_HISTORY_REQUEST_SELECT,
     orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
+  const visibleCompanyNames = getUniqueCompanyNames(calls);
+  const relatedCompanyCalls =
+    visibleCompanyNames.length > 0
+      ? await prisma.serviceRequest.findMany({
+          where: {
+            OR: visibleCompanyNames.map((company) => ({
+              company: { equals: company, mode: "insensitive" },
+            })),
+          },
+          select: CALL_HISTORY_REQUEST_SELECT,
+          orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
+        })
+      : [];
   const mediaByRequestId = await getDashboardMediaItemsByRequestIds(calls.map((request) => request.id));
+  const companyRequestsByKey = groupRequestsByCompany(relatedCompanyCalls);
 
   const activeFilters = getActiveFilterCount({
     searchQuery,
@@ -292,7 +307,13 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                         <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{formatDocketNumber(request.docketNumber)}</td>
                         <td data-call-history-column="customer" className="px-2.5 py-2.5 text-blue-900">
                           <div>
-                            <ReportCallDetailsModal request={request} triggerContent={request.company} />
+                            <ReportCallDetailsModal
+                              request={{
+                                ...request,
+                                relatedRequests: companyRequestsByKey.get(getCompanyKey(request.company)) ?? [request],
+                              }}
+                              triggerContent={request.company}
+                            />
                             <p className="text-[11px] text-blue-600">{request.name}</p>
                           </div>
                         </td>
@@ -363,6 +384,48 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   );
 }
 
+function getUniqueCompanyNames(requests: Array<{ company: string }>) {
+  const seenCompanyKeys = new Set<string>();
+  const companyNames: string[] = [];
+
+  for (const request of requests) {
+    const companyName = request.company.trim();
+    const companyKey = getCompanyKey(companyName);
+
+    if (!companyName || seenCompanyKeys.has(companyKey)) {
+      continue;
+    }
+
+    seenCompanyKeys.add(companyKey);
+    companyNames.push(companyName);
+  }
+
+  return companyNames;
+}
+function groupRequestsByCompany<T extends { company: string; createdAt: Date; assignedAt: Date | null }>(requests: T[]) {
+  const groups = new Map<string, T[]>();
+
+  for (const request of requests) {
+    const companyKey = getCompanyKey(request.company);
+    const existingGroup = groups.get(companyKey) ?? [];
+    existingGroup.push(request);
+    groups.set(companyKey, existingGroup);
+  }
+
+  for (const [companyKey, group] of groups.entries()) {
+    groups.set(companyKey, [...group].sort((a, b) => getRequestSortTime(b) - getRequestSortTime(a)));
+  }
+
+  return groups;
+}
+
+function getCompanyKey(company: string) {
+  return company.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function getRequestSortTime(request: { createdAt: Date; assignedAt: Date | null }) {
+  return (request.assignedAt ?? request.createdAt).getTime();
+}
 function buildReportWhere({
   searchQuery,
   selectedStatus,

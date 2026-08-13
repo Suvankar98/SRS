@@ -49,11 +49,13 @@ type CallDetailsModalProps = {
       name: string;
     } | null;
     activities?: Activity[];
+    relatedRequests?: TimelineRequest[];
   } | null;
   triggerContent?: ReactNode;
 };
 
 type TimelineRequest = NonNullable<CallDetailsModalProps["request"]>;
+type RelatedTimelineRequest = Omit<TimelineRequest, "relatedRequests">;
 
 type TimelineEvent = {
   type: string;
@@ -66,17 +68,23 @@ type TimelineEvent = {
 
 export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   if (!request) return null;
 
-  const timelineEvents = getTimelineEvents(request);
-  const lastAttendedBy = getLastAttendedBy(request);
-  const displayDocketNumber = formatDocketNumber(request.docketNumber);
+  const relatedRequests = getRelatedTimelineRequests(request);
+  const selectedRequest = selectedRequestId ? relatedRequests.find((relatedRequest) => relatedRequest.id === selectedRequestId) ?? null : null;
+  const timelineEvents = selectedRequest ? getTimelineEvents(selectedRequest) : [];
+  const lastAttendedBy = getLastAttendedBy(selectedRequest ?? request);
+  const displayDocketNumber = formatDocketNumber((selectedRequest ?? request).docketNumber);
 
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setSelectedRequestId(null);
+          setIsOpen(true);
+        }}
         className="cursor-pointer text-blue-600 font-medium hover:text-blue-800 hover:underline transition"
       >
         {triggerContent ?? request.name}
@@ -114,7 +122,7 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <a
-                    href={`/api/service-request/${encodeURIComponent(request.id)}/pdf`}
+                    href={`/api/service-request/${encodeURIComponent((selectedRequest ?? request).id)}/pdf`}
                     download
                     className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100"
                     title="Download PDF"
@@ -135,41 +143,86 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-blue-950">Activity Timeline</h3>
-                  <p className="mt-1 text-xs text-slate-500">{timelineEvents.length} recorded events</p>
+              <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-blue-950">Docket Numbers</h3>
+                    <p className="mt-1 text-xs text-slate-500">{relatedRequests.length} docket{relatedRequests.length === 1 ? "" : "s"} for this company</p>
+                  </div>
+                  {selectedRequest ? (
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+                      Selected {formatDocketNumber(selectedRequest.docketNumber)}
+                    </span>
+                  ) : null}
                 </div>
-                <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
-                  Full process
-                </span>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {relatedRequests.map((relatedRequest) => {
+                    const isSelected = selectedRequest?.id === relatedRequest.id;
+
+                    return (
+                      <button
+                        key={relatedRequest.id}
+                        type="button"
+                        onClick={() => setSelectedRequestId(relatedRequest.id)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                            : "border-blue-200 bg-white text-blue-700 hover:border-blue-400 hover:bg-blue-50"
+                        }`}
+                      >
+                        {formatDocketNumber(relatedRequest.docketNumber)}
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${isSelected ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"}`}>
+                          {relatedRequest.status || "New Call"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <ol className="relative space-y-4 before:absolute before:bottom-2 before:left-4 before:top-2 before:w-px before:bg-blue-100 sm:before:left-5">
-                {timelineEvents.map((event, index) => (
-                  <li
-                    key={`${event.type}-${index}-${String(event.timestamp)}`}
-                    className="relative grid gap-3 pl-11 sm:grid-cols-[minmax(0,1fr)_10rem] sm:pl-14"
-                  >
-                    <span className={`absolute left-0 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white sm:h-10 sm:w-10 ${getTimelineDotClass(event.color)}`}>
-                        {getIconForType(event.type)}
-                    </span>
-                    <div className={`rounded-xl border bg-white p-4 shadow-sm ${getTimelineAccentClass(event.color)}`}>
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-950">{event.label}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${getTimelineBadgeClass(event.color)}`}>
-                          {event.type}
-                        </span>
-                      </div>
-                      <p className="mt-2 break-words text-sm leading-6 text-slate-700">{event.details}</p>
-                      {event.meta ? <p className="mt-2 break-words text-xs font-medium leading-5 text-slate-500">{event.meta}</p> : null}
+              {selectedRequest ? (
+                <>
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-semibold text-blue-950">Activity Timeline</h3>
+                      <p className="mt-1 text-xs text-slate-500">{timelineEvents.length} recorded events for {formatDocketNumber(selectedRequest.docketNumber)}</p>
                     </div>
-                    <time className="text-xs font-medium text-slate-500 sm:pt-4 sm:text-right">
-                      {formatTimelineDate(event.timestamp)}
-                    </time>
-                  </li>
-                ))}
-              </ol>
+                    <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                      Full process
+                    </span>
+                  </div>
+
+                  <ol className="relative space-y-4 before:absolute before:bottom-2 before:left-4 before:top-2 before:w-px before:bg-blue-100 sm:before:left-5">
+                    {timelineEvents.map((event, index) => (
+                      <li
+                        key={`${event.type}-${index}-${String(event.timestamp)}`}
+                        className="relative grid gap-3 pl-11 sm:grid-cols-[minmax(0,1fr)_10rem] sm:pl-14"
+                      >
+                        <span className={`absolute left-0 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white sm:h-10 sm:w-10 ${getTimelineDotClass(event.color)}`}>
+                            {getIconForType(event.type)}
+                        </span>
+                        <div className={`rounded-xl border bg-white p-4 shadow-sm ${getTimelineAccentClass(event.color)}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="text-sm font-semibold text-slate-950">{event.label}</p>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${getTimelineBadgeClass(event.color)}`}>
+                              {event.type}
+                            </span>
+                          </div>
+                          <p className="mt-2 break-words text-sm leading-6 text-slate-700">{event.details}</p>
+                          {event.meta ? <p className="mt-2 break-words text-xs font-medium leading-5 text-slate-500">{event.meta}</p> : null}
+                        </div>
+                        <time className="text-xs font-medium text-slate-500 sm:pt-4 sm:text-right">
+                          {formatTimelineDate(event.timestamp)}
+                        </time>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-blue-200 bg-white px-4 py-10 text-center">
+                  <p className="text-sm font-semibold text-blue-950">Select a docket number to view its activity timeline.</p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end border-t border-blue-100 bg-white px-4 py-4 sm:px-6">
@@ -187,6 +240,23 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
   );
 }
 
+function getRelatedTimelineRequests(request: TimelineRequest): RelatedTimelineRequest[] {
+  const relatedRequests = request.relatedRequests ?? [];
+  const byId = new Map<string, RelatedTimelineRequest>();
+
+  for (const relatedRequest of [request, ...relatedRequests]) {
+    const { relatedRequests: _relatedRequests, ...timelineRequest } = relatedRequest;
+    byId.set(timelineRequest.id, timelineRequest);
+  }
+
+  return Array.from(byId.values()).sort((a, b) => getRequestTime(b) - getRequestTime(a));
+}
+
+function getRequestTime(request: RelatedTimelineRequest) {
+  const assignedAt = request.assignedAt ? new Date(request.assignedAt).getTime() : 0;
+  const createdAt = new Date(request.createdAt).getTime();
+  return Number.isNaN(assignedAt) || assignedAt === 0 ? (Number.isNaN(createdAt) ? 0 : createdAt) : assignedAt;
+}
 function getTimelineEvents(request: TimelineRequest): TimelineEvent[] {
   const activityEvents =
     request.activities?.map((activity) => ({

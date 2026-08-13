@@ -115,12 +115,16 @@ function getRequestFallbackRemarks(request: AdminManagerStatusSelectProps["reque
 }
 function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
   const [open, setOpen] = React.useState(false);
+  const [reviewingRemarkId, setReviewingRemarkId] = React.useState<string | null>(null);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setReviewingRemarkId(null);
+          setOpen(true);
+        }}
         className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-800"
       >
         <RemarkIcon />
@@ -150,7 +154,11 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
             </div>
 
             <div className="space-y-3">
-              {remarks.map((remark) => (
+              {remarks.map((remark) => {
+                const reviewIsLocked = remark.approval === "approved" || remark.approval === "not_approved";
+                const reviewButtonsDisabled = reviewIsLocked || reviewingRemarkId === remark.id;
+
+                return (
                 <div key={remark.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -182,22 +190,24 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
                     <div className="flex flex-wrap items-center gap-2">
                       {remark.canReview ? (
                         <>
-                          <form action={updateAssignmentStatusPointApproval}>
+                          <form action={updateAssignmentStatusPointApproval} onSubmit={() => setReviewingRemarkId(remark.id)}>
                             <input type="hidden" name="assignmentId" value={remark.id} />
                             <input type="hidden" name="approval" value="approved" />
                             <button
                               type="submit"
-                              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700"
+                              disabled={reviewButtonsDisabled}
+                              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-emerald-600"
                             >
                               Approved
                             </button>
                           </form>
-                          <form action={updateAssignmentStatusPointApproval}>
+                          <form action={updateAssignmentStatusPointApproval} onSubmit={() => setReviewingRemarkId(remark.id)}>
                             <input type="hidden" name="assignmentId" value={remark.id} />
                             <input type="hidden" name="approval" value="not_approved" />
                             <button
                               type="submit"
-                              className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold uppercase text-rose-700 transition hover:bg-rose-100"
+                              disabled={reviewButtonsDisabled}
+                              className="inline-flex items-center justify-center rounded-lg bg-red-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-red-600"
                             >
                               Not Approved
                             </button>
@@ -215,7 +225,8 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
                     </p>
                   ) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

@@ -441,8 +441,8 @@ export function DashboardRequestList({
             <col className="w-[9%]" />
             <col className="w-[8%]" />
             <col className="w-[9%]" />
-            <col className="w-[6%]" />
-            <col className="w-[11%]" />
+            <col className="w-[7%]" />
+            <col className="w-[10%]" />
             {canAssign ? <col className="w-[19%]" /> : null}
           </colgroup>
           <thead className="bg-blue-50 text-blue-700">
@@ -1013,7 +1013,7 @@ function OpenDocketIcon() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="break-words border-b-2 border-blue-200 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900">
+    <th className="whitespace-nowrap border-b-2 border-blue-200 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900">
       {children}
     </th>
   );

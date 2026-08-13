@@ -93,17 +93,17 @@ export function AppShell({ children, user }: AppShellProps) {
   return (
     <div
       className={`min-h-screen bg-[#f4f9ff] text-[#003d73] lg:grid ${
-        isCollapsed ? "lg:grid-cols-[5.5rem_minmax(0,1fr)]" : "lg:grid-cols-[15rem_minmax(0,1fr)]"
+        isCollapsed ? "lg:grid-cols-[5.5rem_minmax(0,1fr)]" : "lg:grid-cols-[12rem_minmax(0,1fr)]"
       }`}
     >
       <aside
         className={`fixed inset-y-0 left-0 z-50 hidden overflow-hidden bg-gradient-to-b from-[#0759b8] via-[#064f9f] to-[#04356f] text-white shadow-[14px_0_45px_rgba(0,61,115,0.16)] transition-[width] duration-200 lg:block ${
-          isCollapsed ? "w-[5.5rem]" : "w-60"
+          isCollapsed ? "w-[5.5rem]" : "w-48"
         }`}
       >
-        <div className={`relative flex h-full min-h-0 flex-col py-3 ${isCollapsed ? "px-3" : "px-4"}`}>
+        <div className={`relative flex h-full min-h-0 flex-col py-3 ${isCollapsed ? "px-3" : "px-3"}`}>
           <div className="mb-3 flex shrink-0 justify-center">
-            <div className={`overflow-hidden rounded-xl border border-white/25 bg-white p-1.5 shadow-sm ${isCollapsed ? "h-10 w-10" : "h-12 w-28"}`}>
+            <div className={`overflow-hidden rounded-xl border border-white/25 bg-white p-1.5 shadow-sm ${isCollapsed ? "h-10 w-10" : "h-11 w-24"}`}>
               <Image
                 src="/dashboard-srtec-logo.svg"
                 alt="SRTEC Automation"
@@ -115,7 +115,7 @@ export function AppShell({ children, user }: AppShellProps) {
             </div>
           </div>
 
-          <div className={`mb-3 shrink-0 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 shadow-sm ${isCollapsed ? "hidden" : ""}`}>
+          <div className={`mb-3 shrink-0 rounded-xl border border-white/10 bg-white/10 px-2.5 py-2 shadow-sm ${isCollapsed ? "hidden" : ""}`}>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">{formatRole(user.role)}</p>
             <p className="mt-0.5 truncate text-xs font-semibold text-white">{user.name}</p>
           </div>
