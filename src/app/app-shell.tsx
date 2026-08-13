@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { logout } from "./actions";
 import { APP_ROLES, type AppRole } from "@/lib/auth-constants";
@@ -82,6 +82,7 @@ export function AppShell({ children, user }: AppShellProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isTechManualOpen, setIsTechManualOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDetailsElement | null>(null);
 
   if (!user || pathname === "/") {
     return <>{children}</>;
@@ -89,6 +90,11 @@ export function AppShell({ children, user }: AppShellProps) {
 
   const visibleItems = navItems.filter((item) => item.roles.includes(user.role));
   const canSeeTechManual = [APP_ROLES.ADMIN, APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE].includes(user.role);
+  const closeMobileMenu = () => {
+    if (mobileMenuRef.current) {
+      mobileMenuRef.current.open = false;
+    }
+  };
 
   return (
     <div
@@ -166,7 +172,7 @@ export function AppShell({ children, user }: AppShellProps) {
       </aside>
 
       <header className="sticky top-0 z-40 border-b border-blue-100 bg-white/95 px-3 py-2 shadow-sm backdrop-blur lg:hidden">
-        <details className="relative">
+        <details ref={mobileMenuRef} className="relative">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl bg-[#0759b8] px-3 py-2 text-white">
             <span className="inline-flex items-center gap-2">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
@@ -183,10 +189,16 @@ export function AppShell({ children, user }: AppShellProps) {
           <div className="absolute left-0 right-0 mt-2 overflow-hidden rounded-2xl border border-blue-100 bg-[#0759b8] p-2 shadow-2xl">
             <nav className="space-y-1">
               {visibleItems.map((item) => (
-                <MobileSidebarLink key={item.href} item={item} active={isActivePath(pathname, item.href)} />
+                <MobileSidebarLink key={item.href} item={item} active={isActivePath(pathname, item.href)} onNavigate={closeMobileMenu} />
               ))}
               {canSeeTechManual ? (
-                <MobileTechManualNav activePath={pathname} onOpen={() => setIsTechManualOpen(true)} />
+                <MobileTechManualNav
+                  activePath={pathname}
+                  onOpen={() => {
+                    closeMobileMenu();
+                    setIsTechManualOpen(true);
+                  }}
+                />
               ) : null}
               <form action={logout}>
                 <button
@@ -343,10 +355,11 @@ function TechManualPopup({ onClose }: { onClose: () => void }) {
   );
 }
 
-function MobileSidebarLink({ item, active }: { item: NavItem; active: boolean }) {
+function MobileSidebarLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate: () => void }) {
   return (
     <Link
       href={item.href}
+      onClick={onNavigate}
       className={`grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
         active ? "bg-white text-[#0759b8]" : "text-white/90 hover:bg-white/14"
       }`}
