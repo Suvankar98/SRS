@@ -96,10 +96,6 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
     fileInputRef.current?.click();
   }
 
-  function clearSearch() {
-    setSearchInput("");
-  }
-
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -216,23 +212,12 @@ export function SavedCustomerDetailsPanel({ companies, totalRequests }: SavedCus
               <SearchIcon />
             </span>
             <input
-              type="search"
+              type="text"
               value={searchInput}
               onChange={(event) => setSearchInput(event.currentTarget.value)}
               placeholder="Search company, name, phone, area"
-              className="h-11 w-full rounded-full border border-blue-200 bg-blue-50 px-11 text-sm font-medium text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              className="h-11 w-full rounded-full border border-blue-200 bg-blue-50 pl-11 pr-4 text-sm font-medium text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
             />
-            {searchInput ? (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                aria-label="Clear saved customer search"
-                title="Clear"
-              >
-                <ClearIcon />
-              </button>
-            ) : null}
           </label>
           {normalizedSearchQuery ? (
             <p className="text-xs font-semibold text-blue-600">
@@ -485,13 +470,6 @@ function SearchIcon() {
   );
 }
 
-function ClearIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function DownloadIcon() {
   return (
