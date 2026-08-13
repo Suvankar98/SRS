@@ -64,6 +64,7 @@ type DashboardCompanyHistoryRequest = {
   closedAt: Date | string | null;
   closedByName: string | null;
   assignedTo?: { name: string } | null;
+  assignments?: AssignmentPickerAssignment[];
   activities?: DashboardServiceActivity[];
 };
 type DashboardServiceActivity = {
@@ -883,8 +884,15 @@ function getHistoryEventCode(type: string) {
 }
 function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const entries = getPreviousStatusEntries(request);
-  const displayDocketNumber = formatDocketNumber(request.docketNumber);
+  const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
+  const historyRequests = React.useMemo(
+    () => getUniqueHistoryRequests(request.companyHistoryRequests ?? [request]),
+    [request],
+  );
+  const selectedRequest = selectedRequestId
+    ? historyRequests.find((historyRequest) => historyRequest.id === selectedRequestId) ?? null
+    : null;
+  const entries = selectedRequest ? getPreviousStatusEntries(selectedRequest) : [];
 
   return (
     <>
@@ -892,11 +900,12 @@ function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest
         type="button"
         onClick={(event) => {
           event.stopPropagation();
+          setSelectedRequestId(null);
           setIsOpen(true);
         }}
         className="inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
       >
-        Previous status
+        History
       </button>
 
       {isOpen ? (
@@ -905,56 +914,108 @@ function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl"
+            className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-blue-200 px-5 py-4">
-              <div>
-                <h3 className="text-base font-semibold text-blue-950">Previous Status</h3>
-                <p className="mt-1 text-xs font-medium text-blue-600">{displayDocketNumber}</p>
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-blue-950">History</h3>
+                <p className="mt-1 break-words text-xs font-semibold text-blue-600">{request.company}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">{historyRequests.length} docket{historyRequests.length === 1 ? "" : "s"}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
-                aria-label="Close previous status"
+                aria-label="Close history"
                 title="Close"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <div className="space-y-2 p-5">
-              {entries.length === 0 ? (
-                <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-sm font-medium text-slate-600">
-                  No previous status found for this service.
-                </p>
-              ) : (
-                entries.map((entry) => (
-                  <article key={entry.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-900">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="break-words text-sm font-semibold text-blue-950">{entry.person}</p>
-                        <p className="mt-0.5 text-[11px] font-medium text-blue-600">{entry.title}</p>
-                      </div>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${getPreviousStatusClass(entry.status)}`}>
-                        {entry.status}
-                      </span>
-                    </div>
-                    {entry.remark ? (
-                      <p
-                        className={`mt-2 whitespace-pre-wrap break-words rounded-lg px-2.5 py-2 text-[11px] leading-5 ring-1 ring-inset ${
-                          entry.isEmployeeRemark
-                            ? "border-l-4 border-amber-400 bg-amber-50 font-semibold text-amber-950 ring-amber-200"
-                            : "bg-white text-slate-700 ring-blue-100"
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="flex flex-wrap gap-2">
+                  {historyRequests.map((historyRequest) => {
+                    const isSelected = selectedRequest?.id === historyRequest.id;
+                    const isCurrent = historyRequest.id === request.id;
+
+                    return (
+                      <button
+                        key={historyRequest.id}
+                        type="button"
+                        onClick={() => setSelectedRequestId(historyRequest.id)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                            : "border-blue-200 bg-white text-blue-700 hover:border-blue-400 hover:bg-blue-50"
                         }`}
                       >
-                        {entry.remark}
+                        {formatDocketNumber(historyRequest.docketNumber)}
+                        {isCurrent ? (
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${isSelected ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"}`}>
+                            Current
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedRequest ? (
+                <section className="mt-5">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-950">Activity Timeline</h4>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {formatDocketNumber(selectedRequest.docketNumber)} - {entries.length} event{entries.length === 1 ? "" : "s"}
                       </p>
-                    ) : null}
-                    <p className="mt-2 text-[10px] font-medium text-blue-500">{formatPreviousStatusDateTime(entry.createdAt)}</p>
-                  </article>
-                ))
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${getPreviousStatusClass(normalizeStatus(selectedRequest.status))}`}>
+                      {normalizeStatus(selectedRequest.status)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {entries.length === 0 ? (
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-sm font-medium text-slate-600">
+                        No previous status found for this docket.
+                      </p>
+                    ) : (
+                      entries.map((entry) => (
+                        <article key={entry.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-900">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-semibold text-blue-950">{entry.person}</p>
+                              <p className="mt-0.5 text-[11px] font-medium text-blue-600">{entry.title}</p>
+                            </div>
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${getPreviousStatusClass(entry.status)}`}>
+                              {entry.status}
+                            </span>
+                          </div>
+                          {entry.remark ? (
+                            <p
+                              className={`mt-2 whitespace-pre-wrap break-words rounded-lg px-2.5 py-2 text-[11px] leading-5 ring-1 ring-inset ${
+                                entry.isEmployeeRemark
+                                  ? "border-l-4 border-amber-400 bg-amber-50 font-semibold text-amber-950 ring-amber-200"
+                                  : "bg-white text-slate-700 ring-blue-100"
+                              }`}
+                            >
+                              {entry.remark}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-[10px] font-medium text-blue-500">{formatPreviousStatusDateTime(entry.createdAt)}</p>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-blue-200 bg-white px-4 py-10 text-center">
+                  <p className="text-sm font-semibold text-blue-950">Select a docket number to view its activity timeline.</p>
+                </div>
               )}
             </div>
           </div>
@@ -963,7 +1024,6 @@ function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest
     </>
   );
 }
-
 type PreviousStatusEntry = {
   id: string;
   title: string;
@@ -974,7 +1034,7 @@ type PreviousStatusEntry = {
   createdAt: Date | string;
 };
 
-function getPreviousStatusEntries(request: DashboardRequestRowRequest): PreviousStatusEntry[] {
+function getPreviousStatusEntries(request: DashboardRequestRowRequest | DashboardCompanyHistoryRequest): PreviousStatusEntry[] {
   const activityEntries =
     request.activities
       ?.filter((activity) => Boolean(activity.status) || Boolean(activity.statusReason))

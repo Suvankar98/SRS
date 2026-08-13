@@ -255,7 +255,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
     ? await getDashboardMediaItemsByRequestIds(allRequests.map((request) => request.id))
     : new Map();
-  const allRequestsByCompany = groupRequestsByCompany(allRequests);
+  const companyHistorySourceRequests = isEmployee
+    ? await getDashboardCompanyHistoryRequests(allRequests)
+    : allRequests;
+  const allRequestsByCompany = groupRequestsByCompany(companyHistorySourceRequests);
   const dashboardRequests = allRequests.map((request) => {
     const assignmentSummary = getDashboardAssignmentSummary(request.assignments ?? []);
 
@@ -379,6 +382,66 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   );
 }
 
+async function getDashboardCompanyHistoryRequests(requests: Array<{ company: string }>) {
+  const companyNames = getUniqueCompanyNames(requests);
+
+  if (companyNames.length === 0) {
+    return [];
+  }
+
+  return prisma.serviceRequest.findMany({
+    where: {
+      deletedAt: null,
+      OR: companyNames.map((company) => ({
+        company: { equals: company, mode: "insensitive" },
+      })),
+    },
+    orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
+    include: {
+      assignedTo: {
+        select: { name: true },
+      },
+      assignments: {
+        orderBy: { assignedAt: "asc" },
+        include: { employee: { select: { name: true } } },
+      },
+      activities: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          details: true,
+          status: true,
+          statusReason: true,
+          employeeName: true,
+          actorName: true,
+          actorRole: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+}
+
+function getUniqueCompanyNames(requests: Array<{ company: string }>) {
+  const seenCompanyKeys = new Set<string>();
+  const companyNames: string[] = [];
+
+  for (const request of requests) {
+    const companyName = request.company.trim();
+    const companyKey = getCompanyKey(companyName);
+
+    if (!companyName || seenCompanyKeys.has(companyKey)) {
+      continue;
+    }
+
+    seenCompanyKeys.add(companyKey);
+    companyNames.push(companyName);
+  }
+
+  return companyNames;
+}
 function groupRequestsByCompany<T extends { company: string; createdAt: Date; assignedAt?: Date | string | null }>(requests: T[]) {
   const groups = new Map<string, T[]>();
 
