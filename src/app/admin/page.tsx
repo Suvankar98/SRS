@@ -230,7 +230,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </article>
           ) : null}
 
-          <div className={`grid gap-6 ${isAdmin ? "xl:grid-cols-[1.08fr_0.92fr]" : ""}`}>
+          <div className={`grid gap-6 ${isAdmin ? "xl:grid-cols-2" : ""}`}>
             {isAdmin ? (
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -290,7 +290,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </article>
             ) : null}
 
-            <article className="flex h-full min-h-0 flex-col rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+            <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-blue-950">Products</h2>
@@ -314,40 +314,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Add
                 </button>
               </form>
-              <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-2">
+              <div className="mt-5 max-h-[37rem] space-y-3 overflow-y-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-2 pr-1">
                 {products.map((product) => (
-                  <div key={product.id} className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3">
-                    <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
-                      <form action={updateProduct} className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
-                        <input type="hidden" name="id" value={product.id} />
-                        <input
-                          name="name"
-                          defaultValue={product.name}
-                          className="w-full rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                          required
-                        />
-                        <button
-                          type="submit"
-                          aria-label={`Update ${product.name}`}
-                          title="Update product"
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-300 bg-white text-blue-700 transition hover:bg-blue-50"
-                        >
-                          <EditIcon />
-                        </button>
-                      </form>
-                      <form action={deleteProduct}>
-                        <input type="hidden" name="id" value={product.id} />
-                        <ConfirmSubmitButton
-                          confirmMessage={`Are you sure you want to delete product ${product.name}?`}
-                          ariaLabel={`Delete ${product.name}`}
-                          title="Delete product"
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
-                        >
-                          <TrashIcon />
-                        </ConfirmSubmitButton>
-                      </form>
-                    </div>
-                  </div>
+                  <ProductRow key={product.id} product={product} />
                 ))}
               </div>
             </article>
@@ -360,6 +329,43 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </section>
       </div>
     </main>
+  );
+}
+
+function ProductRow({ product }: { product: { id: string; name: string } }) {
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
+        <form action={updateProduct} className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
+          <input type="hidden" name="id" value={product.id} />
+          <input
+            name="name"
+            defaultValue={product.name}
+            className="w-full rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+            required
+          />
+          <button
+            type="submit"
+            aria-label={`Update ${product.name}`}
+            title="Update product"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-300 bg-white text-blue-700 transition hover:bg-blue-50"
+          >
+            <EditIcon />
+          </button>
+        </form>
+        <form action={deleteProduct}>
+          <input type="hidden" name="id" value={product.id} />
+          <ConfirmSubmitButton
+            confirmMessage={`Are you sure you want to delete product ${product.name}?`}
+            ariaLabel={`Delete ${product.name}`}
+            title="Delete product"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
+          >
+            <TrashIcon />
+          </ConfirmSubmitButton>
+        </form>
+      </div>
+    </div>
   );
 }
 
