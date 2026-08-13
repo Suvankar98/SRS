@@ -3,6 +3,7 @@ import { Nunito_Sans } from "next/font/google";
 import { AppShell } from "./app-shell";
 import { ThemeToggle } from "./theme-toggle";
 import { getSession } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import "./globals.css";
 
@@ -73,7 +74,16 @@ async function getCurrentUserName(userId: string) {
 
     return currentUser?.name ?? null;
   } catch (error) {
-    console.error("Failed to load current user for app shell", error);
+    if (isDatabaseConnectionError(error)) {
+      console.warn("Database is temporarily unreachable while loading the app shell user name.");
+      return null;
+    }
+
+    console.error("Failed to load current user for app shell");
     return null;
   }
+}
+
+function isDatabaseConnectionError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001";
 }

@@ -20,6 +20,8 @@ type UploadPopup = {
 export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
   const router = useRouter();
   const formRef = React.useRef<HTMLFormElement | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = React.useRef<HTMLInputElement | null>(null);
   const [fileError, setFileError] = React.useState("");
   const [isUploading, setIsUploading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -40,6 +42,22 @@ export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
     return true;
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
+
+    validateFile(event.currentTarget.files?.[0] ?? null);
+  };
+
+  const handleCameraCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    validateFile(event.currentTarget.files?.[0] ?? null);
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -49,7 +67,10 @@ export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
 
     const form = event.currentTarget;
     const documentName = (form.elements.namedItem("documentName") as HTMLInputElement | null)?.value.trim() ?? "";
-    const selectedFile = (form.elements.namedItem("file") as HTMLInputElement | null)?.files?.[0] ?? null;
+    const selectedFile =
+      (form.elements.namedItem("file") as HTMLInputElement | null)?.files?.[0] ??
+      (form.elements.namedItem("cameraFile") as HTMLInputElement | null)?.files?.[0] ??
+      null;
 
     if (!documentName) {
       setPopup({ type: "error", message: "Please enter a document display name." });
@@ -105,13 +126,26 @@ export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
           className="h-10 rounded-xl border border-blue-200 bg-white px-3 text-sm font-medium text-blue-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
         />
         <input
+          ref={fileInputRef}
           name="file"
           type="file"
-          required
           accept="image/*,video/*,.pdf,.doc,.docx,.rtf"
-          onChange={(event) => validateFile(event.currentTarget.files?.[0] ?? null)}
+          onChange={handleFileChange}
           className="block w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-blue-950 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700"
         />
+        <label className="flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 md:hidden">
+          <CameraIcon />
+          Camera
+          <input
+            ref={cameraInputRef}
+            name="cameraFile"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleCameraCapture}
+            className="sr-only"
+          />
+        </label>
         {fileError ? <p className="text-xs font-semibold text-red-600">{fileError}</p> : null}
         {isUploading ? (
           <div className="rounded-xl border border-blue-100 bg-white p-2">
@@ -135,7 +169,6 @@ export function TechManualUploadForm({ folderId }: TechManualUploadFormProps) {
     </>
   );
 }
-
 async function prepareFileForUpload(file: File) {
   if (!file.type.startsWith("image/") || file.type === "image/gif") {
     return file;
@@ -287,6 +320,15 @@ function UploadMessagePopup({ popup, onClose }: { popup: UploadPopup; onClose: (
         </div>
       </div>
     </div>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 7h1.6l1.2-2h4.4l1.2 2H17a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
   );
 }
 
