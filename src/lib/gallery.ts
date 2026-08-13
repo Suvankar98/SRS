@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 type DashboardGalleryItem = {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   label: string;
   fileName: string;
   requestId: string;
@@ -82,10 +82,12 @@ export async function getDashboardGalleryItems(): Promise<DashboardGalleryItem[]
         }
 
         const extension = path.extname(file.name).toLowerCase();
-        const isVideo = [".mp4", ".webm", ".mov", ".qt"].includes(extension);
+        const isVoiceMessage = file.name.toLowerCase().startsWith("voice-message-");
+        const isAudio = isVoiceMessage || [".mp3", ".wav", ".aac", ".m4a", ".ogg"].includes(extension);
+        const isVideo = !isAudio && [".mp4", ".webm", ".mov", ".qt"].includes(extension);
         const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension);
 
-        if (!isImage && !isVideo) {
+        if (!isImage && !isVideo && !isAudio) {
           continue;
         }
 
@@ -95,7 +97,7 @@ export async function getDashboardGalleryItems(): Promise<DashboardGalleryItem[]
 
         items.push({
           url: `/uploads/${encodeURIComponent(folder.userId)}/${encodeURIComponent(folder.requestId)}/${encodeURIComponent(file.name)}`,
-          type: isVideo ? "video" : "image",
+          type: isAudio ? "audio" : isVideo ? "video" : "image",
           label: `${docketNumber} - ${file.name}`,
           fileName: file.name,
           requestId: folder.requestId,
@@ -169,10 +171,12 @@ export async function getDashboardMediaItemsByRequestIds(
           }
 
           const extension = path.extname(file.name).toLowerCase();
-          const isVideo = [".mp4", ".webm", ".mov", ".qt"].includes(extension);
+          const isVoiceMessage = file.name.toLowerCase().startsWith("voice-message-");
+          const isAudio = isVoiceMessage || [".mp3", ".wav", ".aac", ".m4a", ".ogg"].includes(extension);
+          const isVideo = !isAudio && [".mp4", ".webm", ".mov", ".qt"].includes(extension);
           const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension);
 
-          if (!isImage && !isVideo) {
+          if (!isImage && !isVideo && !isAudio) {
             continue;
           }
 
@@ -180,7 +184,7 @@ export async function getDashboardMediaItemsByRequestIds(
           const currentItems = mediaByRequestId.get(requestDir.name) ?? [];
           currentItems.push({
             url: `/uploads/${encodeURIComponent(userDir.name)}/${encodeURIComponent(requestDir.name)}/${encodeURIComponent(file.name)}`,
-            type: isVideo ? "video" : "image",
+            type: isAudio ? "audio" : isVideo ? "video" : "image",
             label: `${requestDir.name} - ${file.name}`,
             fileName: file.name,
             uploadedAt: stat.mtime,

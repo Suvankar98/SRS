@@ -2464,7 +2464,7 @@ export async function deleteTechManualFolder(formData: FormData) {
 export async function uploadEmployeeImage(formData: FormData) {
   const session = await requireSession();
 
-  // Only employees may upload images for their gallery
+  // Only employees may upload media for their gallery
   if (session.role !== APP_ROLES.EMPLOYEE) {
     redirect("/dashboard");
   }
@@ -2472,7 +2472,7 @@ export async function uploadEmployeeImage(formData: FormData) {
   const requestId = getRequiredField(formData, "requestId");
   const file = formData.get("file") as File | null;
   if (!file || typeof file === "string" || file.size === 0 || !file.name) {
-    throw new Error("Please select a valid image or video file.");
+    throw new Error("Please select a valid image, audio, or video file.");
   }
 
   const allowedTypes = [
@@ -2490,6 +2490,14 @@ export async function uploadEmployeeImage(formData: FormData) {
     "video/3gpp",
     "video/x-ms-wmv",
     "video/x-m4v",
+    "audio/webm",
+    "audio/ogg",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/aac",
+    "audio/m4a",
   ];
   const allowedExtensions = [
     "png",
@@ -2503,10 +2511,15 @@ export async function uploadEmployeeImage(formData: FormData) {
     "mov",
     "qt",
     "ogv",
+    "ogg",
     "avi",
     "mkv",
     "3gp",
     "wmv",
+    "mp3",
+    "wav",
+    "aac",
+    "m4a",
   ];
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const isAllowedType = file.type ? allowedTypes.includes(file.type) : false;
@@ -2634,5 +2647,5 @@ function sanitizeFileName(name: string) {
 
 function isGalleryMediaFile(name: string) {
   const extension = name.split(".").pop()?.toLowerCase() ?? "";
-  return ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "avi", "mkv", "3gp", "wmv"].includes(extension);
+  return ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "ogg", "avi", "mkv", "3gp", "wmv", "mp3", "wav", "aac", "m4a"].includes(extension);
 }

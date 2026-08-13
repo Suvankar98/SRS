@@ -9,7 +9,7 @@ import { ConfirmSubmitButton } from "../confirm-submit-button";
 
 export type GalleryClientItem = {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   label: string;
   fileName: string;
   requestId: string;
@@ -30,7 +30,8 @@ export function GalleryClient({ items }: { items: GalleryClientItem[] }) {
     [dateFilter, employeeFilter, items, query],
   );
   const totalImages = items.filter((item) => item.type === "image").length;
-  const totalVideos = items.length - totalImages;
+  const totalVideos = items.filter((item) => item.type === "video").length;
+  const totalAudio = items.filter((item) => item.type === "audio").length;
   const companyCount = new Set(items.map((item) => item.company)).size;
   const employeeOptions = React.useMemo(
     () => Array.from(new Set(items.map((item) => item.uploadedByName).filter(Boolean))).sort(),
@@ -81,11 +82,12 @@ export function GalleryClient({ items }: { items: GalleryClientItem[] }) {
               </label>
             </div>
           </div>
-          <div className="grid grid-cols-4 overflow-hidden rounded-xl border border-blue-100 bg-blue-50/70 text-center">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-blue-100 bg-blue-50/70 text-center sm:grid-cols-5">
             <GalleryStat label="Files" value={items.length} />
             <GalleryStat label="Dockets" value={new Set(items.map((item) => item.docketNumber)).size} />
             <GalleryStat label="Images" value={totalImages} />
             <GalleryStat label="Videos" value={totalVideos} />
+            <GalleryStat label="Audio" value={totalAudio} />
           </div>
         </div>
       </section>
@@ -139,10 +141,17 @@ function GalleryCard({ item }: { item: GalleryClientItem }) {
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-500">Docket</p>
         <p className="mt-0.5 text-sm font-extrabold text-blue-950">{formatDocketNumber(item.docketNumber)}</p>
       </div>
-      <a href={item.url} target="_blank" rel="noreferrer noopener" className="group block" title="Open full size">
+      <div className="group block">
         <div className="relative aspect-[4/3] overflow-hidden bg-slate-950 text-white">
           {item.type === "image" ? (
             <img src={item.url} alt={item.label} className="h-full w-full object-cover transition duration-200 group-hover:scale-105" />
+          ) : item.type === "audio" ? (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-blue-950/90 p-5">
+              <div className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white">
+                <AudioIcon />
+              </div>
+              <audio src={item.url} className="w-full" controls preload="metadata" />
+            </div>
           ) : (
             <video className="h-full w-full object-cover" muted preload="metadata">
               <source src={item.url} />
@@ -161,7 +170,7 @@ function GalleryCard({ item }: { item: GalleryClientItem }) {
             </div>
           ) : null}
         </div>
-      </a>
+      </div>
       <div className="p-3.5">
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <a
@@ -208,7 +217,7 @@ function EmptyGallery() {
         <ImageIcon />
       </div>
       <p className="mt-4 text-lg font-semibold text-blue-950">No media available yet</p>
-      <p className="mt-2 text-sm text-slate-600">Employees can upload images and videos from their dashboard.</p>
+      <p className="mt-2 text-sm text-slate-600">Employees can upload images, videos, and voice messages from their dashboard.</p>
     </section>
   );
 }
@@ -245,6 +254,16 @@ function getGalleryDateInput(value: string) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+}
+
+function AudioIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
+      <path d="M19 11a7 7 0 0 1-14 0" />
+      <path d="M12 18v3" />
+    </svg>
+  );
 }
 
 function ImageIcon() {

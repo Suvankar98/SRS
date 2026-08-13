@@ -1,6 +1,6 @@
 type DashboardGalleryItem = {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   label: string;
 };
 
@@ -9,7 +9,7 @@ export function DashboardGallery({ items }: { items: DashboardGalleryItem[] }) {
     return (
       <section className="mb-6 rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
         <h2 className="text-lg font-semibold text-blue-950">Media Gallery</h2>
-        <p className="mt-2 text-sm text-blue-600">No uploaded images or videos are available yet.</p>
+        <p className="mt-2 text-sm text-blue-600">No uploaded images, videos, or voice messages are available yet.</p>
       </section>
     );
   }
@@ -32,6 +32,10 @@ export function DashboardGallery({ items }: { items: DashboardGalleryItem[] }) {
             <div className="aspect-[4/3] bg-slate-900 text-white">
               {item.type === "image" ? (
                 <img src={item.url} alt={item.label} className="h-full w-full object-cover" />
+              ) : item.type === "audio" ? (
+                <div className="flex h-full w-full items-center justify-center bg-blue-950/5 p-4">
+                  <audio src={item.url} className="w-full" controls preload="metadata" />
+                </div>
               ) : (
                 <video controls className="h-full w-full object-cover">
                   <source src={item.url} />

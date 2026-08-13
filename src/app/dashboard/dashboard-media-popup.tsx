@@ -32,8 +32,8 @@ export function DashboardMediaPopup({ docketNumber, mediaItems = [], variant = "
             ? "inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             : "inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
         }
-        aria-label={`View photos for ${displayDocketNumber}`}
-        title="View photos"
+        aria-label={`View media for ${displayDocketNumber}`}
+        title="View media"
       >
         {variant === "icon" ? <PhotoIcon /> : "View media"}
       </button>
@@ -68,7 +68,11 @@ export function DashboardMediaPopup({ docketNumber, mediaItems = [], variant = "
                 {mediaItems.map((item) => (
                   <article key={`${item.url}-${item.fileName}`} className="overflow-hidden rounded-xl border border-blue-100 bg-blue-50/40">
                     <div className="aspect-video bg-slate-100">
-                      {item.type === "video" ? (
+                      {item.type === "audio" ? (
+                        <div className="flex h-full w-full items-center justify-center bg-blue-950/5 p-4">
+                          <audio src={item.url} className="w-full" controls preload="metadata" />
+                        </div>
+                      ) : item.type === "video" ? (
                         <video src={item.url} className="h-full w-full bg-black object-contain" controls preload="metadata" />
                       ) : (
                         <img src={item.url} alt={item.fileName} className="h-full w-full object-contain" loading="lazy" />
