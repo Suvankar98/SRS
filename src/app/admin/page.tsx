@@ -83,6 +83,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       orderBy: { createdAt: "asc" },
     }),
   ]);
+  const visibleProducts = products.slice(0, 8);
+  const remainingProducts = products.slice(8);
   const savedCustomerCompanies = buildSavedCustomerCompanies(savedCustomerDetails, importedSavedCustomers);
 
   return (
@@ -230,7 +232,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </article>
           ) : null}
 
-          <div className={`grid gap-6 ${isAdmin ? "xl:grid-cols-2" : ""}`}>
+          <div className={`grid items-start gap-6 ${isAdmin ? "xl:grid-cols-2" : ""}`}>
             {isAdmin ? (
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -290,7 +292,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </article>
             ) : null}
 
-            <article className="flex h-full min-h-0 flex-col rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+            <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-blue-950">Products</h2>
@@ -314,10 +316,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Add
                 </button>
               </form>
-              <div className="mt-5 min-h-[37rem] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-2 pr-1">
-                {products.map((product) => (
+              <div className="mt-5 space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 p-2">
+                {visibleProducts.map((product) => (
                   <ProductRow key={product.id} product={product} />
                 ))}
+                {remainingProducts.length > 0 ? (
+                  <details className="group rounded-2xl border border-blue-200 bg-white">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 transition hover:bg-blue-50">
+                      <span>Show remaining {remainingProducts.length} products</span>
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-blue-200 text-blue-600 transition group-open:rotate-180">
+                        <ChevronDownIcon />
+                      </span>
+                    </summary>
+                    <div className="max-h-[28rem] space-y-3 overflow-y-auto border-t border-blue-100 p-2">
+                      {remainingProducts.map((product) => (
+                        <ProductRow key={product.id} product={product} />
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
               </div>
             </article>
           </div>
@@ -369,6 +386,19 @@ function ProductRow({ product }: { product: { id: string; name: string } }) {
   );
 }
 
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M5 7.5 10 12.5 15 7.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 function TeamMetricIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
