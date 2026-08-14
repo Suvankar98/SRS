@@ -211,7 +211,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
                   <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
                     <p className="break-words text-xs font-medium text-blue-700 sm:text-sm">
-                      {hasUploadedMedia ? "Media uploaded." : "Camera photo or voice message is optional."}
+                      {hasUploadedMedia ? "Media uploaded." : "Camera photo/video or voice message is optional."}
                     </p>
                     <EmployeeMediaUpload
                       requestId={request.id}

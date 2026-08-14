@@ -14,6 +14,15 @@ const allowedTypes = [
   "image/jpg",
   "image/webp",
   "image/gif",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/ogg",
+  "video/x-msvideo",
+  "video/x-matroska",
+  "video/3gpp",
+  "video/x-ms-wmv",
+  "video/x-m4v",
   "audio/webm",
   "audio/ogg",
   "audio/mpeg",
@@ -23,7 +32,7 @@ const allowedTypes = [
   "audio/aac",
   "audio/m4a",
 ];
-const allowedExtensions = ["png", "jpeg", "jpg", "webp", "gif", "webm", "ogg", "mp3", "mp4", "wav", "aac", "m4a"];
+const allowedExtensions = ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "ogg", "avi", "mkv", "3gp", "wmv", "mp3", "wav", "aac", "m4a"];
 
 export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -55,7 +64,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     setUploadError("");
 
     if (!isAllowedType && !isAllowedExtension) {
-      setFileError("Unsupported file type. Please capture an image or record a voice message.");
+      setFileError("Unsupported file type. Please capture a photo, video, or voice message.");
       return false;
     }
 
@@ -133,7 +142,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     }
 
     if (fileError || !selectedFile) {
-      setUploadError(fileError || "Please capture an image or record a voice message first.");
+      setUploadError(fileError || "Please capture a photo, video, or voice message first.");
       return;
     }
 
@@ -167,7 +176,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
           <input
             name="file"
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             capture="environment"
             className="hidden"
             onChange={handleFileChange}
