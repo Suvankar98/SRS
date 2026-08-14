@@ -82,6 +82,7 @@ function getLocalDateTimeParts(value: Date, timeZone: string) {
   };
 }
 
+// Approval can happen any day; points are based only on the employee's allocation day and submission time.
 function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date, assignedCallCount: number) {
   const assignedParts = getLocalDateTimeParts(assignedAt, STATUS_SCORING_TIME_ZONE);
   const submittedParts = getLocalDateTimeParts(submittedAt, STATUS_SCORING_TIME_ZONE);
@@ -116,6 +117,13 @@ function getLocalDayRange(value: Date, timeZone: string) {
   };
 }
 
+function arePointValuesEqual(left: number | null, right: number | null) {
+  if (left === null || right === null) {
+    return left === right;
+  }
+
+  return Math.abs(left - right) < 0.000001;
+}
 async function getAssignedCallCountForStatusSubmission({
   transaction,
   employeeId,
@@ -1896,31 +1904,76 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
       throw new Error("Submitted remark not found");
     }
 
-    const previousPoints = assignment.statusPointsDelta ?? 0;
     const assignedAt = assignment.assignedAt;
-    const nextPoints =
-      approval === "approved"
-        ? getStatusSubmissionPoints(
-            assignedAt,
-            assignment.statusSubmittedAt,
-            await getAssignedCallCountForStatusSubmission({
-              transaction,
-              employeeId: assignment.employeeId,
-              assignedAt,
-            }),
-          )
-        : 0;
-    const pointsDelta = nextPoints - previousPoints;
-
-    await transaction.serviceAssignment.update({
-      where: { id: assignment.id },
-      data: {
-        statusPointsDelta: approval === "approved" ? nextPoints : null,
-        statusPointsApproval: approval,
-        statusPointsReviewedAt: reviewedAt,
-        statusPointsReviewedByName: reviewer?.name ?? "Admin / Manager",
+    const assignedCallCount = await getAssignedCallCountForStatusSubmission({
+      transaction,
+      employeeId: assignment.employeeId,
+      assignedAt,
+    });
+    const allocationDayRange = getLocalDayRange(assignedAt, STATUS_SCORING_TIME_ZONE);
+    const submittedAssignmentsForAllocationDay = await transaction.serviceAssignment.findMany({
+      where: {
+        employeeId: assignment.employeeId,
+        assignedAt: {
+          gte: allocationDayRange.startAt,
+          lte: allocationDayRange.endAt,
+        },
+        statusSubmittedAt: { not: null },
+        request: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        requestId: true,
+        assignedAt: true,
+        statusSubmittedAt: true,
+        statusPointsDelta: true,
+        statusPointsApproval: true,
       },
     });
+
+    let pointsDelta = 0;
+    const affectedRequestIds = new Set<string>();
+
+    for (const submittedAssignment of submittedAssignmentsForAllocationDay) {
+      const nextApproval = submittedAssignment.id === assignment.id ? approval : submittedAssignment.statusPointsApproval;
+      const nextPoints =
+        nextApproval === "approved" && submittedAssignment.statusSubmittedAt
+          ? getStatusSubmissionPoints(
+              submittedAssignment.assignedAt,
+              submittedAssignment.statusSubmittedAt,
+              assignedCallCount,
+            )
+          : null;
+      const previousPoints = submittedAssignment.statusPointsDelta ?? 0;
+      const nextPointsValue = nextPoints ?? 0;
+      const shouldUpdatePoints = !arePointValuesEqual(submittedAssignment.statusPointsDelta, nextPoints);
+      const shouldUpdateReview = submittedAssignment.id === assignment.id;
+
+      if (!shouldUpdatePoints && !shouldUpdateReview) {
+        continue;
+      }
+
+      pointsDelta += nextPointsValue - previousPoints;
+      affectedRequestIds.add(submittedAssignment.requestId);
+
+      await transaction.serviceAssignment.update({
+        where: { id: submittedAssignment.id },
+        data: {
+          statusPointsDelta: nextPoints,
+          ...(shouldUpdateReview
+            ? {
+                statusPointsApproval: approval,
+                statusPointsReviewedAt: reviewedAt,
+                statusPointsReviewedByName: reviewer?.name ?? "Admin / Manager",
+              }
+            : {}),
+        },
+      });
+    }
+
+    if (!affectedRequestIds.has(assignment.requestId)) {
+      affectedRequestIds.add(assignment.requestId);
+    }
 
     await applyEmployeePerformancePointsIncrement({
       transaction,
@@ -1930,23 +1983,25 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
       performanceDate: assignment.statusSubmittedAt,
     });
 
-    const latestApprovedAssignment =
-      (await transaction.serviceAssignment.findMany({
-        where: {
-          requestId: assignment.requestId,
-          statusPointsDelta: { not: null },
-        },
-        orderBy: { statusSubmittedAt: "desc" },
-        take: 1,
-        select: { statusPointsDelta: true },
-      }))[0] ?? null;
+    for (const requestId of affectedRequestIds) {
+      const latestApprovedAssignment =
+        (await transaction.serviceAssignment.findMany({
+          where: {
+            requestId,
+            statusPointsDelta: { not: null },
+          },
+          orderBy: { statusSubmittedAt: "desc" },
+          take: 1,
+          select: { statusPointsDelta: true },
+        }))[0] ?? null;
 
-    await transaction.serviceRequest.update({
-      where: { id: assignment.requestId },
-      data: {
-        statusPointsDelta: latestApprovedAssignment?.statusPointsDelta ?? null,
-      },
-    });
+      await transaction.serviceRequest.update({
+        where: { id: requestId },
+        data: {
+          statusPointsDelta: latestApprovedAssignment?.statusPointsDelta ?? null,
+        },
+      });
+    }
   }, { maxWait: 10000, timeout: 30000 });
 
   revalidatePath("/dashboard");
