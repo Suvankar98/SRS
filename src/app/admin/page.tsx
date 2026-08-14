@@ -83,8 +83,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       orderBy: { createdAt: "asc" },
     }),
   ]);
-  const visibleProducts = products.slice(0, 8);
-  const remainingProducts = products.slice(8);
+  const visibleProducts = products.slice(0, 15);
+  const remainingProducts = products.slice(15);
   const savedCustomerCompanies = buildSavedCustomerCompanies(savedCustomerDetails, importedSavedCustomers);
 
   return (
