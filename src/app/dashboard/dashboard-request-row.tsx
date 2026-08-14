@@ -51,7 +51,7 @@ type DashboardRequestRowRequest = {
   companyHistoryRequests?: DashboardCompanyHistoryRequest[];
 };
 
-type DashboardCompanyHistoryRequest = {
+export type DashboardCompanyHistoryRequest = {
   id: string;
   docketNumber: string;
   company: string;
@@ -882,7 +882,7 @@ function getHistoryEventCode(type: string) {
 
   return codes[type] || "EV";
 }
-function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
+export function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
   const historyRequests = React.useMemo(

@@ -5,6 +5,7 @@ import React from "react";
 import { updateAssignmentStatusPointApproval, updateManagerServiceStatus } from "../actions";
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 import { formatPointDelta } from "@/lib/points";
+import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const STATUS_OPTIONS = ["New Call", "In Process", "Completed", "Cancel"] as const;
 
@@ -28,12 +29,13 @@ type AdminManagerStatusSelectProps = {
       statusPointsReviewedByName?: string | null;
       employee?: { name: string } | null;
     }>;
+    mediaItems?: DashboardRequestMediaItem[];
   };
 };
 
 export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectProps) {
   const status = getStatusLabel(request.status);
-  const assignmentRemarks = getAssignmentRemarks(request.assignments ?? []);
+  const assignmentRemarks = getAssignmentRemarks(request.assignments ?? [], request.mediaItems ?? []);
   const remarks = assignmentRemarks.length > 0 ? assignmentRemarks : getRequestFallbackRemarks(request);
 
   return (
@@ -73,9 +75,15 @@ type AssignmentRemark = {
   reviewedAt: Date | string | null | undefined;
   reviewedByName: string | null | undefined;
   canReview: boolean;
+  audioItems: DashboardRequestMediaItem[];
 };
 
-function getAssignmentRemarks(assignments: NonNullable<AdminManagerStatusSelectProps["request"]["assignments"]>) {
+function getAssignmentRemarks(
+  assignments: NonNullable<AdminManagerStatusSelectProps["request"]["assignments"]>,
+  mediaItems: DashboardRequestMediaItem[],
+) {
+  const availableAudioItems = mediaItems.filter((item) => item.type === "audio");
+
   return assignments
     .filter((assignment) => assignment.statusSubmittedAt && assignment.statusReason?.trim())
     .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt))
@@ -90,6 +98,7 @@ function getAssignmentRemarks(assignments: NonNullable<AdminManagerStatusSelectP
       reviewedAt: assignment.statusPointsReviewedAt,
       reviewedByName: assignment.statusPointsReviewedByName,
       canReview: Boolean(assignment.id),
+      audioItems: getRemarkAudioItems(availableAudioItems, assignment.employeeId, assignment.statusSubmittedAt),
     }));
 }
 
@@ -110,9 +119,33 @@ function getRequestFallbackRemarks(request: AdminManagerStatusSelectProps["reque
       reviewedAt: null,
       reviewedByName: null,
       canReview: false,
+      audioItems: [],
     },
   ];
 }
+
+function getRemarkAudioItems(
+  audioItems: DashboardRequestMediaItem[],
+  employeeId: string,
+  submittedAt: Date | string | null | undefined,
+) {
+  const submittedTime = getDateTime(submittedAt);
+  const gracePeriodMs = 5 * 60 * 1000;
+
+  return audioItems
+    .filter((item) => item.uploadedById === employeeId)
+    .filter((item) => {
+      if (submittedTime === 0) {
+        return true;
+      }
+
+      const uploadedTime = getDateTime(item.uploadedAt);
+      return uploadedTime === 0 || uploadedTime <= submittedTime + gracePeriodMs;
+    })
+    .sort((a, b) => getDateTime(b.uploadedAt) - getDateTime(a.uploadedAt))
+    .slice(0, 3);
+}
+
 function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
   const [open, setOpen] = React.useState(false);
   const [reviewingRemarkId, setReviewingRemarkId] = React.useState<string | null>(null);
@@ -179,6 +212,16 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
                   <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-blue-900">
                     {remark.remark}
                   </p>
+                  {remark.audioItems.length > 0 ? (
+                    <div className="mt-3 space-y-2 rounded-lg border border-blue-100 bg-white/80 p-2.5">
+                      {remark.audioItems.map((item) => (
+                        <div key={item.url} className="space-y-1">
+                          <p className="truncate text-[10px] font-semibold text-blue-600">{item.fileName}</p>
+                          <audio src={item.url} className="w-full" controls preload="metadata" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-blue-100 pt-3">
                     <p className="text-[11px] font-semibold text-blue-700">
                       {remark.approval === "approved"

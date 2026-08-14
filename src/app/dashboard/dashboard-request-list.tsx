@@ -6,7 +6,7 @@ import { StatusUpdateModal } from "../status-update-modal";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardMediaPopup } from "./dashboard-media-popup";
-import { DashboardRequestRow } from "./dashboard-request-row";
+import { DashboardRequestRow, PreviousStatusButton, type DashboardCompanyHistoryRequest } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
 import { formatDocketNumber } from "@/lib/docket";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
@@ -47,6 +47,7 @@ export type DashboardListRequest = {
   activities?: DashboardServiceActivity[];
   createdBy?: { name: string } | null;
   mediaItems?: DashboardRequestMediaItem[];
+  companyHistoryRequests?: DashboardCompanyHistoryRequest[];
 };
 
 export type DashboardServiceActivity = {
@@ -321,6 +322,11 @@ export function DashboardRequestList({
                       </button>
                     )}
                   />
+                  {isEmployee ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <PreviousStatusButton request={request} />
+                    </div>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <span className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] ring-1 ring-inset ${priority.badgeClassName}`}>

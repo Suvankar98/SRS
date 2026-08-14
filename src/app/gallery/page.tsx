@@ -16,7 +16,7 @@ export default async function GalleryPage() {
     redirect("/dashboard");
   }
 
-  const items = await getDashboardGalleryItems();
+  const items = (await getDashboardGalleryItems()).filter((item) => item.type !== "audio");
 
   return (
     <GalleryClient

@@ -17,7 +17,7 @@ type DashboardGalleryItem = {
   uploadedAt: Date;
 };
 
-export type DashboardRequestMediaItem = Pick<DashboardGalleryItem, "url" | "type" | "label" | "fileName">;
+export type DashboardRequestMediaItem = Pick<DashboardGalleryItem, "url" | "type" | "label" | "fileName" | "uploadedById"> & { uploadedAt?: Date | string };
 
 export type DashboardGalleryGroup = {
   company: string;
@@ -187,6 +187,7 @@ export async function getDashboardMediaItemsByRequestIds(
             type: isAudio ? "audio" : isVideo ? "video" : "image",
             label: `${requestDir.name} - ${file.name}`,
             fileName: file.name,
+            uploadedById: userDir.name,
             uploadedAt: stat.mtime,
           });
           mediaByRequestId.set(requestDir.name, currentItems);
@@ -207,6 +208,8 @@ export async function getDashboardMediaItemsByRequestIds(
           type: item.type,
           label: item.label,
           fileName: item.fileName,
+          uploadedById: item.uploadedById,
+          uploadedAt: item.uploadedAt,
         })),
     ]),
   );

@@ -46,6 +46,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const showWorkDoneInput = status === "In Process";
   const showCancelReasonInput = status === "Cancel";
   const showCompletedRemarkInput = status === "Completed";
+  const showMediaInput = status === "In Process" || status === "Completed" || status === "Cancel";
 
   const openModal = () => {
     setStatus("");
@@ -191,7 +192,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                 </div>
               )}
 
-              {status === "Completed" ? (
+              {showMediaInput ? (
                 <div className="space-y-4">
                   {showCompletedRemarkInput ? (
                     <div>

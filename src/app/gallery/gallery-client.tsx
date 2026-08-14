@@ -31,7 +31,6 @@ export function GalleryClient({ items }: { items: GalleryClientItem[] }) {
   );
   const totalImages = items.filter((item) => item.type === "image").length;
   const totalVideos = items.filter((item) => item.type === "video").length;
-  const totalAudio = items.filter((item) => item.type === "audio").length;
   const companyCount = new Set(items.map((item) => item.company)).size;
   const employeeOptions = React.useMemo(
     () => Array.from(new Set(items.map((item) => item.uploadedByName).filter(Boolean))).sort(),
@@ -82,12 +81,11 @@ export function GalleryClient({ items }: { items: GalleryClientItem[] }) {
               </label>
             </div>
           </div>
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-blue-100 bg-blue-50/70 text-center sm:grid-cols-5">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-blue-100 bg-blue-50/70 text-center sm:grid-cols-4">
             <GalleryStat label="Files" value={items.length} />
             <GalleryStat label="Dockets" value={new Set(items.map((item) => item.docketNumber)).size} />
             <GalleryStat label="Images" value={totalImages} />
             <GalleryStat label="Videos" value={totalVideos} />
-            <GalleryStat label="Audio" value={totalAudio} />
           </div>
         </div>
       </section>
@@ -217,7 +215,7 @@ function EmptyGallery() {
         <ImageIcon />
       </div>
       <p className="mt-4 text-lg font-semibold text-blue-950">No media available yet</p>
-      <p className="mt-2 text-sm text-slate-600">Employees can upload images, videos, and voice messages from their dashboard.</p>
+      <p className="mt-2 text-sm text-slate-600">Employees can upload images and videos from their dashboard.</p>
     </section>
   );
 }
