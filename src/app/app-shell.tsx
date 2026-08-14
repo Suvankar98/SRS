@@ -109,9 +109,9 @@ export function AppShell({ children, user }: AppShellProps) {
       >
         <div className={`relative flex h-full min-h-0 flex-col py-3 ${isCollapsed ? "px-3" : "px-3"}`}>
           <div className="mb-3 flex shrink-0 justify-center">
-            <div className={`overflow-hidden rounded-xl border border-white/25 bg-white p-1.5 shadow-sm ${isCollapsed ? "h-10 w-10" : "h-11 w-24"}`}>
+            <div className={`overflow-hidden rounded-xl border border-white/30 bg-[#0170C3] p-1.5 shadow-sm ${isCollapsed ? "h-10 w-10" : "h-11 w-24"}`}>
               <Image
-                src="/dashboard-srtec-logo.svg"
+                src="/srtec-footer-logo.png"
                 alt="SRTEC Automation"
                 width={160}
                 height={72}

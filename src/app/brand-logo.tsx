@@ -8,7 +8,7 @@ export function BrandLogo({ width = 160, className }: BrandLogoProps) {
 
   return (
     <img
-      src="https://srtec.co.in/wp-content/uploads/2025/09/footer-logo-1-1.png"
+      src="/srtec-footer-logo.png"
       alt="SRTEC Automation"
       width={width}
       height={height}
