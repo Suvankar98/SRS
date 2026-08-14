@@ -230,7 +230,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </article>
           ) : null}
 
-          <div className={`grid items-start gap-6 ${isAdmin ? "xl:grid-cols-2" : ""}`}>
+          <div className={`grid gap-6 ${isAdmin ? "xl:grid-cols-2" : ""}`}>
             {isAdmin ? (
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -290,7 +290,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </article>
             ) : null}
 
-            <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+            <article className="flex h-full min-h-0 flex-col rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-blue-950">Products</h2>
@@ -314,7 +314,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Add
                 </button>
               </form>
-              <div className="mt-5 max-h-[37rem] space-y-3 overflow-y-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-2 pr-1">
+              <div className="mt-5 min-h-[37rem] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-blue-100 bg-blue-50/40 p-2 pr-1">
                 {products.map((product) => (
                   <ProductRow key={product.id} product={product} />
                 ))}
