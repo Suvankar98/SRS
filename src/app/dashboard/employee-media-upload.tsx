@@ -40,11 +40,18 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
   const [fileError, setFileError] = useState<string>("");
   const [uploadError, setUploadError] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
+  const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  const photoCanvasRef = useRef<HTMLCanvasElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const cameraRecorderRef = useRef<MediaRecorder | null>(null);
+  const cameraChunksRef = useRef<Blob[]>([]);
 
   const validateFile = (file: File | null) => {
     if (!file) {
@@ -72,14 +79,158 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     return true;
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0] ?? null;
-    validateFile(file);
-  };
-
   const stopRecordingStream = () => {
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     recordingStreamRef.current = null;
+  };
+
+  const stopCameraStream = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
+  };
+
+  React.useEffect(() => {
+    if (!isCameraOpen || !videoPreviewRef.current || !cameraStreamRef.current) {
+      return;
+    }
+
+    videoPreviewRef.current.srcObject = cameraStreamRef.current;
+    void videoPreviewRef.current.play().catch(() => undefined);
+  }, [isCameraOpen]);
+
+  React.useEffect(() => {
+    return () => {
+      stopRecordingStream();
+      stopCameraStream();
+    };
+  }, []);
+
+  const openCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setUploadError("Camera capture is not supported on this device/browser.");
+      return;
+    }
+
+    try {
+      setUploadError("");
+      setFileError("");
+      setIsCameraLoading(true);
+      let stream: MediaStream;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: true,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+      }
+
+      cameraStreamRef.current = stream;
+      setIsCameraOpen(true);
+    } catch (error) {
+      stopCameraStream();
+      setUploadError(error instanceof Error ? error.message : "Unable to open camera.");
+    } finally {
+      setIsCameraLoading(false);
+    }
+  };
+
+  const closeCamera = () => {
+    if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
+      cameraRecorderRef.current.stop();
+      return;
+    }
+
+    setIsVideoRecording(false);
+    setIsCameraOpen(false);
+    stopCameraStream();
+  };
+
+  const capturePhoto = () => {
+    const video = videoPreviewRef.current;
+    const canvas = photoCanvasRef.current;
+
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      setUploadError("Camera is not ready yet.");
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      setUploadError("Unable to capture photo on this device.");
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setUploadError("Unable to capture photo on this device.");
+        return;
+      }
+
+      const photoFile = new File([blob], `camera-photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+      validateFile(photoFile);
+      closeCamera();
+    }, "image/jpeg", 0.92);
+  };
+
+  const startVideoCapture = () => {
+    const stream = cameraStreamRef.current;
+
+    if (!stream || typeof MediaRecorder === "undefined") {
+      setUploadError("Video recording is not supported on this device/browser.");
+      return;
+    }
+
+    try {
+      const mimeType = getSupportedVideoMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      cameraChunksRef.current = [];
+      cameraRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          cameraChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const recordedMimeType = recorder.mimeType || mimeType || "video/webm";
+        const extension = getVideoFileExtension(recordedMimeType);
+        const blob = new Blob(cameraChunksRef.current, { type: recordedMimeType });
+        const videoFile = new File([blob], `camera-video-${Date.now()}.${extension}`, { type: recordedMimeType });
+        validateFile(videoFile);
+        setIsVideoRecording(false);
+        setIsCameraOpen(false);
+        stopCameraStream();
+      };
+
+      recorder.start();
+      setSelectedFile(null);
+      setFileName("Recording video...");
+      setIsVideoRecording(true);
+      setUploadError("");
+      setFileError("");
+    } catch (error) {
+      setIsVideoRecording(false);
+      setUploadError(error instanceof Error ? error.message : "Unable to start video recording.");
+    }
+  };
+
+  const stopVideoCapture = () => {
+    if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
+      cameraRecorderRef.current.stop();
+    }
   };
 
   const startRecording = async () => {
@@ -117,9 +268,6 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
       setSelectedFile(null);
       setFileName("Recording...");
       setIsRecording(true);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     } catch (error) {
       stopRecordingStream();
       setIsRecording(false);
@@ -141,6 +289,11 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
       return;
     }
 
+    if (isVideoRecording) {
+      setUploadError("Stop the video recording before uploading.");
+      return;
+    }
+
     if (fileError || !selectedFile) {
       setUploadError(fileError || "Please capture a photo, video, or voice message first.");
       return;
@@ -157,9 +310,6 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
         setSelectedFile(null);
         setFileName("");
         onUploaded?.();
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
       } catch (error) {
         setUploadError(error instanceof Error ? error.message : "Upload failed. Please try again.");
       }
@@ -170,23 +320,19 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
     <form className="flex flex-col gap-1 text-[11px] text-blue-950" onSubmit={handleSubmit}>
       <div className="flex flex-wrap items-center gap-2">
         <input type="hidden" name="requestId" value={requestId} />
-        <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-blue-200 bg-white px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">
+        <button
+          type="button"
+          onClick={openCamera}
+          disabled={isPending || isRecording || isVideoRecording || isCameraLoading}
+          className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-blue-200 bg-white px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
           <CameraIcon />
-          Camera
-          <input
-            name="file"
-            type="file"
-            accept="image/*,video/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleFileChange}
-            ref={fileInputRef}
-          />
-        </label>
+          {isCameraLoading ? "Opening" : "Camera"}
+        </button>
         <button
           type="button"
           onClick={isRecording ? stopRecording : startRecording}
-          disabled={isPending}
+          disabled={isPending || isCameraOpen || isVideoRecording}
           className={`inline-flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${
             isRecording
               ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
@@ -200,7 +346,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
         <button
           type="submit"
           aria-label="Upload media"
-          disabled={!selectedFile || !!fileError || isPending || isRecording}
+          disabled={!selectedFile || !!fileError || isPending || isRecording || isVideoRecording}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-950 text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <UploadIcon />
@@ -210,6 +356,53 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
       {uploadError ? <p className="text-xs font-medium text-red-600">{uploadError}</p> : null}
       {isPending ? <p className="text-xs font-medium text-blue-700">Uploading...</p> : null}
       <p className="text-[10px] text-blue-600">Optional for this status.</p>
+
+      {isCameraOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={closeCamera}>
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-blue-100 px-4 py-3">
+              <p className="text-sm font-semibold text-blue-950">Camera</p>
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Close camera"
+                title="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="bg-slate-950">
+              <video ref={videoPreviewRef} className="aspect-[3/4] max-h-[68vh] w-full object-cover" playsInline muted autoPlay />
+              <canvas ref={photoCanvasRef} className="hidden" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              <button
+                type="button"
+                onClick={capturePhoto}
+                disabled={isVideoRecording}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Photo
+              </button>
+              <button
+                type="button"
+                onClick={isVideoRecording ? stopVideoCapture : startVideoCapture}
+                className={`inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-xs font-bold transition ${
+                  isVideoRecording
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                {isVideoRecording ? "Stop Video" : "Record Video"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }
@@ -219,6 +412,18 @@ function getVoiceFileExtension(mimeType: string) {
   if (mimeType.includes("mpeg")) return "mp3";
   if (mimeType.includes("mp4")) return "m4a";
   if (mimeType.includes("wav")) return "wav";
+  return "webm";
+}
+
+function getSupportedVideoMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+  return types.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+function getVideoFileExtension(mimeType: string) {
+  if (mimeType.includes("mp4")) return "mp4";
+  if (mimeType.includes("ogg")) return "ogv";
   return "webm";
 }
 
@@ -247,6 +452,14 @@ function UploadIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 5 17 10" />
       <line x1="12" y1="5" x2="12" y2="19" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
     </svg>
   );
 }
