@@ -30,6 +30,7 @@ type EmployeePerformanceAdjustment = {
   attendancePoints: number;
   reviewOption: string;
   reviewPoints: number;
+  teamworkOption: string;
   documentSubmissionOption: string;
   documentSubmissionPoints: number;
   materialHandoverOption: string;
@@ -42,6 +43,7 @@ type SavedDailyAdjustment = {
   attendanceInOption: AttendanceInOption | "";
   attendanceOutOption: AttendanceOutOption | "";
   reviewOption: ReviewOption | "";
+  reviewNote: string;
   documentSubmissionOption: DocumentSubmissionOption | "";
   materialHandoverOption: MaterialHandoverOption | "";
   totalDelta: number;
@@ -74,6 +76,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
   const [attendanceInOption, setAttendanceInOption] = useState<AttendanceInOption | "">("");
   const [attendanceOutOption, setAttendanceOutOption] = useState<AttendanceOutOption | "">("");
   const [reviewOption, setReviewOption] = useState<ReviewOption | "">("");
+  const [reviewNote, setReviewNote] = useState("");
   const [documentSubmissionOption, setDocumentSubmissionOption] = useState<DocumentSubmissionOption | "">("");
   const [materialHandoverOption, setMaterialHandoverOption] = useState<MaterialHandoverOption | "">("");
   const [adjustmentDate, setAdjustmentDate] = useState(todayInputValue);
@@ -94,6 +97,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
     setAttendanceInOption(savedAdjustment?.attendanceInOption ?? "");
     setAttendanceOutOption(savedAdjustment?.attendanceOutOption ?? "");
     setReviewOption(savedAdjustment?.reviewOption ?? "");
+    setReviewNote(savedAdjustment?.reviewNote ?? "");
     setDocumentSubmissionOption(savedAdjustment?.documentSubmissionOption ?? "");
     setMaterialHandoverOption(savedAdjustment?.materialHandoverOption ?? "");
     setErrorMessage("");
@@ -119,6 +123,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
         formData.append("attendanceInOption", attendanceInOption);
         formData.append("attendanceOutOption", attendanceOutOption);
         formData.append("reviewOption", reviewOption);
+        formData.append("reviewNote", reviewNote);
         formData.append("documentSubmissionOption", documentSubmissionOption);
         formData.append("materialHandoverOption", materialHandoverOption);
         formData.append("adjustmentDate", adjustmentDate);
@@ -209,6 +214,17 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
                 onChange={(value) => setReviewOption(value as ReviewOption)}
                 options={REVIEW_OPTIONS}
               />
+              <label className="grid gap-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.1em] text-blue-700">Review Note</span>
+                <textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="Write review details..."
+                  className="min-h-24 w-full resize-y rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-blue-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                />
+              </label>
               <SelectField
                 label="Document Submission"
                 value={documentSubmissionOption}
@@ -281,6 +297,7 @@ function buildSavedAdjustmentsByDate(adjustments: EmployeePerformanceAdjustment[
       attendanceInOption: attendanceOptions.inOption,
       attendanceOutOption: attendanceOptions.outOption,
       reviewOption: getOptionValue(adjustment.reviewOption, REVIEW_OPTIONS),
+      reviewNote: adjustment.teamworkOption === "N/A" ? "" : adjustment.teamworkOption,
       documentSubmissionOption: getOptionValue(adjustment.documentSubmissionOption, DOCUMENT_OPTIONS),
       materialHandoverOption: getOptionValue(adjustment.materialHandoverOption, MATERIAL_OPTIONS),
       totalDelta: adjustment.totalDelta,

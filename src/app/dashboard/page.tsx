@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 
 import CreatedToast from "./created-toast";
 import { DashboardFilters } from "./dashboard-filters";
@@ -56,7 +56,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
 
-  const [employees, databaseProducts, currentUser, employeePointAdjustments] = await Promise.all([
+  const [employees, databaseProducts, currentUser, employeePointAdjustments, reviewNoteAdjustments] = await Promise.all([
     canAssign
       ? prisma.user.findMany({
           where: { role: APP_ROLES.EMPLOYEE },
@@ -85,6 +85,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           take: 20,
         })
       : Promise.resolve([]),
+    prisma.employeePointAdjustment.findMany({
+      where: {
+        ...(isEmployee ? { employeeId: session.userId } : {}),
+        NOT: [{ teamworkOption: "N/A" }, { teamworkOption: "" }],
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        teamworkOption: true,
+        createdAt: true,
+        employee: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
   const products = getProductOptions(databaseProducts);
 
@@ -276,6 +290,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           }
         : {}),
       mediaItems: mediaByRequestId.get(request.id) ?? [],
+      reviewNotes: getDashboardReviewNotes(request, reviewNoteAdjustments),
       companyHistoryRequests: allRequestsByCompany.get(getCompanyKey(request.company)) ?? [request],
     };
   });
@@ -476,6 +491,119 @@ function parseTime(value: Date | string | null | undefined) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+type DashboardReviewNoteAdjustment = {
+  id: string;
+  employeeId: string;
+  teamworkOption: string;
+  createdAt: Date;
+  employee?: { name: string } | null;
+};
+
+type DashboardReviewNoteRequest = {
+  id: string;
+  status: string | null;
+  createdAt: Date | string;
+  assignedToId?: string | null;
+  assignedAt?: Date | string | null;
+  statusSubmittedAt?: Date | string | null;
+  lastAttemptAt?: Date | string | null;
+  closedAt?: Date | string | null;
+  assignments?: Array<{
+    employeeId: string;
+    assignedAt?: Date | string | null;
+    statusSubmittedAt?: Date | string | null;
+    closedAt?: Date | string | null;
+    employee?: { name: string } | null;
+  }>;
+};
+
+function getDashboardReviewNotes(request: DashboardReviewNoteRequest, adjustments: DashboardReviewNoteAdjustment[]) {
+  const employeeIds = getRequestEmployeeIds(request);
+  const dateKeys = getRequestReviewDateKeys(request);
+
+  if (employeeIds.size === 0 || dateKeys.size === 0) {
+    return [];
+  }
+
+  const seenIds = new Set<string>();
+
+  return adjustments
+    .filter((adjustment) => {
+      const note = adjustment.teamworkOption.trim();
+      if (!note || note === "N/A" || seenIds.has(adjustment.id)) {
+        return false;
+      }
+
+      const isMatch = employeeIds.has(adjustment.employeeId) && dateKeys.has(getKolkataDateKey(adjustment.createdAt));
+      if (isMatch) {
+        seenIds.add(adjustment.id);
+      }
+
+      return isMatch;
+    })
+    .map((adjustment) => ({
+      id: adjustment.id,
+      employeeName: adjustment.employee?.name ?? getRequestEmployeeName(request, adjustment.employeeId),
+      status: normalizeStatus(request.status),
+      note: adjustment.teamworkOption.trim(),
+      submittedAt: adjustment.createdAt,
+    }));
+}
+
+function getRequestEmployeeIds(request: DashboardReviewNoteRequest) {
+  const employeeIds = new Set<string>();
+
+  if (request.assignedToId) {
+    employeeIds.add(request.assignedToId);
+  }
+
+  for (const assignment of request.assignments ?? []) {
+    if (assignment.employeeId) {
+      employeeIds.add(assignment.employeeId);
+    }
+  }
+
+  return employeeIds;
+}
+
+function getRequestEmployeeName(request: DashboardReviewNoteRequest, employeeId: string) {
+  const assignment = request.assignments?.find((item) => item.employeeId === employeeId);
+  return assignment?.employee?.name ?? "Employee";
+}
+
+function getRequestReviewDateKeys(request: DashboardReviewNoteRequest) {
+  const values: Array<Date | string | null | undefined> = [
+    request.statusSubmittedAt,
+    request.lastAttemptAt,
+    request.closedAt,
+    request.assignedAt,
+  ];
+
+  for (const assignment of request.assignments ?? []) {
+    values.push(assignment.statusSubmittedAt, assignment.closedAt, assignment.assignedAt);
+  }
+
+  return new Set(values.map(getKolkataDateKey).filter(Boolean));
+}
+
+function getKolkataDateKey(value: Date | string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 type EmployeeReportRequest = {
   id: string;
@@ -1384,4 +1512,7 @@ function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 }
+
+
+
 

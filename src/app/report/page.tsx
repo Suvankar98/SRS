@@ -75,6 +75,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
           attendancePoints: true,
           reviewOption: true,
           reviewPoints: true,
+          teamworkOption: true,
           documentSubmissionOption: true,
           documentSubmissionPoints: true,
           materialHandoverOption: true,

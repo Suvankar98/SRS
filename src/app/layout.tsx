@@ -14,8 +14,8 @@ const nunitoSans = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SRS Service Desk",
-  description: "SRS Service Desk for managing service requests, employee assignments, and status updates with WhatsApp notifications.",
+  title: "SRTEC Service Desk",
+  description: "SRTEC Service Desk for managing service requests, employee assignments, and status updates with WhatsApp notifications.",
 };
 
 export default async function RootLayout({

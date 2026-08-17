@@ -2121,6 +2121,7 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
   const attendanceInRaw = getOptionalField(formData, "attendanceInOption");
   const attendanceOutRaw = getOptionalField(formData, "attendanceOutOption");
   const reviewRaw = getOptionalField(formData, "reviewOption");
+  const reviewNote = getOptionalField(formData, "reviewNote").slice(0, 1000);
   const documentSubmissionRaw = getOptionalField(formData, "documentSubmissionOption");
   const materialHandoverRaw = getOptionalField(formData, "materialHandoverOption");
   const adjustmentDate = parsePerformanceAdjustmentDate(getRequiredField(formData, "adjustmentDate"));
@@ -2215,7 +2216,7 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
           documentSubmissionPoints: documentSubmission?.points ?? 0,
           materialHandoverOption: materialHandoverRaw,
           materialHandoverPoints: materialHandover?.points ?? 0,
-          teamworkOption: "N/A",
+          teamworkOption: reviewNote || "N/A",
           teamworkPoints: 0,
           totalDelta,
           createdAt: adjustmentDate,
@@ -2354,6 +2355,29 @@ export async function createTechManualFolder(formData: FormData) {
   });
 
   revalidatePath(getTechManualCategoryPath(category));
+}
+
+export async function updateTechManualFolderName(formData: FormData) {
+  await requireRole([APP_ROLES.ADMIN, APP_ROLES.MANAGER]);
+  const folderId = getRequiredField(formData, "folderId");
+  const name = getRequiredField(formData, "name");
+
+  const folder = await prisma.techManualFolder.findUnique({
+    where: { id: folderId },
+    select: { id: true, category: true },
+  });
+
+  if (!folder) {
+    throw new Error("Tech manual folder not found.");
+  }
+
+  await prisma.techManualFolder.update({
+    where: { id: folder.id },
+    data: { name },
+  });
+
+  revalidatePath(getTechManualCategoryPath(folder.category));
+  revalidatePath(getTechManualFolderPath(folder.category, folder.id));
 }
 
 export async function uploadTechManualDocument(

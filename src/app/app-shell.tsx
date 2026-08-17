@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -31,7 +31,7 @@ type ManualItem = {
   description: string;
 };
 
-type IconName = "dashboard" | "call" | "gallery" | "report" | "history" | "admin" | "gear" | "folder" | "logout" | "menu" | "collapse";
+type IconName = "dashboard" | "call" | "gallery" | "report" | "history" | "admin" | "note" | "gear" | "folder" | "logout" | "menu" | "collapse";
 
 const navItems: NavItem[] = [
   {
@@ -472,6 +472,16 @@ function AppIcon({ name }: { name: IconName }) {
     );
   }
 
+  if (name === "note") {
+    return (
+      <svg {...common}>
+        <path d="M6 4h9l3 3v13H6V4Z" />
+        <path d="M15 4v4h4" />
+        <path d="M9 11h6" />
+        <path d="M9 15h5" />
+      </svg>
+    );
+  }
   if (name === "gear") {
     return (
       <svg {...common}>
@@ -519,3 +529,4 @@ function AppIcon({ name }: { name: IconName }) {
     </svg>
   );
 }
+

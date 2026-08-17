@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
@@ -6,7 +6,8 @@ import { StatusUpdateModal } from "../status-update-modal";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardMediaPopup } from "./dashboard-media-popup";
-import { DashboardRequestRow, PreviousStatusButton, type DashboardCompanyHistoryRequest } from "./dashboard-request-row";
+import { ReviewNoteButton } from "./review-note-popup";
+import { DashboardRequestRow, PreviousStatusButton, PrintServicePdfLink, type DashboardCompanyHistoryRequest } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
 import { formatDocketNumber } from "@/lib/docket";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
@@ -322,11 +323,10 @@ export function DashboardRequestList({
                       </button>
                     )}
                   />
-                  {isEmployee ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <PreviousStatusButton request={request} />
-                    </div>
-                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} />
+                    {isEmployee ? <PreviousStatusButton request={request} /> : null}
+                  </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <span className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] ring-1 ring-inset ${priority.badgeClassName}`}>
@@ -1048,3 +1048,4 @@ function formatINRCurrency(amount: number) {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+

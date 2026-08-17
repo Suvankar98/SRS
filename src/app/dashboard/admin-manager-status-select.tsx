@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 
@@ -6,12 +6,16 @@ import { updateAssignmentStatusPointApproval, updateManagerServiceStatus } from 
 import { getStatusLabel, getStatusPillClass, normalizeStatus } from "../status-utils";
 import { formatPointDelta } from "@/lib/points";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
+import { ReviewNoteButton } from "./review-note-popup";
 
 const STATUS_OPTIONS = ["New Call", "In Process", "Completed", "Cancel"] as const;
 
 type AdminManagerStatusSelectProps = {
   request: {
     id: string;
+    docketNumber: string;
+    company: string;
+    name: string;
     status: string | null;
     statusReason: string | null;
     statusSubmittedAt?: Date | string | null;
@@ -60,6 +64,7 @@ export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectPr
         </select>
       </form>
       {remarks.length > 0 ? <AssignmentRemarksPopup remarks={remarks} /> : null}
+      <ReviewNoteButton request={request} />
     </div>
   );
 }
@@ -346,3 +351,4 @@ function CloseIcon() {
     </svg>
   );
 }
+

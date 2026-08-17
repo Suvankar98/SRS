@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
@@ -6,6 +6,7 @@ import { StatusUpdateModal } from "../status-update-modal";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { DashboardMediaPopup } from "./dashboard-media-popup";
+import { ReviewNoteButton } from "./review-note-popup";
 import {
   formatServiceBillingType,
   formatINRCurrency,
@@ -276,14 +277,14 @@ export function DashboardRequestRow({
         return (
           <div className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
             <span>Congratulations</span>
-            <span aria-hidden>👍</span>
+            <span aria-hidden>{"\u{1F44D}"}</span>
           </div>
         );
       }
       return (
         <div className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
           <span>Too late</span>
-          <span aria-hidden>👎</span>
+          <span aria-hidden>{"\u{1F44E}"}</span>
         </div>
       );
     }
@@ -456,10 +457,12 @@ export function DashboardRequestRow({
                 </button>
               )}
             />
+            <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} />
 
             {isEmployee ? (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <PreviousStatusButton request={request} />
+                <ReviewNoteButton request={request} />
                 <DashboardMediaPopup docketNumber={request.docketNumber} mediaItems={request.mediaItems} />
               </div>
             ) : null}
@@ -882,6 +885,22 @@ function getHistoryEventCode(type: string) {
 
   return codes[type] || "EV";
 }
+export function PrintServicePdfLink({ requestId, docketNumber }: { requestId: string; docketNumber: string }) {
+  return (
+    <a
+      href={`/api/service-request/${encodeURIComponent(requestId)}/pdf?disposition=inline`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700 shadow-sm transition hover:border-blue-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+      aria-label={`Open printable PDF for ${docketNumber}`}
+      title="Open PDF"
+    >
+      <PrintIcon />
+      Print
+    </a>
+  );
+}
 export function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
@@ -1109,6 +1128,16 @@ function CloseIcon() {
   );
 }
 
+function PrintIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M5.5 7V3.8H14.5V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 14.2H4.2A1.7 1.7 0 0 1 2.5 12.5V9A2 2 0 0 1 4.5 7H15.5A2 2 0 0 1 17.5 9V12.5A1.7 1.7 0 0 1 15.8 14.2H14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 11.5H13.5V16.5H6.5V11.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M14.5 9.8H14.55" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 function OpenDocketIcon() {
   return (
     <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1230,3 +1259,4 @@ function formatPreviousStatusDateTime(value: Date | string) {
     minute: "2-digit",
   }).format(date);
 }
+

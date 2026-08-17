@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import {
   addTechManualYoutubeLink,
   deleteTechManualDocument,
+  updateTechManualFolderName,
 } from "@/app/actions";
 import { ConfirmSubmitButton } from "@/app/confirm-submit-button";
 import { getSession, roleCanAssign } from "@/lib/auth";
@@ -82,7 +83,36 @@ export default async function TechManualFolderDetailPage({ params, searchParams 
               {categoryLabel} folders
             </Link>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-500">Folder</p>
-            <h1 className="mt-2 break-words text-2xl font-bold text-blue-950">{manualFolder.name}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h1 className="break-words text-2xl font-bold text-blue-950">{manualFolder.name}</h1>
+              {canManageManual ? (
+                <details className="group relative">
+                  <summary
+                    className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 transition hover:border-blue-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    aria-label="Edit folder name"
+                    title="Edit folder name"
+                  >
+                    <PencilIcon />
+                  </summary>
+                  <form action={updateTechManualFolderName} className="mt-2 flex min-w-72 flex-wrap gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 shadow-sm">
+                    <input type="hidden" name="folderId" value={manualFolder.id} />
+                    <label className="min-w-0 flex-1">
+                      <span className="sr-only">Folder name</span>
+                      <input
+                        name="name"
+                        defaultValue={manualFolder.name}
+                        maxLength={120}
+                        required
+                        className="h-10 w-full rounded-xl border border-blue-200 bg-white px-3 text-sm font-semibold text-blue-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      />
+                    </label>
+                    <button type="submit" className="h-10 rounded-xl bg-blue-700 px-4 text-sm font-bold text-white transition hover:bg-blue-800">
+                      Save
+                    </button>
+                  </form>
+                </details>
+              ) : null}
+            </div>
           </div>
 
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
@@ -318,6 +348,15 @@ function BackIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20H8L18.5 9.5C19.33 8.67 19.33 7.33 18.5 6.5C17.67 5.67 16.33 5.67 15.5 6.5L5 17V20H4Z" />
+      <path d="M14.5 7.5L17.5 10.5" />
     </svg>
   );
 }
