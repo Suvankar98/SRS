@@ -269,7 +269,7 @@ function drawServiceReportForm(
     drawContainedImage(page, customerSignatureImage, x + 118, bottom + 3, 95, 14);
   }
   drawCenteredText(page, "Total Amount", x + 331, bottom + 12, 68, 8.5, boldFont);
-  drawCenteredText(page, "(Spare + Service Charge)", x + 331, bottom + 3, 68, 6.2, regularFont);
+  drawCenteredText(page, "(Spare + Service Charge)", x + 337, bottom + 3, 68, 6.2, regularFont);
   drawText(page, "Rs.", x + 405, bottom + 12, 8.5, boldFont);
   drawText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 428, bottom + 12, 8.5, boldFont);
 }

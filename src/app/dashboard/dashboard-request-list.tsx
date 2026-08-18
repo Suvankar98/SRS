@@ -113,13 +113,8 @@ export function DashboardRequestList({
   }, []);
 
   const displayedItems = React.useMemo(
-    () =>
-      sortItemsByDaysOld(
-        items,
-        daysSortMode,
-        (request) => starredRequestIds.has(request.id) && (starredDayByRequestId.get(request.id) ?? todayPriorityDay - 1) >= todayPriorityDay,
-      ),
-    [items, daysSortMode, starredRequestIds, starredDayByRequestId, todayPriorityDay],
+    () => sortItemsByDaysOld(items, daysSortMode),
+    [items, daysSortMode],
   );
   const totalPages = Math.max(1, Math.ceil(displayedItems.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -691,22 +686,15 @@ function DaysOldSortControls({
   );
 }
 
-function sortItemsByDaysOld(
-  items: DashboardListRequest[],
-  mode: DaysSortMode,
-  isPinnedRecentPriority: (request: DashboardListRequest) => boolean,
-) {
+function sortItemsByDaysOld(items: DashboardListRequest[], mode: DaysSortMode) {
   if (mode === "default") {
     return items;
   }
 
-  const pinnedItems = items.filter(isPinnedRecentPriority);
-  const sortableItems = items.filter((item) => !isPinnedRecentPriority(item));
-
-  return [...pinnedItems, ...sortableItems.sort((a, b) => {
-    const aTime = getCreatedTime(a);
-    const bTime = getCreatedTime(b);
-    const comparison = mode === "asc" ? bTime - aTime : aTime - bTime;
+  return [...items].sort((a, b) => {
+    const aDays = getComplaintAgeDays(a);
+    const bDays = getComplaintAgeDays(b);
+    const comparison = mode === "asc" ? aDays - bDays : bDays - aDays;
 
     if (comparison !== 0) {
       return comparison;
@@ -716,7 +704,7 @@ function sortItemsByDaysOld(
       numeric: true,
       sensitivity: "base",
     });
-  })];
+  });
 }
 
 function SortUpIcon() {
@@ -744,10 +732,6 @@ function ResetSortIcon() {
   );
 }
 
-function getCreatedTime(request: DashboardListRequest) {
-  const createdAt = request.createdAt instanceof Date ? request.createdAt : new Date(request.createdAt);
-  return Number.isNaN(createdAt.getTime()) ? 0 : createdAt.getTime();
-}
 
 function getStarredRequestIds(requests: DashboardListRequest[]) {
   return new Set(requests.filter((request) => (request.dashboardOrder ?? 0) < 0).map((request) => request.id));
@@ -786,14 +770,18 @@ function getNormalOrderIndex(orderIds: string[], id: string) {
   return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
 }
 
-function getComplaintAgeLabel(request: DashboardListRequest) {
+function getComplaintAgeDays(request: DashboardListRequest) {
   const createdAt = typeof request.createdAt === "string" ? new Date(request.createdAt) : request.createdAt;
   const completedAt = getCompletedAt(request);
   const endDate = isClosedStatus(request.status) && completedAt ? completedAt : new Date();
 
   const endDay = getDayNumberInTimeZone(endDate, "Asia/Kolkata");
   const createdDay = getDayNumberInTimeZone(createdAt, "Asia/Kolkata");
-  const days = Math.max(0, endDay - createdDay);
+  return Math.max(0, endDay - createdDay);
+}
+
+function getComplaintAgeLabel(request: DashboardListRequest) {
+  const days = getComplaintAgeDays(request);
 
   if (days === 0) {
     return "Today";
@@ -1048,4 +1036,3 @@ function formatINRCurrency(amount: number) {
     maximumFractionDigits: 0,
   }).format(amount);
 }
-
