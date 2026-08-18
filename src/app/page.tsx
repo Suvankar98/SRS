@@ -59,9 +59,15 @@ export default async function Home({ searchParams }: HomeProps) {
 
             <button
               type="submit"
-              className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white bg-white text-2xl font-semibold tracking-tight text-[#0170C3] transition hover:opacity-90"
+              className="group inline-flex h-[3.25rem] w-full items-center justify-center gap-3 rounded-2xl border border-white/35 bg-[#003d73] px-6 text-base font-bold uppercase tracking-[0.26em] text-white shadow-[0_14px_32px_rgba(0,61,115,0.28)] transition hover:-translate-y-0.5 hover:bg-[#002f59] hover:shadow-[0_18px_38px_rgba(0,61,115,0.34)] focus:outline-none focus:ring-4 focus:ring-white/35"
             >
-              LOGIN
+              <span className="pt-0.5">Login</span>
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#003d73] transition group-hover:translate-x-0.5">
+                <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+                  <path d="M4 10h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="m10.5 6 4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </button>
           </form>
         </div>
@@ -69,4 +75,7 @@ export default async function Home({ searchParams }: HomeProps) {
     </main>
   );
 }
+
+
+
 

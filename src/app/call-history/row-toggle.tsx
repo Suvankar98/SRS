@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -58,8 +58,8 @@ export function CallHistoryColumnToggle({ children, columns = [], centerContent 
         <div className="justify-self-start sm:justify-self-center">{centerContent}</div>
         <details className="relative justify-self-start sm:justify-self-end">
           <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-blue-700 outline-none transition hover:bg-blue-100 focus:ring-2 focus:ring-blue-200">
-            Heads
-            <span aria-hidden="true" className="text-sm leading-none">&gt;</span>
+            <FilterIcon />
+            Filter
           </summary>
           <div className="absolute right-0 z-20 mt-2 max-h-80 w-56 overflow-y-auto rounded-2xl border border-blue-200 bg-white p-2 shadow-xl">
             {columns.map((column) => {
@@ -94,6 +94,17 @@ export function CallHistoryColumnToggle({ children, columns = [], centerContent 
         </div>
       )}
     </>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M4 6h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M4 14h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 4.5v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M13 12.5v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -134,3 +145,5 @@ function getInitialHiddenColumnIds(columns: CallHistoryColumnToggleItem[]) {
 function escapeAttributeValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
+
+
