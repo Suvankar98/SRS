@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
+import Script from "next/script";
 import { Nunito_Sans } from "next/font/google";
 import { AppShell } from "./app-shell";
 import { ThemeToggle } from "./theme-toggle";
@@ -29,19 +30,17 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`h-full bg-[#eef6ff] antialiased ${nunitoSans.variable}`}>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var storedTheme = localStorage.getItem("srs-theme");
-                var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-                var theme = storedTheme || (prefersDark ? "dark" : "light");
-                document.documentElement.classList.toggle("dark", theme === "dark");
-                document.documentElement.dataset.theme = theme;
-              } catch (_) {}
-            `,
-          }}
-        />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            try {
+              var storedTheme = localStorage.getItem("srs-theme");
+              var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+              var theme = storedTheme || (prefersDark ? "dark" : "light");
+              document.documentElement.classList.toggle("dark", theme === "dark");
+              document.documentElement.dataset.theme = theme;
+            } catch (_) {}
+          `}
+        </Script>
       </head>
       <body
         suppressHydrationWarning
@@ -87,3 +86,4 @@ async function getCurrentUserName(userId: string) {
 function isDatabaseConnectionError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001";
 }
+

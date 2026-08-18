@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, type ReactNode } from "react";
 
@@ -64,6 +64,8 @@ type TimelineEvent = {
   details: string;
   meta?: string;
   color: string;
+  isEmployeeComment?: boolean;
+  commentText?: string;
 };
 
 export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsModalProps) {
@@ -208,7 +210,7 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                               {event.type}
                             </span>
                           </div>
-                          <p className="mt-2 break-words text-sm leading-6 text-slate-700">{event.details}</p>
+                          <TimelineDetails event={event} />
                           {event.meta ? <p className="mt-2 break-words text-xs font-medium leading-5 text-slate-500">{event.meta}</p> : null}
                         </div>
                         <time className="text-xs font-medium text-slate-500 sm:pt-4 sm:text-right">
@@ -240,6 +242,31 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
   );
 }
 
+function TimelineDetails({ event }: { event: TimelineEvent }) {
+  if (!event.isEmployeeComment || !event.commentText) {
+    return <p className="mt-2 break-words text-sm leading-6 text-slate-700">{event.details}</p>;
+  }
+
+  const commentIndex = event.details.indexOf(event.commentText);
+
+  if (commentIndex < 0) {
+    return (
+      <p className="mt-2 break-words text-sm leading-6 text-slate-700">
+        {event.details}{" "}
+        <span className="font-medium text-rose-700">{event.commentText}</span>
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-2 break-words text-sm leading-6 text-slate-700">
+      {event.details.slice(0, commentIndex)}
+      <span className="font-medium text-rose-700">{event.commentText}</span>
+      {event.details.slice(commentIndex + event.commentText.length)}
+    </p>
+  );
+}
+
 function getRelatedTimelineRequests(request: TimelineRequest): RelatedTimelineRequest[] {
   const relatedRequests = request.relatedRequests ?? [];
   const byId = new Map<string, RelatedTimelineRequest>();
@@ -259,20 +286,26 @@ function getRequestTime(request: RelatedTimelineRequest) {
 }
 function getTimelineEvents(request: TimelineRequest): TimelineEvent[] {
   const activityEvents =
-    request.activities?.map((activity) => ({
-      type: activity.type,
-      label: activity.title,
-      timestamp: activity.createdAt,
-      details: activity.details || getActivityDetails(activity),
-      meta: [
-        activity.employeeName ? `Employee: ${activity.employeeName}` : null,
-        activity.actorName ? `By: ${activity.actorName}${activity.actorRole ? ` (${activity.actorRole})` : ""}` : null,
-        activity.status ? `Status: ${activity.status}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-      color: getActivityColor(activity.type),
-    })) ?? [];
+    request.activities?.map((activity) => {
+      const commentText = getEmployeeCommentText(activity);
+
+      return {
+        type: activity.type,
+        label: activity.title,
+        timestamp: activity.createdAt,
+        details: activity.details || getActivityDetails(activity),
+        meta: [
+          activity.employeeName ? `Employee: ${activity.employeeName}` : null,
+          activity.actorName ? `By: ${activity.actorName}${activity.actorRole ? ` (${activity.actorRole})` : ""}` : null,
+          activity.status ? `Status: ${activity.status}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | "),
+        color: getActivityColor(activity.type),
+        isEmployeeComment: Boolean(commentText),
+        commentText,
+      };
+    }) ?? [];
 
   if (activityEvents.length > 0) {
     return activityEvents;
@@ -333,6 +366,49 @@ function getTimelineEvents(request: TimelineRequest): TimelineEvent[] {
   return fallbackEvents;
 }
 
+function getEmployeeCommentText(activity: Activity) {
+  const hasEmployeeActor = activity.actorRole?.toLowerCase() === "employee" || Boolean(activity.employeeName?.trim());
+
+  if (!hasEmployeeActor || !isStatusCommentActivity(activity)) {
+    return "";
+  }
+
+  const statusReason = activity.statusReason?.trim();
+
+  if (statusReason) {
+    return statusReason;
+  }
+
+  const details = activity.details?.trim() ?? "";
+  const colonIndex = details.lastIndexOf(":");
+
+  if (colonIndex < 0) {
+    return "";
+  }
+
+  return details.slice(colonIndex + 1).trim();
+}
+
+function isStatusCommentActivity(activity: Activity) {
+  const type = activity.type.toLowerCase();
+  const title = activity.title.toLowerCase();
+
+  return (
+    type === "status" ||
+    type === "completed" ||
+    type === "closed" ||
+    type === "cancel" ||
+    type === "cancelled" ||
+    title.includes("completed") ||
+    title.includes("status")
+  );
+}
+function isEmployeeWrittenComment(activity: Activity) {
+  return Boolean(
+    activity.statusReason?.trim() &&
+      (activity.actorRole?.toLowerCase() === "employee" || activity.employeeName?.trim()),
+  );
+}
 function getActivityDetails(activity: Activity) {
   if (activity.statusReason) {
     return `${activity.status || "Status"}: ${activity.statusReason}`;
@@ -441,3 +517,13 @@ function PdfIcon() {
     </svg>
   );
 }
+
+
+
+
+
+
+
+
+
+
