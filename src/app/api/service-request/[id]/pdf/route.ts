@@ -1,4 +1,7 @@
-﻿import { PDFDocument, PDFFont, rgb, StandardFonts } from "pdf-lib";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { PDFDocument, PDFImage, PDFFont, rgb, StandardFonts } from "pdf-lib";
 import { NextResponse } from "next/server";
 
 import { normalizeStatus } from "@/app/status-utils";
@@ -9,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 const SRTEC_BLUE = rgb(0, 0.239, 0.451);
+const CUSTOMER_SIGNATURE_FILE_PREFIX = "customer-signature-";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -67,7 +71,8 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const pdfBytes = await buildServiceRequestPdf(serviceRequest);
+  const customerSignatureBytes = await getLatestCustomerSignatureBytes(id);
+  const pdfBytes = await buildServiceRequestPdf(serviceRequest, customerSignatureBytes);
   const url = new URL(request.url);
   const dispositionType = url.searchParams.get("disposition") === "inline" ? "inline" : "attachment";
 
@@ -80,40 +85,89 @@ export async function GET(request: Request, context: RouteContext) {
   });
 }
 
-async function buildServiceRequestPdf(request: {
-  docketNumber: string;
-  name: string;
-  company: string;
-  contactPerson2: string | null;
-  phoneNumber1: string;
-  phoneNumber2: string | null;
-  fullAddress: string;
-  complaintDetails: string | null;
-  product: string;
-  status: string | null;
-  statusReason: string | null;
-  assignedAt: Date | null;
-  statusSubmittedAt: Date | null;
-  closedAt: Date | null;
-  closedByName: string | null;
-  deletedAt: Date | null;
-  deletedByName: string | null;
-  deletedByRole: string | null;
-  callType: string;
-  area: string;
-  serviceBillingType: string | null;
-  chargeableAmount: number | null;
-  createdAt: Date;
-  assignedToId: string | null;
-  assignedTo: { name: string } | null;
-  assignments: Array<{ employeeId: string }>;
-}) {
+async function getLatestCustomerSignatureBytes(requestId: string) {
+  const uploadsBase = shouldUseTmpUploads()
+    ? path.join(os.tmpdir(), "srs-uploads")
+    : path.join(process.cwd(), "public", "uploads");
+  const userDirs = await fs.promises.readdir(uploadsBase, { withFileTypes: true }).catch(() => []);
+  const signatureFiles: Array<{ filePath: string; uploadedAt: number }> = [];
+
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) {
+      continue;
+    }
+
+    const requestDir = path.join(uploadsBase, userDir.name, requestId);
+    const files = await fs.promises.readdir(requestDir, { withFileTypes: true }).catch(() => []);
+
+    for (const file of files) {
+      const normalizedName = file.name.toLowerCase();
+      if (!file.isFile() || !normalizedName.startsWith(CUSTOMER_SIGNATURE_FILE_PREFIX) || !normalizedName.endsWith(".png")) {
+        continue;
+      }
+
+      const filePath = path.join(requestDir, file.name);
+      const stat = await fs.promises.stat(filePath).catch(() => null);
+      if (stat?.isFile()) {
+        signatureFiles.push({ filePath, uploadedAt: stat.mtime.getTime() });
+      }
+    }
+  }
+
+  const latestSignature = signatureFiles.sort((a, b) => b.uploadedAt - a.uploadedAt)[0];
+  return latestSignature ? fs.promises.readFile(latestSignature.filePath) : null;
+}
+
+async function embedSignatureImage(pdfDoc: PDFDocument, bytes: Uint8Array) {
+  try {
+    return await pdfDoc.embedPng(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function shouldUseTmpUploads() {
+  return process.env.USE_TMP_UPLOADS === "1" || process.env.VERCEL === "1";
+}
+
+async function buildServiceRequestPdf(
+  request: {
+    docketNumber: string;
+    name: string;
+    company: string;
+    contactPerson2: string | null;
+    phoneNumber1: string;
+    phoneNumber2: string | null;
+    fullAddress: string;
+    complaintDetails: string | null;
+    product: string;
+    status: string | null;
+    statusReason: string | null;
+    assignedAt: Date | null;
+    statusSubmittedAt: Date | null;
+    closedAt: Date | null;
+    closedByName: string | null;
+    deletedAt: Date | null;
+    deletedByName: string | null;
+    deletedByRole: string | null;
+    callType: string;
+    area: string;
+    serviceBillingType: string | null;
+    chargeableAmount: number | null;
+    createdAt: Date;
+    assignedToId: string | null;
+    assignedTo: { name: string } | null;
+    assignments: Array<{ employeeId: string }>;
+  },
+  customerSignatureBytes: Uint8Array | null,
+) {
   const pdfDoc = await PDFDocument.create();
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const page = pdfDoc.addPage([540, 396]);
+  const customerSignatureImage = customerSignatureBytes ? await embedSignatureImage(pdfDoc, customerSignatureBytes) : null;
 
-  drawServiceReportForm(page, regularFont, boldFont, request);
+  drawServiceReportForm(page, regularFont, boldFont, request, customerSignatureImage);
 
   return pdfDoc.save();
 }
@@ -140,6 +194,7 @@ function drawServiceReportForm(
     deletedAt: Date | null;
     assignedTo: { name: string } | null;
   },
+  customerSignatureImage: PDFImage | null,
 ) {
   const x = 18;
   const top = 374;
@@ -210,6 +265,9 @@ function drawServiceReportForm(
   drawPartsHeader(page, x, y.action - 16, [230, 43, 58, 68, 105], regularFont, boldFont);
   drawCenteredText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 399, y.partsHeader - 15, 105, 8.8, regularFont);
   drawText(page, "Customer Signature :", x + 7, bottom + 9, 8.5, regularFont);
+  if (customerSignatureImage) {
+    drawContainedImage(page, customerSignatureImage, x + 118, bottom + 3, 95, 14);
+  }
   drawCenteredText(page, "Total Amount", x + 331, bottom + 12, 68, 8.5, boldFont);
   drawCenteredText(page, "(Spare + Service Charge)", x + 331, bottom + 3, 68, 6.2, regularFont);
   drawText(page, "Rs.", x + 405, bottom + 12, 8.5, boldFont);
@@ -283,6 +341,7 @@ function drawCheckboxRow(page: ReturnType<PDFDocument["addPage"]>, x: number, y:
     xOffset += label === "Chargeable" ? 82 : 68;
   });
 }
+
 function drawCallStatusOptions(page: ReturnType<PDFDocument["addPage"]>, x: number, y: number, font: PDFFont, status: string) {
   const normalizedStatus = status.toLowerCase();
   const options = [
@@ -295,6 +354,19 @@ function drawCallStatusOptions(page: ReturnType<PDFDocument["addPage"]>, x: numb
     drawCheckbox(page, xOffset, y - 2, option.checked);
     drawText(page, option.label, xOffset + 13, y, 7.6, font);
     xOffset += option.label === "In Process" ? 72 : 58;
+  });
+}
+
+function drawContainedImage(page: ReturnType<PDFDocument["addPage"]>, image: PDFImage, x: number, y: number, width: number, height: number) {
+  const scale = Math.min(width / image.width, height / image.height);
+  const imageWidth = image.width * scale;
+  const imageHeight = image.height * scale;
+
+  page.drawImage(image, {
+    x: x + (width - imageWidth) / 2,
+    y: y + (height - imageHeight) / 2,
+    width: imageWidth,
+    height: imageHeight,
   });
 }
 
@@ -386,7 +458,3 @@ function toPdfText(value: string) {
 function safeFileName(value: string) {
   return value.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "service-request";
 }
-
-
-
-

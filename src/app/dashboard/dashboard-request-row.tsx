@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { DocketDetailsModal } from "../docket-details-modal";
@@ -457,7 +457,7 @@ export function DashboardRequestRow({
                 </button>
               )}
             />
-            {!isEmployee ? <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} /> : null}
+            <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} />
 
             {isEmployee ? (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1259,5 +1259,4 @@ function formatPreviousStatusDateTime(value: Date | string) {
     minute: "2-digit",
   }).format(date);
 }
-
 

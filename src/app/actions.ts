@@ -1657,6 +1657,8 @@ export async function updateServiceCallStatus(formData: FormData) {
   const status = getDashboardStatus(getRequiredField(formData, "status"));
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
+  const customerSignatureDataUrl = getOptionalField(formData, "customerSignatureDataUrl");
+  const customerSignatureBuffer = customerSignatureDataUrl ? decodeCustomerSignatureDataUrl(customerSignatureDataUrl) : null;
 
   let assignment = await prisma.serviceAssignment.findUnique({
     where: {
@@ -1856,6 +1858,13 @@ export async function updateServiceCallStatus(formData: FormData) {
 
   });
 
+  if (customerSignatureBuffer) {
+    await saveCustomerSignatureImage({
+      userId: session.userId,
+      requestId,
+      buffer: customerSignatureBuffer,
+    });
+  }
   revalidatePath("/dashboard");
   revalidatePath("/report");
 }
@@ -2019,6 +2028,8 @@ export async function updateManagerServiceStatus(formData: FormData) {
   const status = getDashboardStatus(getRequiredField(formData, "status"));
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
+  const customerSignatureDataUrl = getOptionalField(formData, "customerSignatureDataUrl");
+  const customerSignatureBuffer = customerSignatureDataUrl ? decodeCustomerSignatureDataUrl(customerSignatureDataUrl) : null;
   const submittedAt = status === "New Call" ? null : new Date();
   const closedAt = status === "Completed" ? submittedAt : null;
 
@@ -2106,6 +2117,13 @@ export async function updateManagerServiceStatus(formData: FormData) {
       },
     });
   });
+  if (customerSignatureBuffer) {
+    await saveCustomerSignatureImage({
+      userId: session.userId,
+      requestId,
+      buffer: customerSignatureBuffer,
+    });
+  }
 
   revalidatePath("/dashboard");
 }
@@ -2720,11 +2738,44 @@ export async function deleteGalleryMedia(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+
+function decodeCustomerSignatureDataUrl(dataUrl: string) {
+  const match = dataUrl.match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+
+  if (!match) {
+    throw new Error("Invalid customer signature.");
+  }
+
+  const buffer = Buffer.from(match[1], "base64");
+
+  if (buffer.length === 0 || buffer.length > 1_500_000) {
+    throw new Error("Customer signature is too large.");
+  }
+
+  return buffer;
+}
+
+async function saveCustomerSignatureImage({ userId, requestId, buffer }: { userId: string; requestId: string; buffer: Buffer }) {
+  const path = await import("path");
+  const fs = await import("fs");
+  const os = await import("os");
+  const uploadsBase = shouldUseTmpUploads()
+    ? path.join(os.tmpdir(), "srs-uploads")
+    : path.join(process.cwd(), "public", "uploads");
+  const requestDir = path.join(uploadsBase, userId, requestId);
+
+  await fs.promises.mkdir(requestDir, { recursive: true });
+  await fs.promises.writeFile(path.join(requestDir, `customer-signature-${Date.now()}.png`), buffer);
+}
+
+function isCustomerSignatureFile(name: string) {
+  return name.toLowerCase().startsWith("customer-signature-") && name.toLowerCase().endsWith(".png");
+}
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 200);
 }
 
 function isGalleryMediaFile(name: string) {
   const extension = name.split(".").pop()?.toLowerCase() ?? "";
-  return ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "ogg", "avi", "mkv", "3gp", "wmv", "mp3", "wav", "aac", "m4a"].includes(extension);
+  return !isCustomerSignatureFile(name) && ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "ogg", "avi", "mkv", "3gp", "wmv", "mp3", "wav", "aac", "m4a"].includes(extension);
 }

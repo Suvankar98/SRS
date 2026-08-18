@@ -3,6 +3,8 @@ import path from "path";
 import { formatDocketNumber } from "@/lib/docket";
 import { prisma } from "@/lib/prisma";
 
+const CUSTOMER_SIGNATURE_FILE_PREFIX = "customer-signature-";
+
 type DashboardGalleryItem = {
   url: string;
   type: "image" | "video" | "audio";
@@ -82,7 +84,11 @@ export async function getDashboardGalleryItems(): Promise<DashboardGalleryItem[]
         }
 
         const extension = path.extname(file.name).toLowerCase();
-        const isVoiceMessage = file.name.toLowerCase().startsWith("voice-message-");
+        const normalizedFileName = file.name.toLowerCase();
+        if (normalizedFileName.startsWith(CUSTOMER_SIGNATURE_FILE_PREFIX)) {
+          continue;
+        }
+        const isVoiceMessage = normalizedFileName.startsWith("voice-message-");
         const isAudio = isVoiceMessage || [".mp3", ".wav", ".aac", ".m4a", ".ogg"].includes(extension);
         const isVideo = !isAudio && [".mp4", ".webm", ".mov", ".qt"].includes(extension);
         const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension);
@@ -171,7 +177,11 @@ export async function getDashboardMediaItemsByRequestIds(
           }
 
           const extension = path.extname(file.name).toLowerCase();
-          const isVoiceMessage = file.name.toLowerCase().startsWith("voice-message-");
+        const normalizedFileName = file.name.toLowerCase();
+        if (normalizedFileName.startsWith(CUSTOMER_SIGNATURE_FILE_PREFIX)) {
+          continue;
+        }
+        const isVoiceMessage = normalizedFileName.startsWith("voice-message-");
           const isAudio = isVoiceMessage || [".mp3", ".wav", ".aac", ".m4a", ".ogg"].includes(extension);
           const isVideo = !isAudio && [".mp4", ".webm", ".mov", ".qt"].includes(extension);
           const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension);
