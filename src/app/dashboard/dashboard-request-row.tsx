@@ -457,7 +457,7 @@ export function DashboardRequestRow({
                 </button>
               )}
             />
-            <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} />
+            {!isEmployee ? <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} /> : null}
 
             {isEmployee ? (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1259,4 +1259,5 @@ function formatPreviousStatusDateTime(value: Date | string) {
     minute: "2-digit",
   }).format(date);
 }
+
 

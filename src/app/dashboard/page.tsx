@@ -307,8 +307,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? sortByEmployeeQueueOrder(visibleRequests)
     : sortByDashboardOrder(visibleRequests);
   const requests = sortedFilteredRequests;
-  const totalRequests = sortedFilteredRequests.length;
-  const assignedRequests = sortedFilteredRequests.filter(
+  const totalRequests = filteredRequests.length;
+  const assignedRequests = filteredRequests.filter(
     (request) => Boolean(request.assignedToId) || (request.assignments?.length ?? 0) > 0,
   ).length;
   const employeeReport = isEmployee
@@ -1512,6 +1512,7 @@ function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 }
+
 
 
 

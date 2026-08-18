@@ -324,7 +324,7 @@ export function DashboardRequestList({
                     )}
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} />
+                    {!isEmployee ? <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} /> : null}
                     {isEmployee ? <PreviousStatusButton request={request} /> : null}
                   </div>
                 </div>
@@ -1048,4 +1048,5 @@ function formatINRCurrency(amount: number) {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
 
