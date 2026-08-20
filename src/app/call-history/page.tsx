@@ -304,7 +304,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
                     return (
                       <tr key={request.id}>
-                        <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{formatDocketNumber(request.docketNumber)}</td>
+                        <td data-call-history-column="docket" className="px-2.5 py-2.5">
+                          <div className="flex items-center gap-1.5 font-semibold text-blue-900">
+                            <span>{formatDocketNumber(request.docketNumber)}</span>
+                            <CallHistoryPrintPdfLink requestId={request.id} docketNumber={formatDocketNumber(request.docketNumber)} />
+                          </div>
+                        </td>
                         <td data-call-history-column="customer" className="px-2.5 py-2.5 text-blue-900">
                           <div>
                             <ReportCallDetailsModal
@@ -384,6 +389,32 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   );
 }
 
+function CallHistoryPrintPdfLink({ requestId, docketNumber }: { requestId: string; docketNumber: string }) {
+  return (
+    <a
+      href={`/api/service-request/${encodeURIComponent(requestId)}/pdf?disposition=inline`}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 shadow-sm transition hover:border-blue-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+      aria-label={`Open printable service report PDF for ${docketNumber}`}
+      title="Open printable PDF"
+    >
+      <PrintIcon />
+      <span className="sr-only">Print {docketNumber}</span>
+    </a>
+  );
+}
+
+function PrintIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M5.5 7V3.8H14.5V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 14.2H4.2A1.7 1.7 0 0 1 2.5 12.5V9A2 2 0 0 1 4.5 7H15.5A2 2 0 0 1 17.5 9V12.5A1.7 1.7 0 0 1 15.8 14.2H14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 11.5H13.5V16.5H6.5V11.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M14.5 9.8H14.55" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 function getUniqueCompanyNames(requests: Array<{ company: string }>) {
   const seenCompanyKeys = new Set<string>();
   const companyNames: string[] = [];

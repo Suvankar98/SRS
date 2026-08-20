@@ -110,6 +110,7 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                     <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
                       {displayDocketNumber}
                     </span>
+                    <ReportPrintPdfLink requestId={(selectedRequest ?? request).id} docketNumber={displayDocketNumber} />
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-600">{request.name}</p>
                 <p className="mt-1 text-sm text-blue-700">
@@ -160,23 +161,29 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                 <div className="mt-4 flex flex-wrap gap-2">
                   {relatedRequests.map((relatedRequest) => {
                     const isSelected = selectedRequest?.id === relatedRequest.id;
+                    const relatedDocketNumber = formatDocketNumber(relatedRequest.docketNumber);
 
                     return (
-                      <button
+                      <div
                         key={relatedRequest.id}
-                        type="button"
-                        onClick={() => setSelectedRequestId(relatedRequest.id)}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                        className={`inline-flex overflow-hidden rounded-full border text-xs font-semibold transition ${
                           isSelected
                             ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                            : "border-blue-200 bg-white text-blue-700 hover:border-blue-400 hover:bg-blue-50"
+                            : "border-blue-200 bg-white text-blue-700 hover:border-blue-400"
                         }`}
                       >
-                        {formatDocketNumber(relatedRequest.docketNumber)}
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${isSelected ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"}`}>
-                          {relatedRequest.status || "New Call"}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRequestId(relatedRequest.id)}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 transition ${isSelected ? "hover:bg-blue-700" : "hover:bg-blue-50"}`}
+                        >
+                          {relatedDocketNumber}
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${isSelected ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"}`}>
+                            {relatedRequest.status || "New Call"}
+                          </span>
+                        </button>
+                        <DocketChipPrintPdfLink requestId={relatedRequest.id} docketNumber={relatedDocketNumber} isSelected={isSelected} />
+                      </div>
                     );
                   })}
                 </div>
@@ -504,6 +511,53 @@ function getTimelineBadgeClass(color: string) {
   return colors[color] || colors.blue;
 }
 
+function DocketChipPrintPdfLink({ requestId, docketNumber, isSelected }: { requestId: string; docketNumber: string; isSelected: boolean }) {
+  return (
+    <a
+      href={`/api/service-request/${encodeURIComponent(requestId)}/pdf?disposition=inline`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className={`inline-flex w-8 shrink-0 items-center justify-center border-l transition focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+        isSelected
+          ? "border-white/25 text-white hover:bg-white/15"
+          : "border-blue-100 text-blue-700 hover:bg-blue-50"
+      }`}
+      aria-label={`Open printable service report PDF for ${docketNumber}`}
+      title={`Print ${docketNumber}`}
+    >
+      <PrintIcon />
+      <span className="sr-only">Print {docketNumber}</span>
+    </a>
+  );
+}
+function ReportPrintPdfLink({ requestId, docketNumber }: { requestId: string; docketNumber: string }) {
+  return (
+    <a
+      href={`/api/service-request/${encodeURIComponent(requestId)}/pdf?disposition=inline`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 shadow-sm transition hover:border-blue-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+      aria-label={`Open printable service report PDF for ${docketNumber}`}
+      title="Open printable PDF"
+    >
+      <PrintIcon />
+      <span className="sr-only">Print {docketNumber}</span>
+    </a>
+  );
+}
+
+function PrintIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M5.5 7V3.8H14.5V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 14.2H4.2A1.7 1.7 0 0 1 2.5 12.5V9A2 2 0 0 1 4.5 7H15.5A2 2 0 0 1 17.5 9V12.5A1.7 1.7 0 0 1 15.8 14.2H14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 11.5H13.5V16.5H6.5V11.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M14.5 9.8H14.55" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 function PdfIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
