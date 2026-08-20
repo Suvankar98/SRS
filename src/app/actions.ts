@@ -1758,6 +1758,10 @@ export async function updateServiceCallStatus(formData: FormData) {
     throw new Error("Remark is required when status is Completed.");
   }
 
+  if ((status === "In Process" || status === "Completed") && !customerSignatureBuffer) {
+    throw new Error("Customer signature is required.");
+  }
+
   const employee = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { name: true },
@@ -2568,6 +2572,7 @@ export async function uploadEmployeeImage(formData: FormData) {
 
   const requestId = getRequiredField(formData, "requestId");
   const file = formData.get("file") as File | null;
+  const mediaLabel = getOptionalField(formData, "mediaLabel");
   if (!file || typeof file === "string" || file.size === 0 || !file.name) {
     throw new Error("Please select a valid image, audio, or video file.");
   }
@@ -2643,7 +2648,7 @@ export async function uploadEmployeeImage(formData: FormData) {
   await fs.promises.mkdir(requestDir, { recursive: true });
 
   const timestamp = Date.now();
-  const safeName = `${timestamp}-${sanitizeFileName(file.name)}`;
+  const safeName = `${timestamp}-${getMediaLabelPrefix(mediaLabel)}${sanitizeFileName(file.name)}`;
   const filePath = path.join(requestDir, safeName);
 
   await fs.promises.writeFile(filePath, buffer);
@@ -2771,6 +2776,16 @@ async function saveCustomerSignatureImage({ userId, requestId, buffer }: { userI
 function isCustomerSignatureFile(name: string) {
   return name.toLowerCase().startsWith("customer-signature-") && name.toLowerCase().endsWith(".png");
 }
+function getMediaLabelPrefix(label: string) {
+  const normalizedLabel = label.trim().toLowerCase();
+
+  if (["before", "after", "status"].includes(normalizedLabel)) {
+    return `${normalizedLabel}-`;
+  }
+
+  return "";
+}
+
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 200);
 }

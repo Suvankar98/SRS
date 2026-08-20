@@ -5,6 +5,8 @@ import { uploadEmployeeImage } from "../actions";
 
 type EmployeeMediaUploadProps = {
   requestId: string;
+  mediaLabel?: string;
+  helperText?: string;
   onUploaded?: () => void;
 };
 
@@ -34,7 +36,7 @@ const allowedTypes = [
 ];
 const allowedExtensions = ["png", "jpeg", "jpg", "webp", "gif", "mp4", "m4v", "webm", "mov", "qt", "ogv", "ogg", "avi", "mkv", "3gp", "wmv", "mp3", "wav", "aac", "m4a"];
 
-export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUploadProps) {
+export function EmployeeMediaUpload({ requestId, mediaLabel, helperText = "Optional for this status.", onUploaded }: EmployeeMediaUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [fileError, setFileError] = useState<string>("");
@@ -317,9 +319,10 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
   };
 
   return (
-    <form className="flex flex-col gap-1 text-[11px] text-blue-950" onSubmit={handleSubmit}>
-      <div className="flex flex-wrap items-center gap-2">
+    <form className="min-w-0 text-[11px] text-blue-950" onSubmit={handleSubmit}>
+      <div className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_2rem] items-center gap-2 max-[420px]:grid-cols-2">
         <input type="hidden" name="requestId" value={requestId} />
+        {mediaLabel ? <input type="hidden" name="mediaLabel" value={mediaLabel} /> : null}
         <button
           type="button"
           onClick={openCamera}
@@ -342,7 +345,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
           <MicIcon />
           {isRecording ? "Stop" : "Voice"}
         </button>
-        <span className="max-w-[9rem] truncate text-blue-600">{fileName || "No file ready"}</span>
+        <span className="min-w-0 truncate text-blue-600 max-[420px]:col-span-1">{fileName || "No file ready"}</span>
         <button
           type="submit"
           aria-label="Upload media"
@@ -355,7 +358,7 @@ export function EmployeeMediaUpload({ requestId, onUploaded }: EmployeeMediaUplo
       {fileError ? <p className="text-xs text-red-600">{fileError}</p> : null}
       {uploadError ? <p className="text-xs font-medium text-red-600">{uploadError}</p> : null}
       {isPending ? <p className="text-xs font-medium text-blue-700">Uploading...</p> : null}
-      <p className="text-[10px] text-blue-600">Optional for this status.</p>
+      <p className="mt-1 break-words text-[10px] leading-4 text-blue-600">{helperText}</p>
 
       {isCameraOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={closeCamera}>

@@ -34,12 +34,55 @@ type StatusChoice = "" | EditableStatus;
 
 type ModalStep = "details" | "signature";
 
+type StatusMediaUploadPanelProps = {
+  title: string;
+  requestId: string;
+  mediaLabel?: string;
+  note: string;
+  notePlaceholder: string;
+  helperText: string;
+  onNoteChange: (value: string) => void;
+  onUploaded: () => void;
+};
+
+function StatusMediaUploadPanel({
+  title,
+  requestId,
+  mediaLabel = title,
+  note,
+  notePlaceholder,
+  helperText,
+  onNoteChange,
+  onUploaded,
+}: StatusMediaUploadPanelProps) {
+  return (
+    <div className="min-w-0 space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+      {notePlaceholder ? (
+        <label className="block min-w-0">
+          <span className="mb-1.5 block text-sm font-semibold text-blue-800">{title}</span>
+          <textarea
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder={notePlaceholder}
+            rows={3}
+            className="w-full resize-y rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-900 outline-none transition placeholder:text-blue-300 focus:border-blue-400"
+          />
+        </label>
+      ) : (
+        <p className="text-sm font-semibold text-blue-800">{title}</p>
+      )}
+      <EmployeeMediaUpload requestId={requestId} mediaLabel={mediaLabel} helperText={helperText} onUploaded={onUploaded} />
+    </div>
+  );
+}
 export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [status, setStatus] = React.useState<StatusChoice>("");
   const [reason, setReason] = React.useState(request.statusReason || "");
   const [submitError, setSubmitError] = React.useState("");
+  const [beforeNote, setBeforeNote] = React.useState("");
+  const [afterNote, setAfterNote] = React.useState("");
   const [uploadToast, setUploadToast] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [hasUploadedMedia, setHasUploadedMedia] = React.useState(Boolean(request.mediaUploadedAt));
@@ -49,10 +92,9 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const signatureCanvasRef = React.useRef<HTMLCanvasElement>(null);
   const currentStatusLabel = getStatusLabel(request.status);
   const displayDocketNumber = formatDocketNumber(request.docketNumber);
-  const showWorkDoneInput = status === "In Process";
   const showCancelReasonInput = status === "Cancel";
-  const showCompletedRemarkInput = status === "Completed";
-  const showMediaInput = status === "In Process" || status === "Completed" || status === "Cancel";
+  const showBeforeAfterMediaInput = status === "In Process" || status === "Completed";
+  const showCancelMediaInput = status === "Cancel";
   const showSignatureStep = status === "In Process" || status === "Completed";
 
   const openModal = () => {
@@ -60,6 +102,8 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setReason("");
     setSubmitError("");
     setUploadToast("");
+    setBeforeNote("");
+    setAfterNote("");
     setHasUploadedMedia(Boolean(request.mediaUploadedAt));
     setStep("details");
     setHasSignature(false);
@@ -120,8 +164,13 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setStatus(newStatus);
     setStep("details");
     setHasSignature(false);
-    if (newStatus !== "Cancel" && newStatus !== "In Process" && newStatus !== "Completed") {
+    if (newStatus !== "Cancel") {
       setReason("");
+    }
+
+    if (newStatus !== "In Process" && newStatus !== "Completed") {
+      setBeforeNote("");
+      setAfterNote("");
     }
   };
 
@@ -133,18 +182,13 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       return false;
     }
 
-    if (showWorkDoneInput && reason.trim() === "") {
-      setSubmitError("Please enter how much work is done.");
-      return false;
-    }
-
     if (showCancelReasonInput && reason.trim() === "") {
       setSubmitError("Reason is required when status is Cancel.");
       return false;
     }
 
-    if (showCompletedRemarkInput && reason.trim() === "") {
-      setSubmitError("Remark is required when status is Completed.");
+    if (status === "Completed" && !beforeNote.trim() && !afterNote.trim()) {
+      setSubmitError("Please enter before or after details.");
       return false;
     }
 
@@ -159,8 +203,34 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setStep("signature");
   };
 
+  const handleMediaUploaded = (label: string) => {
+    setHasUploadedMedia(true);
+    setSubmitError("");
+    setUploadToast(`${label} media uploaded successfully.`);
+    router.refresh();
+  };
+
+  const getStatusReasonValue = () => {
+    const sections = [reason.trim()];
+
+    if (showBeforeAfterMediaInput && beforeNote.trim()) {
+      sections.push(`Before: ${beforeNote.trim()}`);
+    }
+
+    if (showBeforeAfterMediaInput && afterNote.trim()) {
+      sections.push(`After: ${afterNote.trim()}`);
+    }
+
+    return sections.filter(Boolean).join("\n\n");
+  };
+
   const handleSubmit = async () => {
     if (!validateDetails()) {
+      return;
+    }
+
+    if (showSignatureStep && !hasSignature) {
+      setSubmitError("Customer signature is required.");
       return;
     }
 
@@ -171,7 +241,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       const signatureDataUrl = hasSignature ? signatureCanvasRef.current?.toDataURL("image/png") : "";
       formData.append("requestId", String(request.id));
       formData.append("status", status);
-      formData.append("statusReason", reason);
+      formData.append("statusReason", getStatusReasonValue());
 
       if (signatureDataUrl) {
         formData.append("customerSignatureDataUrl", signatureDataUrl);
@@ -272,17 +342,17 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
             </div>
           ) : null}
           <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-blue-200 bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-blue-200 px-6 py-4">
+            <div className="border-b border-blue-200 px-4 py-4 sm:px-6">
               <h3 className="text-lg font-semibold text-blue-950">Update Call Status</h3>
               <p className="mt-1 text-sm text-blue-600">
                 Docket: {displayDocketNumber} <span className="mx-2 text-blue-300">|</span> Current status: {currentStatusLabel}
               </p>
             </div>
 
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               {step === "details" ? (
                 <>
                   <div>
@@ -300,21 +370,6 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                     <p className="mt-2 text-xs text-blue-600">After saving, this call will move off your dashboard.</p>
                   </div>
 
-                  {showWorkDoneInput && (
-                    <div>
-                      <label className="block text-sm font-medium text-blue-700">
-                        Work done <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        placeholder="Describe how much work is done..."
-                        className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-                        rows={4}
-                      />
-                    </div>
-                  )}
-
                   {showCancelReasonInput && (
                     <div>
                       <label className="block text-sm font-medium text-blue-700">
@@ -330,44 +385,47 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                     </div>
                   )}
 
-                  {showMediaInput ? (
-                    <div className="space-y-4">
-                      {showCompletedRemarkInput ? (
-                        <div>
-                          <label className="block text-sm font-medium text-blue-700">
-                            Remark <span className="text-red-500">*</span>
-                          </label>
-                          <textarea
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            placeholder="Enter completion remark..."
-                            className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none focus:border-blue-400"
-                            rows={4}
-                          />
-                        </div>
-                      ) : null}
-
-                      <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
-                        <p className="break-words text-xs font-medium text-blue-700 sm:text-sm">
-                          {hasUploadedMedia ? "Media uploaded." : "Camera photo/video or voice message is optional."}
-                        </p>
-                        <EmployeeMediaUpload
-                          requestId={request.id}
-                          onUploaded={() => {
-                            setHasUploadedMedia(true);
-                            setSubmitError("");
-                            setUploadToast("Media uploaded successfully.");
-                            router.refresh();
-                          }}
-                        />
-                      </div>
+                  {showBeforeAfterMediaInput ? (
+                    <div className="grid min-w-0 gap-3 md:grid-cols-2">
+                      <StatusMediaUploadPanel
+                        title="Before"
+                        requestId={request.id}
+                        note={beforeNote}
+                        notePlaceholder="Describe before condition..."
+                        helperText="Capture before photo/video or voice message."
+                        onNoteChange={setBeforeNote}
+                        onUploaded={() => handleMediaUploaded("Before")}
+                      />
+                      <StatusMediaUploadPanel
+                        title="After"
+                        requestId={request.id}
+                        note={afterNote}
+                        notePlaceholder="Describe after work/result..."
+                        helperText="Capture after photo/video or voice message."
+                        onNoteChange={setAfterNote}
+                        onUploaded={() => handleMediaUploaded("After")}
+                      />
                     </div>
                   ) : null}
+
+                  {showCancelMediaInput ? (
+                    <StatusMediaUploadPanel
+                      title={hasUploadedMedia ? "Status media uploaded" : "Status media"}
+                      requestId={request.id}
+                      mediaLabel="Status"
+                      note=""
+                      notePlaceholder=""
+                      helperText="Optional for this status."
+                      onNoteChange={() => undefined}
+                      onUploaded={() => handleMediaUploaded("Status")}
+                    />
+                  ) : null}
+
                 </>
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm text-blue-900">
-                    <p className="font-semibold">Customer Signature</p>
+                    <p className="font-semibold">Customer Signature <span className="text-red-500">*</span></p>
                     <p className="mt-1 text-xs text-blue-600">
                       Status: {status} <span className="mx-1 text-blue-300">|</span> Docket: {displayDocketNumber}
                     </p>
@@ -386,7 +444,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                       />
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-xs text-blue-600">Signature is optional.</p>
+                      <p className="text-xs font-medium text-red-600">Signature is required.</p>
                       <button
                         type="button"
                         onClick={clearSignature}

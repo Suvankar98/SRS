@@ -88,7 +88,7 @@ export async function getDashboardGalleryItems(): Promise<DashboardGalleryItem[]
         if (normalizedFileName.startsWith(CUSTOMER_SIGNATURE_FILE_PREFIX)) {
           continue;
         }
-        const isVoiceMessage = normalizedFileName.startsWith("voice-message-");
+        const isVoiceMessage = normalizedFileName.includes("voice-message-");
         const isAudio = isVoiceMessage || [".mp3", ".wav", ".aac", ".m4a", ".ogg"].includes(extension);
         const isVideo = !isAudio && [".mp4", ".webm", ".mov", ".qt"].includes(extension);
         const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension);
@@ -181,7 +181,7 @@ export async function getDashboardMediaItemsByRequestIds(
         if (normalizedFileName.startsWith(CUSTOMER_SIGNATURE_FILE_PREFIX)) {
           continue;
         }
-        const isVoiceMessage = normalizedFileName.startsWith("voice-message-");
+        const isVoiceMessage = normalizedFileName.includes("voice-message-");
           const isAudio = isVoiceMessage || [".mp3", ".wav", ".aac", ".m4a", ".ogg"].includes(extension);
           const isVideo = !isAudio && [".mp4", ".webm", ".mov", ".qt"].includes(extension);
           const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension);
