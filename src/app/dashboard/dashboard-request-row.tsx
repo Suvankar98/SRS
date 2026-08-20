@@ -745,7 +745,7 @@ function CompanyHistoryButton({
                             <p className="text-sm font-semibold text-slate-950">{event.title}</p>
                             <time className="text-xs font-medium text-slate-500">{formatPreviousStatusDateTime(event.createdAt)}</time>
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{event.details}</p>
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><CompanyHistoryDetailsText details={event.details} employeeRemark={event.employeeRemark} /></p>
                           {event.meta ? <p className="mt-2 break-words text-xs font-medium text-slate-500">{event.meta}</p> : null}
                         </article>
                       </li>
@@ -770,10 +770,35 @@ type CompanyHistoryEvent = {
   code: string;
   title: string;
   details: string;
+  employeeRemark?: string;
   meta: string;
   createdAt: Date | string;
 };
 
+function CompanyHistoryDetailsText({ details, employeeRemark }: { details: string; employeeRemark?: string }) {
+  if (!employeeRemark) {
+    return details;
+  }
+
+  const remarkIndex = details.indexOf(employeeRemark);
+
+  if (remarkIndex === -1) {
+    return (
+      <>
+        {details}
+        <span className="font-semibold text-purple-700"> {employeeRemark}</span>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {details.slice(0, remarkIndex)}
+      <span className="font-semibold text-purple-700">{employeeRemark}</span>
+      {details.slice(remarkIndex + employeeRemark.length)}
+    </>
+  );
+}
 function getUniqueHistoryRequests(requests: DashboardCompanyHistoryRequest[]) {
   const byId = new Map<string, DashboardCompanyHistoryRequest>();
 
@@ -791,6 +816,7 @@ function getCompanyHistoryEvents(request: DashboardCompanyHistoryRequest) {
       code: getHistoryEventCode(activity.type),
       title: activity.title,
       details: getHistoryActivityDetails(activity),
+      employeeRemark: getEmployeeHistoryRemark(activity),
       meta: [
         activity.employeeName ? `Employee: ${activity.employeeName}` : null,
         activity.actorName ? `By: ${activity.actorName}${activity.actorRole ? ` (${activity.actorRole})` : ""}` : null,
@@ -833,6 +859,7 @@ function getCompanyHistoryEvents(request: DashboardCompanyHistoryRequest) {
       code: "ST",
       title: "Status Updated",
       details: `Status: ${request.status || "New Call"}${request.statusReason ? ` - ${request.statusReason}` : ""}`,
+      employeeRemark: request.statusReason?.trim() || undefined,
       meta: request.closedByName ? `Last attended by: ${request.closedByName}` : "",
       createdAt: request.statusSubmittedAt,
     });
@@ -852,6 +879,15 @@ function getCompanyHistoryEvents(request: DashboardCompanyHistoryRequest) {
   return fallbackEvents;
 }
 
+function getEmployeeHistoryRemark(activity: DashboardServiceActivity) {
+  const remark = activity.statusReason?.trim();
+
+  if (!remark) {
+    return undefined;
+  }
+
+  return activity.employeeName?.trim() || activity.actorRole === "Employee" ? remark : undefined;
+}
 function getHistoryActivityDetails(activity: DashboardServiceActivity) {
   if (activity.details?.trim()) {
     return activity.details.trim();
