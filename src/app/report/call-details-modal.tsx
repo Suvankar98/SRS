@@ -110,7 +110,6 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                     <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
                       {displayDocketNumber}
                     </span>
-                    <ReportPrintPdfLink requestId={(selectedRequest ?? request).id} docketNumber={displayDocketNumber} />
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-600">{request.name}</p>
                 <p className="mt-1 text-sm text-blue-700">
@@ -525,22 +524,6 @@ function DocketChipPrintPdfLink({ requestId, docketNumber, isSelected }: { reque
       }`}
       aria-label={`Open printable service report PDF for ${docketNumber}`}
       title={`Print ${docketNumber}`}
-    >
-      <PrintIcon />
-      <span className="sr-only">Print {docketNumber}</span>
-    </a>
-  );
-}
-function ReportPrintPdfLink({ requestId, docketNumber }: { requestId: string; docketNumber: string }) {
-  return (
-    <a
-      href={`/api/service-request/${encodeURIComponent(requestId)}/pdf?disposition=inline`}
-      target="_blank"
-      rel="noreferrer"
-      onClick={(event) => event.stopPropagation()}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 shadow-sm transition hover:border-blue-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-      aria-label={`Open printable service report PDF for ${docketNumber}`}
-      title="Open printable PDF"
     >
       <PrintIcon />
       <span className="sr-only">Print {docketNumber}</span>
