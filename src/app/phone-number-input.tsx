@@ -211,6 +211,51 @@ const COUNTRY_CODES = [
   { code: "+998", label: "Uzbekistan" },
 ] as const;
 
+const ISO_REGION_CODES =
+  "AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GT GU GW GY HK HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW".split(
+    " ",
+  );
+
+const COUNTRY_REGION_ALIASES: Record<string, string> = {
+  "Aland Islands": "AX",
+  "Ascension Island": "AC",
+  "Cape Verde": "CV",
+  "Cote d'Ivoire": "CI",
+  "Czech Republic": "CZ",
+  "DR Congo": "CD",
+  "Hong Kong": "HK",
+  Kosovo: "XK",
+  Macau: "MO",
+  Myanmar: "MM",
+  Palestine: "PS",
+  "Republic of the Congo": "CG",
+  Reunion: "RE",
+  Russia: "RU",
+  "Saint Barthelemy": "BL",
+  "Saint Helena": "SH",
+  "Sao Tome and Principe": "ST",
+  Syria: "SY",
+  Turkey: "TR",
+  UAE: "AE",
+};
+
+const countryRegionDisplayNames =
+  typeof Intl.DisplayNames === "function" ? new Intl.DisplayNames(["en"], { type: "region" }) : null;
+
+const countryRegionByName = ISO_REGION_CODES.reduce<Record<string, string>>((lookup, regionCode) => {
+  const regionName = countryRegionDisplayNames?.of(regionCode);
+
+  if (regionName) {
+    lookup[normalizeCountryName(regionName)] = regionCode;
+  }
+
+  return lookup;
+}, {});
+
+const countryRegionAliasByName = Object.fromEntries(
+  Object.entries(COUNTRY_REGION_ALIASES).map(([name, regionCode]) => [normalizeCountryName(name), regionCode]),
+) as Record<string, string>;
+
 type PhoneNumberInputProps = {
   name: string;
   label?: string;
@@ -226,7 +271,7 @@ type PhoneNumberInputProps = {
 const baseInputClassName =
   "min-w-0 flex-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-950 outline-none transition placeholder:text-blue-400 focus:border-blue-400 focus:bg-white";
 const baseSelectClassName =
-  "w-16 shrink-0 rounded-xl border border-blue-200 bg-white px-1.5 py-2.5 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-400";
+  "w-20 shrink-0 rounded-xl border border-blue-200 bg-white px-1.5 py-2.5 text-sm font-semibold text-blue-800 outline-none transition focus:border-blue-400";
 
 export function PhoneNumberInput({
   name,
@@ -239,19 +284,17 @@ export function PhoneNumberInput({
   inputClassName = baseInputClassName,
   selectClassName = baseSelectClassName,
 }: PhoneNumberInputProps) {
-  const initialValue = value ?? defaultValue;
-  const [countryCode, setCountryCode] = React.useState(() => getPhoneParts(initialValue).countryCode);
-  const [localNumber, setLocalNumber] = React.useState(() => getPhoneParts(initialValue).localNumber);
+  const isControlled = value !== undefined;
+  const valueParts = React.useMemo(() => getPhoneParts(value ?? defaultValue), [value, defaultValue]);
+  const [uncontrolledCountryCode, setUncontrolledCountryCode] = React.useState(() => valueParts.countryCode);
+  const [uncontrolledLocalNumber, setUncontrolledLocalNumber] = React.useState(() => valueParts.localNumber);
+  const countryCode = isControlled ? valueParts.countryCode : uncontrolledCountryCode;
+  const localNumber = isControlled ? valueParts.localNumber : uncontrolledLocalNumber;
   const [isCodeOpen, setIsCodeOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement | null>(null);
   const submittedValue = composePhoneValue(countryCode, localNumber);
   const selectedCountry = COUNTRY_CODES.find((country) => country.code === countryCode) ?? COUNTRY_CODES[0];
-
-  React.useEffect(() => {
-    const parts = getPhoneParts(value ?? defaultValue);
-    setCountryCode(parts.countryCode);
-    setLocalNumber(parts.localNumber);
-  }, [value, defaultValue]);
+  const selectedCountryRegionCode = getCountryRegionCode(selectedCountry.label);
 
   React.useEffect(() => {
     if (!isCodeOpen) {
@@ -271,13 +314,17 @@ export function PhoneNumberInput({
   }, [isCodeOpen]);
 
   function updateCountryCode(nextCode: string) {
-    setCountryCode(nextCode);
+    if (!isControlled) {
+      setUncontrolledCountryCode(nextCode);
+    }
     setIsCodeOpen(false);
     onChange?.(composePhoneValue(nextCode, localNumber));
   }
 
   function updateLocalNumber(nextNumber: string) {
-    setLocalNumber(nextNumber);
+    if (!isControlled) {
+      setUncontrolledLocalNumber(nextNumber);
+    }
     onChange?.(composePhoneValue(countryCode, nextNumber));
   }
 
@@ -294,26 +341,34 @@ export function PhoneNumberInput({
             aria-label={label ? `${label} country code` : "Country code"}
             aria-expanded={isCodeOpen}
           >
-            <span>{selectedCountry.code}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <CountryFlag regionCode={selectedCountryRegionCode} />
+              <span>{selectedCountry.code}</span>
+            </span>
             <ChevronDownIcon />
           </button>
           {isCodeOpen ? (
-            <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-52 overflow-y-auto rounded-xl border border-blue-200 bg-white p-1 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
-              {COUNTRY_CODES.map((country) => (
-                <button
-                  key={country.code}
-                  type="button"
-                  onClick={() => updateCountryCode(country.code)}
-                  className={`grid w-full grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs transition ${
-                    country.code === countryCode
-                      ? "bg-blue-700 font-semibold text-white"
-                      : "text-blue-950 hover:bg-blue-50"
-                  }`}
-                >
-                  <span>{country.code}</span>
-                  <span className="truncate">{country.label}</span>
-                </button>
-              ))}
+            <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-blue-200 bg-white p-1 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+              {COUNTRY_CODES.map((country) => {
+                const countryRegionCode = getCountryRegionCode(country.label);
+
+                return (
+                  <button
+                    key={country.code}
+                    type="button"
+                    onClick={() => updateCountryCode(country.code)}
+                    className={`grid w-full grid-cols-[1.4rem_3.25rem_minmax(0,1fr)] items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs transition ${
+                      country.code === countryCode
+                        ? "bg-blue-700 font-semibold text-white"
+                        : "text-blue-950 hover:bg-blue-50"
+                    }`}
+                  >
+                    <CountryFlag regionCode={countryRegionCode} />
+                    <span>{country.code}</span>
+                    <span className="truncate">{country.label}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </div>
@@ -366,6 +421,42 @@ function getPhoneParts(value: string) {
   }
 
   return { countryCode: "+91", localNumber: compact };
+}
+
+function CountryFlag({ regionCode }: { regionCode: string }) {
+  if (!regionCode) {
+    return <span className="h-3.5 w-5" aria-hidden="true" />;
+  }
+
+  return (
+    <span
+      className="inline-block h-3.5 w-5 shrink-0 overflow-hidden rounded-[2px] border border-slate-200 bg-cover bg-center bg-no-repeat shadow-[0_0_0_1px_rgba(15,23,42,0.04)]"
+      style={{ backgroundImage: `url(https://flagcdn.com/w40/${regionCode.toLowerCase()}.png)` }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function getCountryRegionCode(label: string) {
+  const primaryCountryName = label.split("/")[0]?.trim();
+
+  if (!primaryCountryName) {
+    return "";
+  }
+
+  const normalizedCountryName = normalizeCountryName(primaryCountryName);
+
+  return countryRegionAliasByName[normalizedCountryName] ?? countryRegionByName[normalizedCountryName] ?? "";
+}
+
+function normalizeCountryName(countryName: string) {
+  return countryName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function composePhoneValue(countryCode: string, localNumber: string) {

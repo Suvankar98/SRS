@@ -121,7 +121,7 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
       <div className="md:col-span-2">
         <div className="grid gap-4 rounded-2xl bg-slate-50 p-4 sm:gap-5 md:grid-cols-2">
           <Field label="Contact Person 1" name="name" value={name} onChange={setName} placeholder="Enter contact person name" />
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_3rem] sm:items-end">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_3rem] sm:items-start">
             <PhoneNumberInput
               label="Ph No. - Contact 1"
               name="phoneNumber1"
@@ -132,7 +132,7 @@ export function CustomerDetailsFields({ savedCompanies }: CustomerDetailsFieldsP
             <button
               type="button"
               onClick={() => setShowSecondContact(true)}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-300 bg-white text-2xl font-semibold leading-none text-blue-700 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-300 bg-white text-2xl font-semibold leading-none text-blue-700 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300 sm:mt-7"
               aria-label="Add another contact"
               title="Add another contact"
             >
