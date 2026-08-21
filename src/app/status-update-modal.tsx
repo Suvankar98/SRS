@@ -42,6 +42,8 @@ type StatusMediaUploadPanelProps = {
   note: string;
   notePlaceholder: string;
   helperText: string;
+  requiredNote?: boolean;
+  tone?: "blue" | "yellow" | "green";
   onNoteChange: (value: string) => void;
   onUploaded: () => void;
 };
@@ -53,24 +55,47 @@ function StatusMediaUploadPanel({
   note,
   notePlaceholder,
   helperText,
+  requiredNote = false,
+  tone = "blue",
   onNoteChange,
   onUploaded,
 }: StatusMediaUploadPanelProps) {
+  const toneClasses = {
+    blue: {
+      panel: "border-blue-200 bg-blue-50/50",
+      title: "text-blue-800",
+      textarea: "border-blue-200 text-blue-900 placeholder:text-blue-300 focus:border-blue-400",
+    },
+    yellow: {
+      panel: "border-yellow-300 bg-yellow-50",
+      title: "text-yellow-900",
+      textarea: "border-yellow-300 text-yellow-950 placeholder:text-yellow-500 focus:border-yellow-500",
+    },
+    green: {
+      panel: "border-green-300 bg-green-50",
+      title: "text-green-900",
+      textarea: "border-green-300 text-green-950 placeholder:text-green-500 focus:border-green-500",
+    },
+  }[tone];
+
   return (
-    <div className="min-w-0 space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+    <div className={`min-w-0 space-y-3 rounded-lg border p-3 ${toneClasses.panel}`}>
       {notePlaceholder ? (
         <label className="block min-w-0">
-          <span className="mb-1.5 block text-sm font-semibold text-blue-800">{title}</span>
+          <span className={`mb-1.5 block text-sm font-semibold ${toneClasses.title}`}>
+            {title} {requiredNote ? <span className="text-red-500">*</span> : null}
+          </span>
           <textarea
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
             placeholder={notePlaceholder}
             rows={3}
-            className="w-full resize-y rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-900 outline-none transition placeholder:text-blue-300 focus:border-blue-400"
+            required={requiredNote}
+            className={`w-full resize-y rounded-lg border bg-white px-3 py-2 text-sm outline-none transition ${toneClasses.textarea}`}
           />
         </label>
       ) : (
-        <p className="text-sm font-semibold text-blue-800">{title}</p>
+        <p className={`text-sm font-semibold ${toneClasses.title}`}>{title}</p>
       )}
       <EmployeeMediaUpload requestId={requestId} mediaLabel={mediaLabel} helperText={helperText} onUploaded={onUploaded} />
     </div>
@@ -191,8 +216,8 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       return false;
     }
 
-    if (status === "Completed" && !beforeNote.trim() && !afterNote.trim()) {
-      setSubmitError("Please enter before or after details.");
+    if (showBeforeAfterMediaInput && (!beforeNote.trim() || !afterNote.trim())) {
+      setSubmitError("Before and After descriptions are required.");
       return false;
     }
 
@@ -398,6 +423,8 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                         note={beforeNote}
                         notePlaceholder="Describe before condition..."
                         helperText="Capture before photo/video or voice message."
+                        requiredNote
+                        tone="yellow"
                         onNoteChange={setBeforeNote}
                         onUploaded={() => handleMediaUploaded("Before")}
                       />
@@ -407,6 +434,8 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                         note={afterNote}
                         notePlaceholder="Describe after work/result..."
                         helperText="Capture after photo/video or voice message."
+                        requiredNote
+                        tone="green"
                         onNoteChange={setAfterNote}
                         onUploaded={() => handleMediaUploaded("After")}
                       />
