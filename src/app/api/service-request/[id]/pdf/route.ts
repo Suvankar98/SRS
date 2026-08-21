@@ -236,7 +236,7 @@ function drawServiceReportForm(
   [y.header, y.date, y.billing, y.contactNumber, y.info, y.action, y.partsHeader, y.part1, y.part2, y.part3, y.part4].forEach((lineY) => {
     drawLine(page, x, lineY, x + width, lineY);
   });
-  drawLine(page, partColumnXs[0], y.part5, x + width, y.part5);
+  drawLine(page, x, y.part5, partColumnXs[0], y.part5);
   drawLine(page, x, y.contactPerson, rightX, y.contactPerson);
   drawLine(page, rightX, y.product, x + width, y.product);
 
@@ -271,16 +271,16 @@ function drawServiceReportForm(
 
   drawPartsHeader(page, x, y.action - 16, [230, 43, 58, 68, 105], regularFont, boldFont);
   drawCenteredText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 399, y.partsHeader - 15, 105, 8.8, regularFont);
-  drawText(page, "Total Amount", x + 7, bottom + 24, 8.5, boldFont);
-  drawText(page, "(Spare + Service Charge)", x + 7, bottom + 14, 6.2, regularFont);
-  drawText(page, "Rs.", x + 136, bottom + 24, 8.5, boldFont);
-  drawText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 159, bottom + 24, 8.5, boldFont);
-  drawText(page, "Customer Review :", partColumnXs[0] + 7, y.part5 + 12, 7.4, regularFont);
-  drawWrappedText(page, customerReview, partColumnXs[0] + 86, y.part5 + 12, 180, 7.4, regularFont, 7.2, 2);
-  drawText(page, "Customer Signature :", partColumnXs[0] + 7, bottom + 13, 6.6, regularFont);
+  drawText(page, "Customer Review :", x + 7, y.part5 + 12, 7.4, regularFont);
+  drawWrappedText(page, customerReview, x + 88, y.part5 + 12, 134, 7.4, regularFont, 7.2, 2);
+  drawText(page, "Customer Signature :", x + 7, bottom + 13, 6.6, regularFont);
   if (customerSignatureImage) {
-    drawContainedImage(page, customerSignatureImage, partColumnXs[0] + 92, bottom + 2, 130, 10);
+    drawContainedImage(page, customerSignatureImage, x + 96, bottom + 2, 125, 10);
   }
+  drawCenteredText(page, "Total Amount", partColumnXs[2], bottom + 24, 68, 8.5, boldFont);
+  drawCenteredText(page, "(Spare + Service Charge)", partColumnXs[2] + 6, bottom + 14, 68, 6.2, regularFont);
+  drawText(page, "Rs.", partColumnXs[3] + 6, bottom + 24, 8.5, boldFont);
+  drawText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), partColumnXs[3] + 29, bottom + 24, 8.5, boldFont);
 }
 
 function drawOuterTable(page: ReturnType<PDFDocument["addPage"]>, x: number, y: number, width: number, height: number) {
