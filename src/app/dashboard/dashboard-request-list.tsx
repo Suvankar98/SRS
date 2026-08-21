@@ -38,6 +38,7 @@ export type DashboardListRequest = {
   status: string | null;
   statusSubmittedAt?: Date | string | null;
   statusReason: string | null;
+  customerReview?: string | null;
   closedAt: Date | string | null;
   closedByName: string | null;
   lastAttemptByName?: string | null;

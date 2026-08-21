@@ -1657,6 +1657,8 @@ export async function updateServiceCallStatus(formData: FormData) {
   const status = getDashboardStatus(getRequiredField(formData, "status"));
   const statusReason = formData.get("statusReason");
   const reasonValue = typeof statusReason === "string" ? statusReason.trim() : "";
+  const customerReview = formData.get("customerReview");
+  const customerReviewValue = typeof customerReview === "string" ? customerReview.trim() : "";
   const customerSignatureDataUrl = getOptionalField(formData, "customerSignatureDataUrl");
   const customerSignatureBuffer = customerSignatureDataUrl ? decodeCustomerSignatureDataUrl(customerSignatureDataUrl) : null;
 
@@ -1816,7 +1818,7 @@ export async function updateServiceCallStatus(formData: FormData) {
             : primaryOpenAssignment?.assignedAt ?? null,
         status: aggregateStatus,
         statusReason: (latestAssignment?.statusReason ?? reasonValue) || null,
-        customerReview: null,
+        customerReview: customerReviewValue || null,
         statusSubmittedAt: latestAssignment?.statusSubmittedAt ?? submittedAt,
         statusPointsDelta: latestAssignment?.statusPointsDelta ?? null,
         reviewPointsDelta: null,

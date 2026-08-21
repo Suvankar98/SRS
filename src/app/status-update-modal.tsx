@@ -12,6 +12,7 @@ type StatusRequest = {
   docketNumber: string;
   status: string | null;
   statusReason: string | null;
+  customerReview?: string | null;
   mediaUploadedAt?: Date | string | null;
   activities?: ServiceHistoryActivity[];
 };
@@ -80,6 +81,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [status, setStatus] = React.useState<StatusChoice>("");
   const [reason, setReason] = React.useState(request.statusReason || "");
+  const [customerReview, setCustomerReview] = React.useState(request.customerReview || "");
   const [submitError, setSubmitError] = React.useState("");
   const [beforeNote, setBeforeNote] = React.useState("");
   const [afterNote, setAfterNote] = React.useState("");
@@ -104,6 +106,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     setUploadToast("");
     setBeforeNote("");
     setAfterNote("");
+    setCustomerReview(request.customerReview || "");
     setHasUploadedMedia(Boolean(request.mediaUploadedAt));
     setStep("details");
     setHasSignature(false);
@@ -171,6 +174,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
     if (newStatus !== "In Process" && newStatus !== "Completed") {
       setBeforeNote("");
       setAfterNote("");
+    setCustomerReview(request.customerReview || "");
     }
   };
 
@@ -242,6 +246,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       formData.append("requestId", String(request.id));
       formData.append("status", status);
       formData.append("statusReason", getStatusReasonValue());
+      formData.append("customerReview", customerReview.trim());
 
       if (signatureDataUrl) {
         formData.append("customerSignatureDataUrl", signatureDataUrl);
@@ -430,6 +435,16 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                       Status: {status} <span className="mx-1 text-blue-300">|</span> Docket: {displayDocketNumber}
                     </p>
                   </div>
+                  <label className="block">
+                    <span className="block text-sm font-medium text-blue-700">Customer Review</span>
+                    <textarea
+                      value={customerReview}
+                      onChange={(event) => setCustomerReview(event.target.value)}
+                      placeholder="Enter customer review..."
+                      rows={3}
+                      className="mt-2 w-full resize-y rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none transition placeholder:text-blue-300 focus:border-blue-400"
+                    />
+                  </label>
                   <div>
                     <div className="rounded-xl border border-blue-200 bg-white p-2">
                       <canvas
