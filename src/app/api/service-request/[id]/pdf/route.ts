@@ -242,7 +242,9 @@ function drawServiceReportForm(
   drawLine(page, rightX, top, rightX, y.info);
   drawLine(page, labelX, y.header, labelX, y.info);
   drawLine(page, rightLabelX, y.billing, rightLabelX, y.info);
-  partColumnXs.slice(0, 3).forEach((columnX) => drawLine(page, columnX, y.action, columnX, bottom));
+  drawLine(page, partColumnXs[0], y.action, partColumnXs[0], bottom);
+  drawLine(page, partColumnXs[1], y.action, partColumnXs[1], y.part5);
+  drawLine(page, partColumnXs[2], y.action, partColumnXs[2], bottom);
   drawLine(page, partColumnXs[3], y.action, partColumnXs[3], y.part5);
 
   drawCompanyHeader(page, regularFont, boldFont, x, top);
@@ -268,12 +270,11 @@ function drawServiceReportForm(
 
   drawPartsHeader(page, x, y.action - 16, [230, 43, 58, 68, 105], regularFont, boldFont);
   drawCenteredText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 399, y.partsHeader - 15, 105, 8.8, regularFont);
-  drawLine(page, x, bottom + 10, x + 331, bottom + 10);
-  drawText(page, "Customer Review :", x + 7, bottom + 14, 7.8, regularFont);
-  drawWrappedText(page, customerReview, x + 108, bottom + 14, 220, 7.8, regularFont, 8, 1);
-  drawText(page, "Customer Signature :", x + 7, bottom + 3.5, 7.8, regularFont);
+  drawText(page, "Customer Review :", x + 7, bottom + 12, 7.4, regularFont);
+  drawWrappedText(page, customerReview, x + 88, bottom + 12, 134, 7.4, regularFont, 7.2, 2);
+  drawText(page, "Customer Signature :", x + 235, bottom + 14, 6.6, regularFont);
   if (customerSignatureImage) {
-    drawContainedImage(page, customerSignatureImage, x + 118, bottom + 1, 95, 8);
+    drawContainedImage(page, customerSignatureImage, x + 243, bottom + 2, 78, 9);
   }
   drawCenteredText(page, "Total Amount", x + 331, bottom + 12, 68, 8.5, boldFont);
   drawCenteredText(page, "(Spare + Service Charge)", x + 337, bottom + 3, 68, 6.2, regularFont);
