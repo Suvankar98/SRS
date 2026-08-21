@@ -247,7 +247,6 @@ function drawServiceReportForm(
   drawLine(page, partColumnXs[1], y.action, partColumnXs[1], y.part4);
   drawLine(page, partColumnXs[2], y.action, partColumnXs[2], y.part4);
   drawLine(page, partColumnXs[3], y.action, partColumnXs[3], y.part4);
-  drawLine(page, partColumnXs[3], y.part4, partColumnXs[3], bottom);
 
   drawCompanyHeader(page, regularFont, boldFont, x, top);
   drawCenteredText(page, "Service Report", rightX, top - 18, rightWidth, 14, boldFont);
