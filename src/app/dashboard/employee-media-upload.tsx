@@ -320,32 +320,31 @@ export function EmployeeMediaUpload({ requestId, mediaLabel, helperText = "Optio
 
   return (
     <form className="min-w-0 text-[11px] text-blue-950" onSubmit={handleSubmit}>
-      <div className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_2rem] items-center gap-2 max-[420px]:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-2 sm:grid-cols-[auto_auto_2rem_minmax(0,1fr)]">
         <input type="hidden" name="requestId" value={requestId} />
         {mediaLabel ? <input type="hidden" name="mediaLabel" value={mediaLabel} /> : null}
         <button
           type="button"
           onClick={openCamera}
           disabled={isPending || isRecording || isVideoRecording || isCameraLoading}
-          className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-blue-200 bg-white px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-blue-200 bg-white px-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
         >
           <CameraIcon />
-          {isCameraLoading ? "Opening" : "Camera"}
+          <span className="truncate">{isCameraLoading ? "Opening" : "Camera"}</span>
         </button>
         <button
           type="button"
           onClick={isRecording ? stopRecording : startRecording}
           disabled={isPending || isCameraOpen || isVideoRecording}
-          className={`inline-flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${
+          className={`inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-full border px-2 text-xs font-semibold transition sm:px-3 ${
             isRecording
               ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
               : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
           } disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <MicIcon />
-          {isRecording ? "Stop" : "Voice"}
+          <span className="truncate">{isRecording ? "Stop" : "Voice"}</span>
         </button>
-        <span className="min-w-0 truncate text-blue-600 max-[420px]:col-span-1">{fileName || "No file ready"}</span>
         <button
           type="submit"
           aria-label="Upload media"
@@ -354,11 +353,12 @@ export function EmployeeMediaUpload({ requestId, mediaLabel, helperText = "Optio
         >
           <UploadIcon />
         </button>
+        <span className="col-span-3 min-w-0 truncate text-blue-600 sm:col-span-1">{fileName || "No file ready"}</span>
       </div>
       {fileError ? <p className="text-xs text-red-600">{fileError}</p> : null}
       {uploadError ? <p className="text-xs font-medium text-red-600">{uploadError}</p> : null}
       {isPending ? <p className="text-xs font-medium text-blue-700">Uploading...</p> : null}
-      <p className="mt-1 break-words text-[10px] leading-4 text-blue-600">{helperText}</p>
+      {helperText ? <p className="mt-1 break-words text-[10px] leading-4 text-blue-600">{helperText}</p> : null}
 
       {isCameraOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={closeCamera}>

@@ -422,7 +422,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                         requestId={request.id}
                         note={beforeNote}
                         notePlaceholder="Describe before condition..."
-                        helperText="Capture before photo/video or voice message."
+                        helperText=""
                         requiredNote
                         tone="yellow"
                         onNoteChange={setBeforeNote}
@@ -433,7 +433,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                         requestId={request.id}
                         note={afterNote}
                         notePlaceholder="Describe after work/result..."
-                        helperText="Capture after photo/video or voice message."
+                        helperText=""
                         requiredNote
                         tone="green"
                         onNoteChange={setAfterNote}
