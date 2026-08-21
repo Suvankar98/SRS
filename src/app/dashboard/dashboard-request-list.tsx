@@ -6,7 +6,7 @@ import { StatusUpdateModal } from "../status-update-modal";
 import { AssignmentPicker, type AssignmentPickerAssignment } from "./assignment-picker";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
 import { DashboardMediaPopup } from "./dashboard-media-popup";
-import { DashboardRequestRow, PreviousStatusButton, type DashboardCompanyHistoryRequest } from "./dashboard-request-row";
+import { DashboardRequestRow, PreviousStatusButton, PrintServicePdfLink, type DashboardCompanyHistoryRequest } from "./dashboard-request-row";
 import { normalizeStatus } from "../status-utils";
 import { formatDocketNumber } from "@/lib/docket";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
@@ -318,6 +318,7 @@ export function DashboardRequestList({
                     )}
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {!isEmployee ? <PrintServicePdfLink requestId={request.id} docketNumber={displayDocketNumber} /> : null}
                     {isEmployee ? <PreviousStatusButton request={request} /> : null}
                   </div>
                 </div>
