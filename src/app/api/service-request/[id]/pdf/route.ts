@@ -40,6 +40,7 @@ export async function GET(request: Request, context: RouteContext) {
       product: true,
       status: true,
       statusReason: true,
+      customerReview: true,
       assignedAt: true,
       statusSubmittedAt: true,
       closedAt: true,
@@ -143,6 +144,7 @@ async function buildServiceRequestPdf(
     product: string;
     status: string | null;
     statusReason: string | null;
+    customerReview: string | null;
     assignedAt: Date | null;
     statusSubmittedAt: Date | null;
     closedAt: Date | null;
@@ -188,6 +190,7 @@ function drawServiceReportForm(
     product: string;
     status: string | null;
     statusReason: string | null;
+    customerReview: string | null;
     serviceBillingType: string | null;
     chargeableAmount: number | null;
     createdAt: Date;
@@ -224,6 +227,7 @@ function drawServiceReportForm(
   const statusText = request.deletedAt ? "Deleted" : normalizeStatus(request.status);
   const isClosed = statusText.toLowerCase() === "completed" || statusText.toLowerCase() === "closed";
   const actionTaken = request.statusReason || (isClosed ? "Completed" : "");
+  const customerReview = request.customerReview?.trim() || "-";
   const contactNumbers = [request.phoneNumber1, request.phoneNumber2].filter(Boolean).join(" / ");
   const partColumnXs = [x + 230, x + 273, x + 331, x + 399];
 
@@ -264,9 +268,12 @@ function drawServiceReportForm(
 
   drawPartsHeader(page, x, y.action - 16, [230, 43, 58, 68, 105], regularFont, boldFont);
   drawCenteredText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 399, y.partsHeader - 15, 105, 8.8, regularFont);
-  drawText(page, "Customer Signature :", x + 7, bottom + 9, 8.5, regularFont);
+  drawLine(page, x, bottom + 10, x + 331, bottom + 10);
+  drawText(page, "Customer Review :", x + 7, bottom + 14, 7.8, regularFont);
+  drawWrappedText(page, customerReview, x + 108, bottom + 14, 220, 7.8, regularFont, 8, 1);
+  drawText(page, "Customer Signature :", x + 7, bottom + 3.5, 7.8, regularFont);
   if (customerSignatureImage) {
-    drawContainedImage(page, customerSignatureImage, x + 118, bottom + 3, 95, 14);
+    drawContainedImage(page, customerSignatureImage, x + 118, bottom + 1, 95, 8);
   }
   drawCenteredText(page, "Total Amount", x + 331, bottom + 12, 68, 8.5, boldFont);
   drawCenteredText(page, "(Spare + Service Charge)", x + 337, bottom + 3, 68, 6.2, regularFont);
