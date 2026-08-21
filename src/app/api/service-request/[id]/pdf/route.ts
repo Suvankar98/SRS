@@ -279,7 +279,6 @@ function drawServiceReportForm(
   }
   drawText(page, "Total Amount", partColumnXs[0] + 7, bottom + 24, 8.5, boldFont);
   drawText(page, "(Spare + Service Charge)", partColumnXs[0] + 7, bottom + 14, 6.2, regularFont);
-  drawRupeeAmount(page, partColumnXs[3] + 10, bottom + 24, formatAmount(request.serviceBillingType, request.chargeableAmount), 8.5, boldFont);
 }
 
 function drawOuterTable(page: ReturnType<PDFDocument["addPage"]>, x: number, y: number, width: number, height: number) {
@@ -395,27 +394,6 @@ function drawText(page: ReturnType<PDFDocument["addPage"]>, text: string, x: num
   page.drawText(toPdfText(text), { x, y, size, font, color: SRTEC_BLUE });
 }
 
-function drawRupeeAmount(page: ReturnType<PDFDocument["addPage"]>, x: number, y: number, amount: string, size: number, font: PDFFont) {
-  if (!amount) return;
-
-  drawRupeeSymbol(page, x, y, size);
-  drawText(page, amount, x + size + 7, y, size, font);
-}
-
-function drawRupeeSymbol(page: ReturnType<PDFDocument["addPage"]>, x: number, y: number, size: number) {
-  const top = y + size * 0.82;
-  const mid = y + size * 0.56;
-  const left = x + size * 0.12;
-  const right = x + size * 0.86;
-  const stemTop = y + size * 0.78;
-  const stemMid = y + size * 0.42;
-  const bottomRight = x + size * 0.74;
-
-  page.drawLine({ start: { x, y: top }, end: { x: right, y: top }, thickness: 1.2, color: SRTEC_BLUE });
-  page.drawLine({ start: { x, y: mid }, end: { x: right * 0.96 + x * 0.04, y: mid }, thickness: 1.2, color: SRTEC_BLUE });
-  page.drawLine({ start: { x: left, y: stemTop }, end: { x: left, y: stemMid }, thickness: 1.2, color: SRTEC_BLUE });
-  page.drawLine({ start: { x: left, y: stemMid }, end: { x: bottomRight, y }, thickness: 1.2, color: SRTEC_BLUE });
-}
 
 function drawCenteredText(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, width: number, size: number, font: PDFFont) {
   const safeText = toPdfText(text);
