@@ -271,9 +271,9 @@ function drawServiceReportForm(
 
   drawPartsHeader(page, x, y.action - 16, [230, 43, 58, 68, 105], regularFont, boldFont);
   drawCenteredText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 399, y.partsHeader - 15, 105, 8.8, regularFont);
-  drawText(page, "Customer Review :", x + 7, y.part5 + 12, 7.4, regularFont);
+  drawText(page, "Customer Review :", x + 7, y.part5 + 12, 7.4, boldFont);
   drawWrappedText(page, customerReview, x + 88, y.part5 + 12, 134, 7.4, regularFont, 7.2, 2);
-  drawText(page, "Customer Signature :", x + 7, bottom + 13, 6.6, regularFont);
+  drawText(page, "Customer Signature :", x + 7, bottom + 13, 7.4, boldFont);
   if (customerSignatureImage) {
     drawContainedImage(page, customerSignatureImage, x + 96, bottom + 2, 125, 10);
   }
