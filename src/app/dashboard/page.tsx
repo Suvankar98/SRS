@@ -1,4 +1,4 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import CreatedToast from "./created-toast";
 import { DashboardFilters } from "./dashboard-filters";
@@ -266,9 +266,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         })
       : [];
 
+  const requestIds = allRequests.map((request) => request.id);
   const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
-    ? await getDashboardMediaItemsByRequestIds(allRequests.map((request) => request.id))
+    ? await getDashboardMediaItemsByRequestIds(requestIds)
     : new Map();
+  const signedRequestIds = await getRequestIdsWithCustomerSignatures(requestIds);
   const companyHistorySourceRequests = isEmployee
     ? await getDashboardCompanyHistoryRequests(allRequests)
     : allRequests;
@@ -290,6 +292,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           }
         : {}),
       mediaItems: mediaByRequestId.get(request.id) ?? [],
+      hasCustomerSignature: signedRequestIds.has(request.id),
       reviewNotes: getDashboardReviewNotes(request, reviewNoteAdjustments),
       companyHistoryRequests: allRequestsByCompany.get(getCompanyKey(request.company)) ?? [request],
     };
@@ -1233,6 +1236,46 @@ function formatINRCurrency(amount: number) {
   }).format(amount);
 }
 
+async function getRequestIdsWithCustomerSignatures(requestIds: string[]) {
+  const uniqueRequestIds = Array.from(new Set(requestIds));
+  const signedRequestIds = new Set<string>();
+
+  if (uniqueRequestIds.length === 0) {
+    return signedRequestIds;
+  }
+
+  const path = await import("path");
+  const fs = await import("fs");
+  const os = await import("os");
+  const uploadsBase = shouldUseTmpUploads()
+    ? path.join(os.tmpdir(), "srs-uploads")
+    : path.join(process.cwd(), "public", "uploads");
+  const userDirs = await fs.promises.readdir(uploadsBase, { withFileTypes: true }).catch(() => []);
+
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) {
+      continue;
+    }
+
+    for (const requestId of uniqueRequestIds) {
+      if (signedRequestIds.has(requestId)) {
+        continue;
+      }
+
+      const requestDir = path.join(uploadsBase, userDir.name, requestId);
+      const files = await fs.promises.readdir(requestDir, { withFileTypes: true }).catch(() => []);
+      if (files.some((file) => file.isFile() && file.name.toLowerCase().startsWith("customer-signature-") && file.name.toLowerCase().endsWith(".png"))) {
+        signedRequestIds.add(requestId);
+      }
+    }
+  }
+
+  return signedRequestIds;
+}
+
+function shouldUseTmpUploads() {
+  return process.env.USE_TMP_UPLOADS === "1" || process.env.VERCEL === "1";
+}
 function getSearchParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
     return value[0] ?? "";

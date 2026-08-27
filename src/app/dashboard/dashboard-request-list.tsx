@@ -39,6 +39,7 @@ export type DashboardListRequest = {
   statusSubmittedAt?: Date | string | null;
   statusReason: string | null;
   customerReview?: string | null;
+  hasCustomerSignature?: boolean;
   closedAt: Date | string | null;
   closedByName: string | null;
   lastAttemptByName?: string | null;

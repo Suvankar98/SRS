@@ -1661,6 +1661,7 @@ export async function updateServiceCallStatus(formData: FormData) {
   const customerReviewValue = typeof customerReview === "string" ? customerReview.trim() : "";
   const customerSignatureDataUrl = getOptionalField(formData, "customerSignatureDataUrl");
   const customerSignatureBuffer = customerSignatureDataUrl ? decodeCustomerSignatureDataUrl(customerSignatureDataUrl) : null;
+  const existingCustomerSignatureFile = customerSignatureBuffer ? null : await getLatestCustomerSignatureFile(requestId);
 
   let assignment = await prisma.serviceAssignment.findUnique({
     where: {
@@ -1760,7 +1761,7 @@ export async function updateServiceCallStatus(formData: FormData) {
     throw new Error("Remark is required when status is Completed.");
   }
 
-  if ((status === "In Process" || status === "Completed") && !customerSignatureBuffer) {
+  if ((status === "In Process" || status === "Completed") && !customerSignatureBuffer && !existingCustomerSignatureFile) {
     throw new Error("Customer signature is required.");
   }
 
@@ -1865,10 +1866,17 @@ export async function updateServiceCallStatus(formData: FormData) {
   });
 
   if (customerSignatureBuffer) {
-    await saveCustomerSignatureImage({
-      userId: session.userId,
+    await saveCustomerSignatureForRequest({
       requestId,
       buffer: customerSignatureBuffer,
+      fallbackUserId: session.userId,
+    });
+  } else if (existingCustomerSignatureFile) {
+    const fs = await import("fs");
+    await saveCustomerSignatureForRequest({
+      requestId,
+      buffer: await fs.promises.readFile(existingCustomerSignatureFile.filePath),
+      fallbackUserId: session.userId,
     });
   }
   revalidatePath("/dashboard");
@@ -2124,10 +2132,10 @@ export async function updateManagerServiceStatus(formData: FormData) {
     });
   });
   if (customerSignatureBuffer) {
-    await saveCustomerSignatureImage({
-      userId: session.userId,
+    await saveCustomerSignatureForRequest({
       requestId,
       buffer: customerSignatureBuffer,
+      fallbackUserId: session.userId,
     });
   }
 
@@ -2760,6 +2768,80 @@ function decodeCustomerSignatureDataUrl(dataUrl: string) {
   }
 
   return buffer;
+}
+
+async function getLatestCustomerSignatureFile(requestId: string) {
+  const path = await import("path");
+  const fs = await import("fs");
+  const os = await import("os");
+  const uploadsBase = shouldUseTmpUploads()
+    ? path.join(os.tmpdir(), "srs-uploads")
+    : path.join(process.cwd(), "public", "uploads");
+  const userDirs = await fs.promises.readdir(uploadsBase, { withFileTypes: true }).catch(() => []);
+  const signatureFiles: Array<{ filePath: string; uploadedAt: number }> = [];
+
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) {
+      continue;
+    }
+
+    const requestDir = path.join(uploadsBase, userDir.name, requestId);
+    const files = await fs.promises.readdir(requestDir, { withFileTypes: true }).catch(() => []);
+
+    for (const file of files) {
+      if (!file.isFile() || !isCustomerSignatureFile(file.name)) {
+        continue;
+      }
+
+      const filePath = path.join(requestDir, file.name);
+      const stat = await fs.promises.stat(filePath).catch(() => null);
+      if (stat?.isFile()) {
+        signatureFiles.push({ filePath, uploadedAt: stat.mtime.getTime() });
+      }
+    }
+  }
+
+  return signatureFiles.sort((a, b) => b.uploadedAt - a.uploadedAt)[0] ?? null;
+}
+
+async function saveCustomerSignatureForRequest({
+  requestId,
+  buffer,
+  fallbackUserId,
+}: {
+  requestId: string;
+  buffer: Buffer;
+  fallbackUserId: string;
+}) {
+  const [assignments, request] = await Promise.all([
+    prisma.serviceAssignment.findMany({
+      where: { requestId },
+      select: { employeeId: true },
+    }),
+    prisma.serviceRequest.findUnique({
+      where: { id: requestId },
+      select: { assignedToId: true },
+    }),
+  ]);
+  const recipientIds = new Set<string>([fallbackUserId]);
+
+  for (const assignment of assignments) {
+    recipientIds.add(assignment.employeeId);
+  }
+
+  if (request?.assignedToId) {
+    recipientIds.add(request.assignedToId);
+  }
+
+  await Promise.all(
+    Array.from(recipientIds).map((userId) =>
+      saveCustomerSignatureImage({
+        userId,
+        requestId,
+        buffer,
+      }),
+    ),
+  );
 }
 
 async function saveCustomerSignatureImage({ userId, requestId, buffer }: { userId: string; requestId: string; buffer: Buffer }) {

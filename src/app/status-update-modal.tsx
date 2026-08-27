@@ -13,6 +13,7 @@ type StatusRequest = {
   status: string | null;
   statusReason: string | null;
   customerReview?: string | null;
+  hasCustomerSignature?: boolean;
   mediaUploadedAt?: Date | string | null;
   activities?: ServiceHistoryActivity[];
 };
@@ -123,6 +124,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
   const showBeforeAfterMediaInput = status === "In Process" || status === "Completed";
   const showCancelMediaInput = status === "Cancel";
   const showSignatureStep = status === "In Process" || status === "Completed";
+  const hasSharedCustomerSignature = Boolean(request.hasCustomerSignature);
 
   const openModal = () => {
     setStatus("");
@@ -258,7 +260,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
       return;
     }
 
-    if (showSignatureStep && !hasSignature) {
+    if (showSignatureStep && !hasSharedCustomerSignature && !hasSignature) {
       setSubmitError("Customer signature is required.");
       return;
     }
@@ -267,7 +269,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
 
     try {
       const formData = new FormData();
-      const signatureDataUrl = hasSignature ? signatureCanvasRef.current?.toDataURL("image/png") : "";
+      const signatureDataUrl = hasSignature && !hasSharedCustomerSignature ? signatureCanvasRef.current?.toDataURL("image/png") : "";
       formData.append("requestId", String(request.id));
       formData.append("status", status);
       formData.append("statusReason", getStatusReasonValue());
@@ -459,7 +461,7 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm text-blue-900">
-                    <p className="font-semibold">Customer Signature <span className="text-red-500">*</span></p>
+                    <p className="font-semibold">Customer Signature {hasSharedCustomerSignature ? null : <span className="text-red-500">*</span>}</p>
                     <p className="mt-1 text-xs text-blue-600">
                       Status: {status} <span className="mx-1 text-blue-300">|</span> Docket: {displayDocketNumber}
                     </p>
@@ -474,30 +476,37 @@ export function StatusUpdateModal({ request }: { request: StatusRequest }) {
                       className="mt-2 w-full resize-y rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm text-blue-900 outline-none transition placeholder:text-blue-300 focus:border-blue-400"
                     />
                   </label>
-                  <div>
-                    <div className="rounded-xl border border-blue-200 bg-white p-2">
-                      <canvas
-                        ref={signatureCanvasRef}
-                        onPointerDown={startSignature}
-                        onPointerMove={drawSignature}
-                        onPointerUp={stopSignature}
-                        onPointerCancel={stopSignature}
-                        onPointerLeave={stopSignature}
-                        className="h-40 w-full touch-none rounded-lg bg-white"
-                        aria-label="Customer signature pad"
-                      />
+                  {hasSharedCustomerSignature ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      <p className="font-semibold">Customer signature already captured.</p>
+                      <p className="mt-1 text-xs font-medium text-emerald-700">This shared signature will be used for this status update.</p>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-xs font-medium text-red-600">Signature is required.</p>
-                      <button
-                        type="button"
-                        onClick={clearSignature}
-                        className="rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
-                      >
-                        Clear
-                      </button>
+                  ) : (
+                    <div>
+                      <div className="rounded-xl border border-blue-200 bg-white p-2">
+                        <canvas
+                          ref={signatureCanvasRef}
+                          onPointerDown={startSignature}
+                          onPointerMove={drawSignature}
+                          onPointerUp={stopSignature}
+                          onPointerCancel={stopSignature}
+                          onPointerLeave={stopSignature}
+                          className="h-40 w-full touch-none rounded-lg bg-white"
+                          aria-label="Customer signature pad"
+                        />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <p className="text-xs font-medium text-red-600">Signature is required.</p>
+                        <button
+                          type="button"
+                          onClick={clearSignature}
+                          className="rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
+                        >
+                          Clear
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
               {submitError ? <p className="text-sm font-medium text-red-600">{submitError}</p> : null}

@@ -35,6 +35,7 @@ type DashboardTableBodyProps = {
     company: string;
     fullAddress: string;
     complaintDetails: string | null;
+    hasCustomerSignature?: boolean;
     assignedTo?: { name: string } | null;
     createdBy?: { name: string } | null;
   }>;
