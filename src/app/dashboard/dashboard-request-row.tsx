@@ -783,12 +783,14 @@ function CompanyHistoryDetailsText({ details, employeeRemark }: { details: strin
   }
 
   const remarkIndex = details.indexOf(employeeRemark);
+  const highlightedRemark = <HighlightedEmployeeRemark remark={employeeRemark} />;
 
   if (remarkIndex === -1) {
     return (
       <>
         {details}
-        <span className="font-semibold text-purple-700"> {employeeRemark}</span>
+        <span> </span>
+        {highlightedRemark}
       </>
     );
   }
@@ -796,11 +798,34 @@ function CompanyHistoryDetailsText({ details, employeeRemark }: { details: strin
   return (
     <>
       {details.slice(0, remarkIndex)}
-      <span className="font-semibold text-purple-700">{employeeRemark}</span>
+      {highlightedRemark}
       {details.slice(remarkIndex + employeeRemark.length)}
     </>
   );
 }
+
+function HighlightedEmployeeRemark({ remark }: { remark: string }) {
+  const beforeIndex = remark.indexOf("Before:");
+  const afterIndex = remark.indexOf("After:");
+
+  if (beforeIndex === -1 && afterIndex === -1) {
+    return <span className="font-semibold text-purple-700">{remark}</span>;
+  }
+
+  const firstSectionIndex = Math.min(...[beforeIndex, afterIndex].filter((index) => index >= 0));
+  const prefix = remark.slice(0, firstSectionIndex);
+  const beforeText = beforeIndex >= 0 ? remark.slice(beforeIndex, afterIndex > beforeIndex ? afterIndex : undefined).trim() : "";
+  const afterText = afterIndex >= 0 ? remark.slice(afterIndex).trim() : "";
+
+  return (
+    <>
+      {prefix ? <span className="font-semibold text-purple-700">{prefix}</span> : null}
+      {beforeText ? <span className="font-semibold text-red-600">{beforeText}</span> : null}
+      {afterText ? <span className="mt-1 block font-semibold text-green-600">{afterText}</span> : null}
+    </>
+  );
+}
+
 function getUniqueHistoryRequests(requests: DashboardCompanyHistoryRequest[]) {
   const byId = new Map<string, DashboardCompanyHistoryRequest>();
 

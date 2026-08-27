@@ -45,6 +45,7 @@ export async function GET(request: Request, context: RouteContext) {
       statusSubmittedAt: true,
       closedAt: true,
       closedByName: true,
+      lastAttemptByName: true,
       deletedAt: true,
       deletedByName: true,
       deletedByRole: true,
@@ -55,7 +56,15 @@ export async function GET(request: Request, context: RouteContext) {
       createdAt: true,
       assignedToId: true,
       assignedTo: { select: { name: true } },
-      assignments: { select: { employeeId: true } },
+      assignments: {
+        select: {
+          employeeId: true,
+          assignedAt: true,
+          statusSubmittedAt: true,
+          closedAt: true,
+          employee: { select: { name: true } },
+        },
+      },
     },
   });
 
@@ -149,6 +158,7 @@ async function buildServiceRequestPdf(
     statusSubmittedAt: Date | null;
     closedAt: Date | null;
     closedByName: string | null;
+    lastAttemptByName: string | null;
     deletedAt: Date | null;
     deletedByName: string | null;
     deletedByRole: string | null;
@@ -159,7 +169,7 @@ async function buildServiceRequestPdf(
     createdAt: Date;
     assignedToId: string | null;
     assignedTo: { name: string } | null;
-    assignments: Array<{ employeeId: string }>;
+    assignments: Array<{ employeeId: string; assignedAt: Date; statusSubmittedAt: Date | null; closedAt: Date | null; employee: { name: string } }>;
   },
   customerSignatureBytes: Uint8Array | null,
 ) {
@@ -195,7 +205,10 @@ function drawServiceReportForm(
     chargeableAmount: number | null;
     createdAt: Date;
     deletedAt: Date | null;
+    closedByName: string | null;
+    lastAttemptByName: string | null;
     assignedTo: { name: string } | null;
+    assignments: Array<{ assignedAt: Date; statusSubmittedAt: Date | null; closedAt: Date | null; employee: { name: string } }>;
   },
   customerSignatureImage: PDFImage | null,
 ) {
@@ -227,6 +240,7 @@ function drawServiceReportForm(
   const statusText = request.deletedAt ? "Deleted" : normalizeStatus(request.status);
   const isClosed = statusText.toLowerCase() === "completed" || statusText.toLowerCase() === "closed";
   const actionTaken = request.statusReason || (isClosed ? "Completed" : "");
+  const technicianName = getPdfTechnicianName(request);
   const customerReview = request.customerReview?.trim() || "-";
   const contactNumbers = [request.phoneNumber1, request.phoneNumber2].filter(Boolean).join(" / ");
   const partColumnXs = [x + 230, x + 273, x + 331, x + 399];
@@ -262,12 +276,12 @@ function drawServiceReportForm(
   drawCellLabelValue(page, "Address :", request.fullAddress, x + 5, y.contactNumber - 15, labelX, rightX - 5, regularFont, boldFont, 8.3, 2);
 
   drawCellLabelValue(page, "Call Description :", request.complaintDetails || "-", rightX + 5, y.billing - 15, rightLabelX, x + width - 5, regularFont, boldFont, 8.1, 2);
-  drawCellLabelValue(page, "Technician Name :", request.assignedTo?.name || "-", rightX + 5, y.contactNumber - 15, rightLabelX, x + width - 5, regularFont, boldFont, 8.3, 1);
+  drawCellLabelValue(page, "Technician Name :", technicianName, rightX + 5, y.contactNumber - 15, rightLabelX, x + width - 5, regularFont, boldFont, 8.3, 1);
   drawText(page, "Call Status :", rightX + 5, y.product - 15, 8.3, boldFont);
   drawCallStatusOptions(page, statusOptionX, y.product - 16, regularFont, statusText);
 
   drawText(page, "Action Taken :", x + 5, y.info - 16, 8.5, regularFont);
-  drawWrappedText(page, actionTaken || "-", x + 82, y.info - 16, x + width - 90, 9, regularFont, 10, 2);
+  drawActionTakenText(page, actionTaken || "-", x + 82, y.info - 14, x + width - 90, 8.5, regularFont);
 
   drawPartsHeader(page, x, y.action - 16, [230, 43, 58, 68, 105], regularFont, boldFont);
   drawCenteredText(page, formatAmount(request.serviceBillingType, request.chargeableAmount), x + 399, y.partsHeader - 15, 105, 8.8, regularFont);
@@ -423,6 +437,23 @@ function drawWrappedText(
   });
 }
 
+function drawActionTakenText(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, width: number, size: number, font: PDFFont) {
+  const sections = getActionTakenSections(text);
+  const lineHeight = 9.2;
+  const maxLines = 4;
+  let lineIndex = 0;
+
+  for (const section of sections) {
+    const lines = wrapText(section, font, width, size);
+
+    for (const line of lines) {
+      if (lineIndex >= maxLines) return;
+      drawText(page, line, x, y - lineIndex * lineHeight, size, font);
+      lineIndex += 1;
+    }
+  }
+}
+
 function wrapText(text: string, font: PDFFont, width: number, size: number) {
   const words = toPdfText(text).split(/\s+/);
   const lines: string[] = [];
@@ -452,6 +483,45 @@ function formatDate(value: Date) {
     year: "numeric",
     timeZone: "Asia/Kolkata",
   }).format(value);
+}
+
+function getPdfTechnicianName(request: {
+  assignedTo: { name: string } | null;
+  closedByName: string | null;
+  lastAttemptByName: string | null;
+  assignments: Array<{ assignedAt: Date; statusSubmittedAt: Date | null; closedAt: Date | null; employee: { name: string } }>;
+}) {
+  if (request.assignedTo?.name) return request.assignedTo.name;
+  if (request.closedByName) return request.closedByName;
+  if (request.lastAttemptByName) return request.lastAttemptByName;
+
+  const latestAssignment = [...request.assignments].sort((a, b) => {
+    const aTime = (a.closedAt ?? a.statusSubmittedAt ?? a.assignedAt).getTime();
+    const bTime = (b.closedAt ?? b.statusSubmittedAt ?? b.assignedAt).getTime();
+    return bTime - aTime;
+  })[0];
+
+  return latestAssignment?.employee.name || "-";
+}
+
+function getActionTakenSections(text: string) {
+  const normalized = text.trim();
+
+  if (!normalized) return ["-"];
+
+  const beforeIndex = normalized.indexOf("Before:");
+  const afterIndex = normalized.indexOf("After:");
+
+  if (beforeIndex === -1 || afterIndex === -1) {
+    return normalized.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean);
+  }
+
+  const firstIndex = Math.min(beforeIndex, afterIndex);
+  const prefix = normalized.slice(0, firstIndex).trim();
+  const beforeText = normalized.slice(beforeIndex, afterIndex).trim();
+  const afterText = normalized.slice(afterIndex).trim();
+
+  return [prefix, beforeText, afterText].filter(Boolean);
 }
 
 function formatAmount(type: string | null, amount: number | null) {
