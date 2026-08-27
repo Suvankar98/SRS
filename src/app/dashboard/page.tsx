@@ -292,7 +292,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           }
         : {}),
       mediaItems: mediaByRequestId.get(request.id) ?? [],
-      hasCustomerSignature: signedRequestIds.has(request.id),
+      hasCustomerSignature: signedRequestIds.has(request.id) && getRequestEmployeeIds(request).size > 1,
       reviewNotes: getDashboardReviewNotes(request, reviewNoteAdjustments),
       companyHistoryRequests: allRequestsByCompany.get(getCompanyKey(request.company)) ?? [request],
     };
@@ -1555,8 +1555,3 @@ function sortByEmployeeQueueOrder<T extends { assignedAt: Date | null; createdAt
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 }
-
-
-
-
-

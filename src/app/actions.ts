@@ -1661,7 +1661,6 @@ export async function updateServiceCallStatus(formData: FormData) {
   const customerReviewValue = typeof customerReview === "string" ? customerReview.trim() : "";
   const customerSignatureDataUrl = getOptionalField(formData, "customerSignatureDataUrl");
   const customerSignatureBuffer = customerSignatureDataUrl ? decodeCustomerSignatureDataUrl(customerSignatureDataUrl) : null;
-  const existingCustomerSignatureFile = customerSignatureBuffer ? null : await getLatestCustomerSignatureFile(requestId);
 
   let assignment = await prisma.serviceAssignment.findUnique({
     where: {
@@ -1743,6 +1742,11 @@ export async function updateServiceCallStatus(formData: FormData) {
       },
     });
   }
+
+  const signatureRecipientIds = await getAssignedCustomerSignatureRecipientIds(requestId);
+  const canReuseSharedCustomerSignature = signatureRecipientIds.length > 1;
+  const existingCustomerSignatureFile =
+    canReuseSharedCustomerSignature && !customerSignatureBuffer ? await getLatestCustomerSignatureFile(requestId) : null;
 
   const currentStatus = normalizeStatus(assignment.status);
   if (currentStatus === "Completed") {
@@ -2804,15 +2808,7 @@ async function getLatestCustomerSignatureFile(requestId: string) {
   return signatureFiles.sort((a, b) => b.uploadedAt - a.uploadedAt)[0] ?? null;
 }
 
-async function saveCustomerSignatureForRequest({
-  requestId,
-  buffer,
-  fallbackUserId,
-}: {
-  requestId: string;
-  buffer: Buffer;
-  fallbackUserId: string;
-}) {
+async function getAssignedCustomerSignatureRecipientIds(requestId: string) {
   const [assignments, request] = await Promise.all([
     prisma.serviceAssignment.findMany({
       where: { requestId },
@@ -2823,7 +2819,7 @@ async function saveCustomerSignatureForRequest({
       select: { assignedToId: true },
     }),
   ]);
-  const recipientIds = new Set<string>([fallbackUserId]);
+  const recipientIds = new Set<string>();
 
   for (const assignment of assignments) {
     recipientIds.add(assignment.employeeId);
@@ -2832,6 +2828,21 @@ async function saveCustomerSignatureForRequest({
   if (request?.assignedToId) {
     recipientIds.add(request.assignedToId);
   }
+
+  return Array.from(recipientIds);
+}
+
+async function saveCustomerSignatureForRequest({
+  requestId,
+  buffer,
+  fallbackUserId,
+}: {
+  requestId: string;
+  buffer: Buffer;
+  fallbackUserId: string;
+}) {
+  const assignedRecipientIds = await getAssignedCustomerSignatureRecipientIds(requestId);
+  const recipientIds = assignedRecipientIds.length > 1 ? new Set([...assignedRecipientIds, fallbackUserId]) : new Set([fallbackUserId]);
 
   await Promise.all(
     Array.from(recipientIds).map((userId) =>
