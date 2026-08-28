@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -29,6 +29,29 @@ export function CallHistoryColumnToggle({ children, columns = [], centerContent 
   useEffect(() => {
     dispatchVisibleColumns(visibleColumnIds);
   }, [visibleColumnIds]);
+
+  useEffect(() => {
+    let animationFrame = 0;
+    const updateTableHeadOffset = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const stickyFilters = document.getElementById("call-history-sticky-filters");
+        const filterBottom = stickyFilters?.getBoundingClientRect().bottom ?? 0;
+        document.documentElement.style.setProperty("--call-history-table-head-top", `${Math.max(0, Math.round(filterBottom))}px`);
+      });
+    };
+
+    updateTableHeadOffset();
+    window.addEventListener("resize", updateTableHeadOffset);
+    window.addEventListener("scroll", updateTableHeadOffset, { passive: true });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", updateTableHeadOffset);
+      window.removeEventListener("scroll", updateTableHeadOffset);
+      document.documentElement.style.removeProperty("--call-history-table-head-top");
+    };
+  }, []);
 
   function toggleColumn(columnId: string) {
     setHiddenColumnIds((current) => {
@@ -145,5 +168,3 @@ function getInitialHiddenColumnIds(columns: CallHistoryColumnToggleItem[]) {
 function escapeAttributeValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
-
-
