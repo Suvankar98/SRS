@@ -275,21 +275,21 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
               </div>
             }
           >
-            <div className="mt-3 overflow-x-auto overflow-y-visible">
+            <div className="mt-3 overflow-visible">
               <table className="min-w-full table-auto divide-y divide-blue-100 text-left text-xs">
-                <thead className="bg-blue-50 text-blue-700">
+                <thead className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 text-blue-700 shadow-[0_1px_0_rgba(147,197,253,0.9)]">
                   <tr>
-                    <th data-call-history-column="docket" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Docket</th>
-                    <th data-call-history-column="customer" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Company</th>
-                    <th data-call-history-column="area" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Area</th>
-                    <th data-call-history-column="call-type" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Call Type</th>
-                    <th data-call-history-column="amount" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Amount</th>
-                    <th data-call-history-column="assigned-to" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Assigned To</th>
-                    <th data-call-history-column="completed-by" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Completed By</th>
-                    <th data-call-history-column="assigned-date" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Assigned Date</th>
-                    <th data-call-history-column="status" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Status</th>
-                    <th data-call-history-column="deleted-by" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Deleted By</th>
-                    <th data-call-history-column="created" className="sticky top-[var(--call-history-table-head-top,0px)] z-20 bg-blue-50 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-[0_1px_0_rgba(147,197,253,0.9)]">Created</th>
+                    <th data-call-history-column="docket" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Docket</th>
+                    <th data-call-history-column="customer" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Company</th>
+                    <th data-call-history-column="area" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Area</th>
+                    <th data-call-history-column="call-type" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Call Type</th>
+                    <th data-call-history-column="amount" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Amount</th>
+                    <th data-call-history-column="assigned-to" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned To</th>
+                    <th data-call-history-column="completed-by" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Completed By</th>
+                    <th data-call-history-column="assigned-date" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Assigned Date</th>
+                    <th data-call-history-column="status" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Status</th>
+                    <th data-call-history-column="deleted-by" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Deleted By</th>
+                    <th data-call-history-column="created" className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Created</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-100 bg-white">
