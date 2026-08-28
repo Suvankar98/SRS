@@ -168,7 +168,10 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
         })
       : [];
-  const mediaByRequestId = await getDashboardMediaItemsByRequestIds(calls.map((request) => request.id));
+  const mediaByRequestId = await getDashboardMediaItemsByRequestIds([
+    ...calls.map((request) => request.id),
+    ...relatedCompanyCalls.map((request) => request.id),
+  ]);
   const companyRequestsByKey = groupRequestsByCompany(relatedCompanyCalls);
 
   const activeFilters = getActiveFilterCount({
@@ -296,22 +299,34 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                   {calls.map((request) => {
                     const status = normalizeStatus(request.status);
                     const isDeleted = Boolean(request.deletedAt);
-                    const isCompleted = !isDeleted && status === "Completed";
                     const assignedEmployeeChips = getCallHistoryEmployeeChips(request);
                     const completedEmployeeChips = getCallHistoryCompletedByChips(request);
                     const assignedAt = getCallHistoryAssignedAt(request);
-                    const mediaItems = isCompleted ? mediaByRequestId.get(request.id) ?? [] : [];
+                    const mediaItems = mediaByRequestId.get(request.id) ?? [];
 
                     return (
                       <tr key={request.id}>
-                        <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">{formatDocketNumber(request.docketNumber)}</td>
+                        <td data-call-history-column="docket" className="px-2.5 py-2.5 font-semibold text-blue-900">
+                          <div className="flex items-center gap-1.5">
+                            <span>{formatDocketNumber(request.docketNumber)}</span>
+                            <DashboardMediaPopup
+                              docketNumber={formatDocketNumber(request.docketNumber)}
+                              mediaItems={mediaItems}
+                              variant="icon"
+                            />
+                          </div>
+                        </td>
 
                         <td data-call-history-column="customer" className="px-2.5 py-2.5 text-blue-900">
                           <div>
                             <ReportCallDetailsModal
                               request={{
                                 ...request,
-                                relatedRequests: companyRequestsByKey.get(getCompanyKey(request.company)) ?? [request],
+                                mediaItems,
+                                relatedRequests: (companyRequestsByKey.get(getCompanyKey(request.company)) ?? [request]).map((relatedRequest) => ({
+                                  ...relatedRequest,
+                                  mediaItems: mediaByRequestId.get(relatedRequest.id) ?? [],
+                                })),
                               }}
                               triggerContent={request.company}
                             />
@@ -356,9 +371,6 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
                             >
                               {isDeleted ? "Deleted" : getStatusLabel(status)}
                             </span>
-                            {mediaItems.length > 0 ? (
-                              <DashboardMediaPopup docketNumber={formatDocketNumber(request.docketNumber)} mediaItems={mediaItems} variant="icon" />
-                            ) : null}
                           </div>
                         </td>
                         <td data-call-history-column="deleted-by" className="px-2.5 py-2.5 text-blue-900">

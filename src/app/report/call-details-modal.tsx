@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState, type ReactNode } from "react";
 
+import { DashboardMediaPopup } from "../dashboard/dashboard-media-popup";
 import { formatDocketNumber } from "@/lib/docket";
+import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 type Activity = {
   id: string;
@@ -50,6 +52,7 @@ type CallDetailsModalProps = {
     } | null;
     activities?: Activity[];
     relatedRequests?: TimelineRequest[];
+    mediaItems?: DashboardRequestMediaItem[];
   } | null;
   triggerContent?: ReactNode;
 };
@@ -182,6 +185,7 @@ export function ReportCallDetailsModal({ request, triggerContent }: CallDetailsM
                           </span>
                         </button>
                         <DocketChipPrintPdfLink requestId={relatedRequest.id} docketNumber={relatedDocketNumber} isSelected={isSelected} />
+                        <DocketChipMediaButton request={relatedRequest} docketNumber={relatedDocketNumber} isSelected={isSelected} />
                       </div>
                     );
                   })}
@@ -510,6 +514,25 @@ function getTimelineBadgeClass(color: string) {
   return colors[color] || colors.blue;
 }
 
+function DocketChipMediaButton({ request, docketNumber, isSelected }: { request: RelatedTimelineRequest; docketNumber: string; isSelected: boolean }) {
+  const mediaItems = request.mediaItems ?? [];
+
+  if (mediaItems.length === 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className={`inline-flex w-8 shrink-0 items-center justify-center border-l transition ${
+        isSelected ? "border-white/25 text-white [&_button]:text-white [&_button]:hover:bg-white/15" : "border-blue-100 text-blue-700 [&_button]:hover:bg-blue-50"
+      }`}
+      onClick={(event) => event.stopPropagation()}
+      title={`View media for ${docketNumber}`}
+    >
+      <DashboardMediaPopup docketNumber={docketNumber} mediaItems={mediaItems} variant="icon" />
+    </span>
+  );
+}
 function DocketChipPrintPdfLink({ requestId, docketNumber, isSelected }: { requestId: string; docketNumber: string; isSelected: boolean }) {
   return (
     <a
@@ -554,13 +577,3 @@ function PdfIcon() {
     </svg>
   );
 }
-
-
-
-
-
-
-
-
-
-
