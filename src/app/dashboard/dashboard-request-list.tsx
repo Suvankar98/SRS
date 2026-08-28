@@ -447,7 +447,7 @@ export function DashboardRequestList({
             <col className="w-[10%]" />
             {canAssign ? <col className="w-[19%]" /> : null}
           </colgroup>
-          <thead className="sticky top-[10.25rem] z-20 bg-blue-50 text-blue-700 shadow-[0_1px_0_rgba(147,197,253,0.9)] xl:top-[12rem]">
+          <thead className="bg-blue-50 text-blue-700">
             <tr>
               <Th>Docket</Th>
             <Th>
@@ -1007,7 +1007,7 @@ function OpenDocketIcon() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="whitespace-nowrap border-b-2 border-blue-200 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900">
+    <th className="sticky top-[10.25rem] z-20 whitespace-nowrap border-b-2 border-blue-200 bg-blue-50 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900 shadow-[0_1px_0_rgba(147,197,253,0.9)] xl:top-[12rem]">
       {children}
     </th>
   );
