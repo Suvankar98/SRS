@@ -353,7 +353,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               ) : null}
 
               {!isEmployee ? (
-                <header className="sticky top-0 z-30 mb-3 grid gap-2 bg-[#f4f8ff]/95 py-2 backdrop-blur xl:mb-5 xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,1fr)] lg:top-0">
+                <header id="dashboard-sticky-header" className="sticky top-0 z-30 grid gap-2 bg-[#f4f8ff]/95 py-2 backdrop-blur xl:gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,1fr)] lg:top-0">
                   <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-5 py-5">
                     <p className="text-xs uppercase tracking-[0.25em] text-blue-500">Overview</p>
                     <div className="mt-2 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">

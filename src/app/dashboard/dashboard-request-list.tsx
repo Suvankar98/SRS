@@ -97,6 +97,34 @@ export function DashboardRequestList({
   const canReorder = canEditDocket && canAssign && !isEmployee;
   const canDragRows = canReorder && daysSortMode === "default";
 
+  React.useEffect(() => {
+    if (isEmployee) {
+      document.documentElement.style.removeProperty("--dashboard-table-head-top");
+      return;
+    }
+
+    let animationFrame = 0;
+    const updateTableHeadOffset = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const stickyHeader = document.getElementById("dashboard-sticky-header");
+        const headerBottom = stickyHeader?.getBoundingClientRect().bottom ?? 0;
+        document.documentElement.style.setProperty("--dashboard-table-head-top", `${Math.max(0, Math.round(headerBottom))}px`);
+      });
+    };
+
+    updateTableHeadOffset();
+    window.addEventListener("resize", updateTableHeadOffset);
+    window.addEventListener("scroll", updateTableHeadOffset, { passive: true });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", updateTableHeadOffset);
+      window.removeEventListener("scroll", updateTableHeadOffset);
+      document.documentElement.style.removeProperty("--dashboard-table-head-top");
+    };
+  }, [isEmployee]);
+
   const normalOrderIds = React.useRef(getNormalOrderIds(requests));
   const dragItem = React.useRef<number | null>(null);
   const dragOverItem = React.useRef<number | null>(null);
@@ -1007,7 +1035,7 @@ function OpenDocketIcon() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="sticky top-[10.25rem] z-20 whitespace-nowrap border-b-2 border-blue-200 bg-blue-50 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900 shadow-[0_1px_0_rgba(147,197,253,0.9)] xl:top-[12rem]">
+    <th className="sticky top-[var(--dashboard-table-head-top,0px)] z-20 whitespace-nowrap border-b-2 border-blue-200 bg-blue-50 px-2 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-900 shadow-[0_1px_0_rgba(147,197,253,0.9)]">
       {children}
     </th>
   );
