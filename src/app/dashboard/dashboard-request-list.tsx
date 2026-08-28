@@ -276,7 +276,7 @@ export function DashboardRequestList({
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white">
+    <section className="overflow-visible rounded-2xl border border-blue-200 bg-white">
       {orderMessage ? (
         <div className="border-b border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
           {orderMessage}
@@ -434,7 +434,7 @@ export function DashboardRequestList({
         ) : null}
       </div>
 
-      <div className="hidden overflow-hidden md:block">
+      <div className="hidden overflow-visible md:block">
         <table className="w-full table-fixed divide-y divide-blue-300 text-left text-xs">
           <colgroup>
             <col className="w-[12%]" />
@@ -447,7 +447,7 @@ export function DashboardRequestList({
             <col className="w-[10%]" />
             {canAssign ? <col className="w-[19%]" /> : null}
           </colgroup>
-          <thead className="bg-blue-50 text-blue-700">
+          <thead className="sticky top-[10.25rem] z-20 bg-blue-50 text-blue-700 shadow-[0_1px_0_rgba(147,197,253,0.9)] xl:top-[12rem]">
             <tr>
               <Th>Docket</Th>
             <Th>
