@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 
@@ -33,14 +33,36 @@ type AdminManagerStatusSelectProps = {
       statusPointsReviewedByName?: string | null;
       employee?: { name: string } | null;
     }>;
+    activities?: Array<{
+      id: string;
+      type: string;
+      title: string;
+      details: string | null;
+      status: string | null;
+      statusReason: string | null;
+      statusAssignmentId?: string | null;
+      statusAssignedAt?: Date | string | null;
+      statusAssignedCallCount?: number | null;
+      statusSubmittedAt?: Date | string | null;
+      statusPointsDelta?: number | null;
+      statusPointsApproval?: string | null;
+      statusPointsReviewedAt?: Date | string | null;
+      statusPointsReviewedByName?: string | null;
+      employeeId?: string | null;
+      employeeName: string | null;
+      actorName: string | null;
+      actorRole: string | null;
+      createdAt: Date | string;
+    }>;
     mediaItems?: DashboardRequestMediaItem[];
   };
 };
 
 export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectProps) {
   const status = getStatusLabel(request.status);
+  const activityRemarks = getActivityRemarks(request.activities ?? [], request.assignments ?? [], request.mediaItems ?? []);
   const assignmentRemarks = getAssignmentRemarks(request.assignments ?? [], request.mediaItems ?? []);
-  const remarks = assignmentRemarks.length > 0 ? assignmentRemarks : getRequestFallbackRemarks(request);
+  const remarks = activityRemarks.length > 0 ? activityRemarks : assignmentRemarks.length > 0 ? assignmentRemarks : getRequestFallbackRemarks(request);
 
   return (
     <div className="space-y-1">
@@ -63,7 +85,7 @@ export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectPr
           ))}
         </select>
       </form>
-      {remarks.length > 0 ? <AssignmentRemarksPopup remarks={remarks} /> : null}
+      {remarks.length > 0 ? <AssignmentRemarksPopup request={request} remarks={remarks} /> : null}
       <ReviewNoteButton request={request} />
     </div>
   );
@@ -71,6 +93,8 @@ export function AdminManagerStatusSelect({ request }: AdminManagerStatusSelectPr
 
 type AssignmentRemark = {
   id: string;
+  activityId?: string | null;
+  assignmentId: string | null;
   employeeName: string;
   status: ReturnType<typeof normalizeStatus>;
   remark: string;
@@ -83,6 +107,69 @@ type AssignmentRemark = {
   audioItems: DashboardRequestMediaItem[];
 };
 
+function getActivityRemarks(
+  activities: NonNullable<AdminManagerStatusSelectProps["request"]["activities"]>,
+  assignments: NonNullable<AdminManagerStatusSelectProps["request"]["assignments"]>,
+  mediaItems: DashboardRequestMediaItem[],
+) {
+  const availableAudioItems = mediaItems.filter((item) => item.type === "audio");
+  const submittedAssignments = assignments.filter((assignment) => assignment.statusSubmittedAt);
+
+  const findActivityAssignment = (activity: NonNullable<AdminManagerStatusSelectProps["request"]["activities"]>[number]) => {
+    if (activity.statusAssignmentId) {
+      const exactAssignment = submittedAssignments.find((assignment) => assignment.id === activity.statusAssignmentId);
+      if (exactAssignment) {
+        return exactAssignment;
+      }
+    }
+
+    const activityTime = getDateTime(activity.statusSubmittedAt ?? activity.createdAt);
+
+    return submittedAssignments.find((assignment) => {
+      const sameEmployee = activity.employeeId
+        ? assignment.employeeId === activity.employeeId
+        : assignment.employee?.name && activity.employeeName
+          ? assignment.employee.name === activity.employeeName
+          : false;
+      const sameTime = Math.abs(getDateTime(assignment.statusSubmittedAt) - activityTime) < 60_000;
+      return sameEmployee && sameTime;
+    }) ?? submittedAssignments.find((assignment) => {
+      const sameEmployee = activity.employeeId ? assignment.employeeId === activity.employeeId : true;
+      const assignmentTime = getDateTime(assignment.statusSubmittedAt);
+      return sameEmployee && assignmentTime <= activityTime && activityTime - assignmentTime <= 5 * 60 * 1000;
+    }) ?? null;
+  };
+
+  return activities
+    .filter((activity) => Boolean(activity.status) || Boolean(activity.statusReason))
+    .filter((activity) => isStatusPointActivity(activity) && Boolean(activity.employeeId || activity.employeeName || activity.actorRole === "Employee"))
+    .sort((a, b) => getDateTime(a.statusSubmittedAt ?? a.createdAt) - getDateTime(b.statusSubmittedAt ?? b.createdAt))
+    .map((activity) => {
+      const matchingAssignment = findActivityAssignment(activity);
+      const submittedAt = activity.statusSubmittedAt ?? activity.createdAt;
+      const employeeId = activity.employeeId ?? matchingAssignment?.employeeId ?? "";
+      const points = activity.statusPointsDelta ?? null;
+
+      return {
+        id: `activity-${activity.id}`,
+        activityId: activity.id,
+        assignmentId: activity.statusAssignmentId ?? matchingAssignment?.id ?? null,
+        employeeName: activity.employeeName || activity.actorName || "Employee",
+        status: normalizeStatus(activity.status),
+        remark: activity.statusReason?.trim() || activity.details?.trim() || "-",
+        submittedAt,
+        points,
+        approval: activity.statusPointsApproval ?? (typeof points === "number" ? "approved" : "pending"),
+        reviewedAt: activity.statusPointsReviewedAt,
+        reviewedByName: activity.statusPointsReviewedByName,
+        canReview: true,
+        audioItems: employeeId ? getRemarkAudioItems(availableAudioItems, employeeId, submittedAt) : [],
+      };
+    });
+}
+function isStatusPointActivity(activity: NonNullable<AdminManagerStatusSelectProps["request"]["activities"]>[number]) {
+  return activity.type === "status" || activity.type === "completed";
+}
 function getAssignmentRemarks(
   assignments: NonNullable<AdminManagerStatusSelectProps["request"]["assignments"]>,
   mediaItems: DashboardRequestMediaItem[],
@@ -91,9 +178,10 @@ function getAssignmentRemarks(
 
   return assignments
     .filter((assignment) => assignment.statusSubmittedAt && assignment.statusReason?.trim())
-    .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt))
+    .sort((a, b) => getDateTime(a.statusSubmittedAt) - getDateTime(b.statusSubmittedAt))
     .map((assignment) => ({
       id: assignment.id ?? assignment.employeeId,
+      assignmentId: assignment.id ?? null,
       employeeName: assignment.employee?.name ?? "Employee",
       status: normalizeStatus(assignment.status),
       remark: assignment.statusReason?.trim() ?? "",
@@ -112,9 +200,12 @@ function getRequestFallbackRemarks(request: AdminManagerStatusSelectProps["reque
     return [];
   }
 
+  const fallbackAssignment = request.assignments?.find((assignment) => assignment.id)?.id ?? null;
+
   return [
     {
       id: `request-${request.id}`,
+      assignmentId: fallbackAssignment,
       employeeName: request.lastAttemptByName ?? "Recent update",
       status: normalizeStatus(request.status),
       remark: request.statusReason.trim(),
@@ -123,7 +214,7 @@ function getRequestFallbackRemarks(request: AdminManagerStatusSelectProps["reque
       approval: "legacy",
       reviewedAt: null,
       reviewedByName: null,
-      canReview: false,
+      canReview: Boolean(fallbackAssignment),
       audioItems: [],
     },
   ];
@@ -151,7 +242,13 @@ function getRemarkAudioItems(
     .slice(0, 3);
 }
 
-function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
+function AssignmentRemarksPopup({
+  request,
+  remarks,
+}: {
+  request: AdminManagerStatusSelectProps["request"];
+  remarks: AssignmentRemark[];
+}) {
   const [open, setOpen] = React.useState(false);
   const [reviewingRemarkId, setReviewingRemarkId] = React.useState<string | null>(null);
 
@@ -193,8 +290,13 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
 
             <div className="space-y-3">
               {remarks.map((remark) => {
+                const reviewTargetId =
+                  remark.assignmentId ??
+                  request.assignments?.find((assignment) => Boolean(assignment.id))?.id ??
+                  "";
                 const reviewIsLocked = remark.approval === "approved" || remark.approval === "not_approved";
                 const reviewButtonsDisabled = reviewIsLocked || reviewingRemarkId === remark.id;
+                const canSubmitApproval = Boolean(remark.activityId || reviewTargetId) && !reviewTargetId.startsWith("request-");
 
                 return (
                 <div key={remark.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
@@ -236,10 +338,13 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
                           : "Points pending"}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
-                      {remark.canReview ? (
+                      {canSubmitApproval ? (
                         <>
                           <form action={updateAssignmentStatusPointApproval} onSubmit={() => setReviewingRemarkId(remark.id)}>
-                            <input type="hidden" name="assignmentId" value={remark.id} />
+                            <input type="hidden" name="activityId" value={remark.activityId ?? ""} />
+
+                            <input type="hidden" name="assignmentId" value={reviewTargetId} />
+                            <input type="hidden" name="requestId" value={request.id} />
                             <input type="hidden" name="approval" value="approved" />
                             <button
                               type="submit"
@@ -250,7 +355,10 @@ function AssignmentRemarksPopup({ remarks }: { remarks: AssignmentRemark[] }) {
                             </button>
                           </form>
                           <form action={updateAssignmentStatusPointApproval} onSubmit={() => setReviewingRemarkId(remark.id)}>
-                            <input type="hidden" name="assignmentId" value={remark.id} />
+                            <input type="hidden" name="activityId" value={remark.activityId ?? ""} />
+
+                            <input type="hidden" name="assignmentId" value={reviewTargetId} />
+                            <input type="hidden" name="requestId" value={request.id} />
                             <input type="hidden" name="approval" value="not_approved" />
                             <button
                               type="submit"

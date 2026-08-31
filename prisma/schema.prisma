@@ -126,6 +126,14 @@ model ServiceRequestActivity {
   details       String?
   status        String?
   statusReason  String?
+  statusAssignmentId String?  @db.Uuid
+  statusAssignedAt DateTime?
+  statusAssignedCallCount Int?
+  statusSubmittedAt DateTime?
+  statusPointsDelta Float?
+  statusPointsApproval String?
+  statusPointsReviewedAt DateTime?
+  statusPointsReviewedByName String?
   actorId       String?  @db.Uuid
   actorName     String?
   actorRole     String?

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { updateAssignmentStatusPointApproval } from "../actions";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
@@ -13,6 +14,7 @@ import {
   normalizeStatus,
 } from "../status-utils";
 import { formatDocketNumber } from "@/lib/docket";
+import { formatPointDelta } from "@/lib/points";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -77,6 +79,15 @@ type DashboardServiceActivity = {
   details: string | null;
   status: string | null;
   statusReason: string | null;
+  statusAssignmentId?: string | null;
+  statusAssignedAt?: Date | string | null;
+  statusAssignedCallCount?: number | null;
+  statusSubmittedAt?: Date | string | null;
+  statusPointsDelta?: number | null;
+  statusPointsApproval?: string | null;
+  statusPointsReviewedAt?: Date | string | null;
+  statusPointsReviewedByName?: string | null;
+  employeeId?: string | null;
   employeeName: string | null;
   actorName: string | null;
   actorRole: string | null;
@@ -316,7 +327,7 @@ export function DashboardRequestRow({
   const getSubmittedAssignmentAttempts = () =>
     request.assignments
       ?.filter((assignment) => assignment.statusSubmittedAt)
-      .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt)) ?? [];
+      .sort((a, b) => getDateTime(a.statusSubmittedAt) - getDateTime(b.statusSubmittedAt)) ?? [];
 
   const renderLastAttemptBadge = () => {
     if (isEmployee) {
@@ -537,7 +548,7 @@ export function DashboardRequestRow({
               </div>
             ) : null}
             <AssignmentPicker
-              key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
+              key={`${request.id}:${request.assignedToId ?? "unassigned"}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`}
               requestId={request.id}
               employees={employees}
               assignments={request.assignments}
@@ -967,6 +978,7 @@ export function PrintServicePdfLink({ requestId, docketNumber }: { requestId: st
 export function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
+  const [lockedApprovalByEntryId, setLockedApprovalByEntryId] = React.useState<Record<string, string>>({});
   const historyRequests = React.useMemo(
     () => getUniqueHistoryRequests(request.companyHistoryRequests ?? [request]),
     [request],
@@ -1088,6 +1100,83 @@ export function PreviousStatusButton({ request }: { request: DashboardRequestRow
                               {entry.remark}
                             </p>
                           ) : null}
+                          {entry.activityId || entry.assignmentId ? (
+                            <>
+                              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-blue-100 bg-white px-2.5 py-2">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                                    entry.approval === "approved"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : entry.approval === "not_approved"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {entry.approval === "approved"
+                                    ? "Approved"
+                                    : entry.approval === "not_approved"
+                                      ? "Not Approved"
+                                      : "Pending"}
+                                </span>
+                                {entry.approval === "approved" ? (
+                                  <span className="text-[10px] font-semibold text-emerald-700">{formatPointDelta(entry.points ?? 0)}</span>
+                                ) : entry.approval === "not_approved" ? (
+                                  <span className="text-[10px] font-semibold text-red-700">Points: 0</span>
+                                ) : null}
+                              </div>
+
+                              <div className="mt-3 rounded-lg border border-blue-100 bg-white p-2.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-[10px] font-semibold text-blue-700">
+                                    {entry.approval === "approved"
+                                      ? `Points: ${formatPointDelta(entry.points ?? 0)}`
+                                      : entry.approval === "not_approved"
+                                        ? "Points: 0"
+                                        : "Points pending"}
+                                  </p>
+
+                                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                                    <form
+                                      action={updateAssignmentStatusPointApproval}
+                                      onSubmit={() => setLockedApprovalByEntryId((current) => ({ ...current, [entry.id]: "approved" }))}
+                                      className="inline-block"
+                                    >
+                                      <input type="hidden" name="activityId" value={entry.activityId ?? ""} />
+
+                                      <input type="hidden" name="assignmentId" value={entry.assignmentId ?? ""} />
+                                      <input type="hidden" name="requestId" value={selectedRequest?.id ?? request.id} />
+                                      <input type="hidden" name="approval" value="approved" />
+                                      <button
+                                        type="submit"
+                                        disabled={entry.approval === "approved" || entry.approval === "not_approved" || lockedApprovalByEntryId[entry.id] === "approved"}
+                                        className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-emerald-600"
+                                      >
+                                        Approved
+                                      </button>
+                                    </form>
+                                    <form
+                                      action={updateAssignmentStatusPointApproval}
+                                      onSubmit={() => setLockedApprovalByEntryId((current) => ({ ...current, [entry.id]: "not_approved" }))}
+                                      className="inline-block"
+                                    >
+                                      <input type="hidden" name="activityId" value={entry.activityId ?? ""} />
+
+                                      <input type="hidden" name="assignmentId" value={entry.assignmentId ?? ""} />
+                                      <input type="hidden" name="requestId" value={selectedRequest?.id ?? request.id} />
+                                      <input type="hidden" name="approval" value="not_approved" />
+                                      <button
+                                        type="submit"
+                                        disabled={entry.approval === "approved" || entry.approval === "not_approved" || lockedApprovalByEntryId[entry.id] === "not_approved"}
+                                        className="inline-flex items-center justify-center rounded-lg bg-red-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-red-600"
+                                      >
+                                        Not Approved
+                                      </button>
+                                    </form>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : null}
                           <p className="mt-2 text-[10px] font-medium text-blue-500">{formatPreviousStatusDateTime(entry.createdAt)}</p>
                         </article>
                       ))
@@ -1108,27 +1197,82 @@ export function PreviousStatusButton({ request }: { request: DashboardRequestRow
 }
 type PreviousStatusEntry = {
   id: string;
+  activityId?: string;
+  assignmentId?: string;
   title: string;
   person: string;
   status: ReturnType<typeof normalizeStatus>;
   remark: string;
   isEmployeeRemark: boolean;
+  approval: string | null;
+  points: number | null;
   createdAt: Date | string;
 };
 
 function getPreviousStatusEntries(request: DashboardRequestRowRequest | DashboardCompanyHistoryRequest): PreviousStatusEntry[] {
+  const assignments = [...(request.assignments ?? [])]
+    .filter((assignment) => assignment.statusSubmittedAt)
+    .sort((a, b) => getDateTime(a.statusSubmittedAt) - getDateTime(b.statusSubmittedAt));
+
+  const findActivityAssignment = (activity: DashboardServiceActivity) => {
+    if (activity.statusAssignmentId) {
+      const exactAssignment = assignments.find((assignment) => assignment.id === activity.statusAssignmentId);
+      if (exactAssignment) {
+        return exactAssignment;
+      }
+    }
+
+    const activityTime = getDateTime(activity.statusSubmittedAt ?? activity.createdAt);
+
+    return assignments.find((assignment) => {
+      if (!assignment.statusSubmittedAt) {
+        return false;
+      }
+
+      const sameEmployee = activity.employeeId
+        ? assignment.employeeId === activity.employeeId
+        : assignment.employee?.name && activity.employeeName
+          ? assignment.employee.name === activity.employeeName
+          : false;
+      const sameTime = Math.abs(getDateTime(assignment.statusSubmittedAt) - activityTime) < 60_000;
+      return sameEmployee && sameTime;
+    }) ?? assignments.find((assignment) => {
+      if (!assignment.statusSubmittedAt) {
+        return false;
+      }
+
+      const assignmentTime = getDateTime(assignment.statusSubmittedAt);
+      const sameEmployee = activity.employeeId ? assignment.employeeId === activity.employeeId : true;
+      return sameEmployee && assignmentTime <= activityTime && activityTime - assignmentTime <= 5 * 60 * 1000;
+    }) ?? null;
+  };
+
   const activityEntries =
     request.activities
       ?.filter((activity) => Boolean(activity.status) || Boolean(activity.statusReason))
-      .map((activity) => ({
-        id: `activity-${activity.id}`,
-        title: activity.title,
-        person: activity.employeeName || activity.actorName || "Staff",
-        status: normalizeStatus(activity.status),
-        remark: getPreviousStatusRemark(activity.statusReason, activity.details),
-        isEmployeeRemark: Boolean(activity.statusReason?.trim() && (activity.employeeName || activity.actorRole === "Employee")),
-        createdAt: activity.createdAt,
-      })) ?? [];
+      .map((activity) => {
+        const matchingAssignment = findActivityAssignment(activity);
+        const isEmployeeActivity = isStatusPointActivity(activity) && Boolean(activity.employeeId || activity.employeeName || activity.actorRole === "Employee");
+        const points = activity.statusPointsDelta ?? null;
+        const approval = isEmployeeActivity
+          ? activity.statusPointsApproval ?? (typeof points === "number" ? "approved" : "pending")
+          : null;
+
+        return {
+          id: `activity-${activity.id}`,
+          activityId: isEmployeeActivity ? activity.id : undefined,
+          assignmentId: isEmployeeActivity ? activity.statusAssignmentId ?? matchingAssignment?.id : undefined,
+          title: activity.title,
+          person: activity.employeeName || activity.actorName || "Staff",
+          status: normalizeStatus(activity.status),
+          remark: getPreviousStatusRemark(activity.statusReason, activity.details),
+          isEmployeeRemark: Boolean(activity.statusReason?.trim() && isEmployeeActivity),
+          approval,
+          points,
+          createdAt: activity.statusSubmittedAt ?? activity.createdAt,
+        };
+      })
+      .sort((a, b) => getDateTime(a.createdAt) - getDateTime(b.createdAt)) ?? [];
 
   if (activityEntries.length > 0) {
     return activityEntries.slice(0, 8);
@@ -1137,20 +1281,25 @@ function getPreviousStatusEntries(request: DashboardRequestRowRequest | Dashboar
   return (
     request.assignments
       ?.filter((assignment) => assignment.statusSubmittedAt)
-      .sort((a, b) => getDateTime(b.statusSubmittedAt) - getDateTime(a.statusSubmittedAt))
+      .sort((a, b) => getDateTime(a.statusSubmittedAt) - getDateTime(b.statusSubmittedAt))
       .map((assignment) => ({
         id: `assignment-${assignment.id ?? assignment.employeeId}`,
+        assignmentId: assignment.id,
         title: "Status Updated",
         person: assignment.employee?.name || "Employee",
         status: normalizeStatus(assignment.status),
         remark: assignment.statusReason?.trim() ?? "",
         isEmployeeRemark: Boolean(assignment.statusReason?.trim()),
+        approval: assignment.statusPointsApproval ?? (typeof assignment.statusPointsDelta === "number" ? "approved" : null),
+        points: assignment.statusPointsDelta ?? null,
         createdAt: assignment.statusSubmittedAt ?? assignment.closedAt ?? "",
       }))
       .slice(0, 8) ?? []
   );
 }
-
+function isStatusPointActivity(activity: DashboardServiceActivity) {
+  return activity.type === "status" || activity.type === "completed";
+}
 function getPreviousStatusRemark(statusReason: string | null, details: string | null) {
   return statusReason?.trim() || details?.trim() || "";
 }
@@ -1277,21 +1426,6 @@ function isCompletedReassignWindowOpen(request: DashboardRequestRowRequest) {
   }
 
   return Date.now() - completedAt.getTime() <= COMPLETED_REASSIGN_WINDOW_MS;
-}
-
-function formatShortDateTime(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 function formatAttemptDateTime(value: Date | string) {

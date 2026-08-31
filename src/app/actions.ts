@@ -397,6 +397,14 @@ async function addServiceActivity(
     details?: string | null;
     status?: string | null;
     statusReason?: string | null;
+    statusAssignmentId?: string | null;
+    statusAssignedAt?: Date | null;
+    statusAssignedCallCount?: number | null;
+    statusSubmittedAt?: Date | null;
+    statusPointsDelta?: number | null;
+    statusPointsApproval?: string | null;
+    statusPointsReviewedAt?: Date | null;
+    statusPointsReviewedByName?: string | null;
     actorId?: string | null;
     actorName?: string | null;
     actorRole?: string | null;
@@ -413,6 +421,14 @@ async function addServiceActivity(
       details: data.details ?? null,
       status: data.status ?? null,
       statusReason: data.statusReason ?? null,
+      statusAssignmentId: data.statusAssignmentId ?? null,
+      statusAssignedAt: data.statusAssignedAt ?? null,
+      statusAssignedCallCount: data.statusAssignedCallCount ?? null,
+      statusSubmittedAt: data.statusSubmittedAt ?? null,
+      statusPointsDelta: data.statusPointsDelta ?? null,
+      statusPointsApproval: data.statusPointsApproval ?? null,
+      statusPointsReviewedAt: data.statusPointsReviewedAt ?? null,
+      statusPointsReviewedByName: data.statusPointsReviewedByName ?? null,
       actorId: data.actorId ?? null,
       actorName: data.actorName ?? null,
       actorRole: data.actorRole ?? null,
@@ -1586,6 +1602,12 @@ export async function assignServiceCall(formData: FormData) {
       },
     });
 
+    if (assignedToId === null) {
+      await transaction.serviceAssignment.deleteMany({
+        where: { requestId },
+      });
+    }
+
     if (allocationChanged || shouldReopenForQueue) {
       await addServiceActivity(transaction, {
         requestId,
@@ -1778,6 +1800,12 @@ export async function updateServiceCallStatus(formData: FormData) {
   const employeeName = employee?.name || "Unknown";
 
   await prisma.$transaction(async (transaction) => {
+    const statusAssignedCallCount = await getAssignedCallCountForStatusSubmission({
+      transaction,
+      employeeId: assignment.employeeId,
+      assignedAt: assignment.assignedAt,
+    });
+
     await transaction.serviceAssignment.update({
       where: { id: assignment.id },
       data: {
@@ -1810,17 +1838,24 @@ export async function updateServiceCallStatus(formData: FormData) {
     const shouldClearPriorityStar = aggregateStatus === "Completed" || aggregateStatus === "Cancel";
     const hadPriorityStar = (assignment.request.dashboardOrder ?? 0) < 0;
 
+    const shouldReleaseActiveAssignment = session.role === APP_ROLES.EMPLOYEE && normalizeStatus(status) !== "New Call";
+    const shouldClearAssignments = shouldReleaseActiveAssignment || aggregateStatus === "Completed" || aggregateStatus === "Cancel";
+
     await transaction.serviceRequest.update({
       where: { id: requestId },
       data: {
         assignedToId:
-          aggregateStatus === "Completed" || aggregateStatus === "Cancel"
+          shouldReleaseActiveAssignment
             ? null
-            : primaryOpenAssignment?.employeeId ?? null,
+            : aggregateStatus === "Completed" || aggregateStatus === "Cancel"
+              ? null
+              : primaryOpenAssignment?.employeeId ?? null,
         assignedAt:
-          aggregateStatus === "Completed" || aggregateStatus === "Cancel"
+          shouldReleaseActiveAssignment
             ? null
-            : primaryOpenAssignment?.assignedAt ?? null,
+            : aggregateStatus === "Completed" || aggregateStatus === "Cancel"
+              ? null
+              : primaryOpenAssignment?.assignedAt ?? null,
         status: aggregateStatus,
         statusReason: (latestAssignment?.statusReason ?? reasonValue) || null,
         customerReview: customerReviewValue || null,
@@ -1835,6 +1870,12 @@ export async function updateServiceCallStatus(formData: FormData) {
       },
     });
 
+    if (shouldClearAssignments) {
+      await transaction.serviceAssignment.deleteMany({
+        where: { requestId },
+      });
+    }
+
     await addServiceActivity(transaction, {
       requestId,
       type: status === "Completed" ? "completed" : "status",
@@ -1842,6 +1883,11 @@ export async function updateServiceCallStatus(formData: FormData) {
       details: `${employeeName} marked this call as ${status}${reasonValue ? `: ${reasonValue}` : ""}`,
       status,
       statusReason: reasonValue || null,
+      statusAssignmentId: assignment.id,
+      statusAssignedAt: assignment.assignedAt,
+      statusAssignedCallCount,
+      statusSubmittedAt: submittedAt,
+      statusPointsApproval: "pending",
       actorId: session.userId,
       actorName: employeeName,
       actorRole: getActorRoleLabel(session.role),
@@ -1894,7 +1940,9 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
     redirect("/dashboard");
   }
 
-  const assignmentId = getRequiredField(formData, "assignmentId");
+  const activityIdInput = formData.get("activityId");
+  const assignmentIdInput = formData.get("assignmentId");
+  const requestIdInput = formData.get("requestId");
   const approval = getRequiredField(formData, "approval");
 
   if (approval !== "approved" && approval !== "not_approved") {
@@ -1906,6 +1954,202 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
     select: { name: true },
   });
   const reviewedAt = new Date();
+  const reviewerName = reviewer?.name ?? "Admin / Manager";
+  const activityId = typeof activityIdInput === "string" && activityIdInput.trim() ? activityIdInput.trim() : null;
+
+  if (activityId) {
+    await prisma.$transaction(async (transaction) => {
+      const activity = await transaction.serviceRequestActivity.findUnique({
+        where: { id: activityId },
+        include: {
+          request: {
+            select: {
+              id: true,
+              deletedAt: true,
+            },
+          },
+        },
+      });
+
+      if (!activity || activity.request.deletedAt || !activity.employeeId) {
+        throw new Error("Submitted remark not found");
+      }
+
+      if (activity.statusPointsApproval === "approved" || activity.statusPointsApproval === "not_approved") {
+        return;
+      }
+
+      let assignment = activity.statusAssignmentId
+        ? await transaction.serviceAssignment.findUnique({
+            where: { id: activity.statusAssignmentId },
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  monthlyPerformancePoints: true,
+                  lastMonthlyResetDate: true,
+                },
+              },
+            },
+          })
+        : null;
+
+      const assignmentId = typeof assignmentIdInput === "string" && assignmentIdInput.trim() ? assignmentIdInput.trim() : null;
+      if (!assignment && assignmentId) {
+        assignment = await transaction.serviceAssignment.findUnique({
+          where: { id: assignmentId },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                monthlyPerformancePoints: true,
+                lastMonthlyResetDate: true,
+              },
+            },
+          },
+        });
+      }
+
+      if (!assignment) {
+        assignment = await transaction.serviceAssignment.findFirst({
+          where: {
+            requestId: activity.requestId,
+            employeeId: activity.employeeId,
+          },
+          orderBy: { assignedAt: "desc" },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                monthlyPerformancePoints: true,
+                lastMonthlyResetDate: true,
+              },
+            },
+          },
+        });
+      }
+
+      const employee = assignment?.employee ?? await transaction.user.findUnique({
+        where: { id: activity.employeeId },
+        select: {
+          id: true,
+          monthlyPerformancePoints: true,
+          lastMonthlyResetDate: true,
+        },
+      });
+
+      const assignedAt = activity.statusAssignedAt ?? assignment?.assignedAt ?? activity.createdAt;
+      const submittedAt = activity.statusSubmittedAt ?? activity.createdAt;
+
+      if (!employee || !assignedAt || !submittedAt) {
+        throw new Error("Submitted remark not found");
+      }
+
+      const assignedCallCount = activity.statusAssignedCallCount ?? await getAssignedCallCountForStatusSubmission({
+        transaction,
+        employeeId: activity.employeeId,
+        assignedAt,
+      });
+      const nextPoints = approval === "approved"
+        ? getStatusSubmissionPoints(assignedAt, submittedAt, Math.max(1, assignedCallCount))
+        : null;
+      const previousPoints = activity.statusPointsDelta ?? 0;
+      const pointsDelta = (nextPoints ?? 0) - previousPoints;
+
+      await transaction.serviceRequestActivity.update({
+        where: { id: activity.id },
+        data: {
+          statusAssignmentId: activity.statusAssignmentId ?? assignment?.id ?? null,
+          statusAssignedAt: assignedAt,
+          statusAssignedCallCount: Math.max(1, assignedCallCount),
+          statusSubmittedAt: submittedAt,
+          statusPointsDelta: nextPoints,
+          statusPointsApproval: approval,
+          statusPointsReviewedAt: reviewedAt,
+          statusPointsReviewedByName: reviewerName,
+        },
+      });
+
+      if (assignment) {
+        await transaction.serviceAssignment.update({
+          where: { id: assignment.id },
+          data: {
+            statusPointsDelta: nextPoints,
+            statusPointsApproval: approval,
+            statusPointsReviewedAt: reviewedAt,
+            statusPointsReviewedByName: reviewerName,
+          },
+        });
+      }
+
+      await applyEmployeePerformancePointsIncrement({
+        transaction,
+        employee,
+        employeeId: activity.employeeId,
+        pointsDelta,
+        performanceDate: submittedAt,
+      });
+
+      const latestApprovedActivity =
+        (await transaction.serviceRequestActivity.findMany({
+          where: {
+            requestId: activity.requestId,
+            statusPointsDelta: { not: null },
+          },
+          orderBy: [{ statusSubmittedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+          select: { statusPointsDelta: true },
+        }))[0] ?? null;
+      const latestApprovedAssignment =
+        (await transaction.serviceAssignment.findMany({
+          where: {
+            requestId: activity.requestId,
+            statusPointsDelta: { not: null },
+          },
+          orderBy: { statusSubmittedAt: "desc" },
+          take: 1,
+          select: { statusPointsDelta: true },
+        }))[0] ?? null;
+
+      await transaction.serviceRequest.update({
+        where: { id: activity.requestId },
+        data: { statusPointsDelta: latestApprovedActivity?.statusPointsDelta ?? latestApprovedAssignment?.statusPointsDelta ?? null },
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/report");
+    return;
+  }
+
+  let assignmentId = typeof assignmentIdInput === "string" && assignmentIdInput.trim()
+    ? assignmentIdInput.trim()
+    : null;
+
+  if (assignmentId) {
+    const matchingAssignment = await prisma.serviceAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, requestId: true, statusSubmittedAt: true },
+    });
+
+    if (!matchingAssignment || !matchingAssignment.statusSubmittedAt) {
+      assignmentId = null;
+    }
+  }
+
+  if (!assignmentId && typeof requestIdInput === "string" && requestIdInput.trim()) {
+    assignmentId = (
+      await prisma.serviceAssignment.findFirst({
+        where: { requestId: requestIdInput.trim(), statusSubmittedAt: { not: null } },
+        orderBy: { statusSubmittedAt: "desc" },
+        select: { id: true },
+      })
+    )?.id ?? null;
+  }
+
+  if (!assignmentId) {
+    throw new Error("Submitted remark not found");
+  }
 
   await prisma.$transaction(async (transaction) => {
     const assignment = await transaction.serviceAssignment.findUnique({
@@ -1991,7 +2235,7 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
             ? {
                 statusPointsApproval: approval,
                 statusPointsReviewedAt: reviewedAt,
-                statusPointsReviewedByName: reviewer?.name ?? "Admin / Manager",
+                statusPointsReviewedByName: reviewerName,
               }
             : {}),
         },
@@ -2034,7 +2278,6 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/report");
 }
-
 export async function updateManagerServiceStatus(formData: FormData) {
   const session = await requireSession();
 
