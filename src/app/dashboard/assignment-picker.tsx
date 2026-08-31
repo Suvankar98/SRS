@@ -10,6 +10,8 @@ export type AssignmentPickerAssignment = {
   status?: string | null;
   statusReason?: string | null;
   statusSubmittedAt?: Date | string | null;
+  statusPointsDelta?: number | null;
+  statusPointsApproval?: string | null;
   closedAt?: Date | string | null;
   employee?: { name: string } | null;
 };
@@ -25,17 +27,20 @@ type AssignmentPickerProps = {
 };
 
 function getInitialRows(assignments: AssignmentPickerAssignment[] | undefined, defaultEmployeeId?: string | null) {
-  const selected = assignments?.map((assignment) => assignment.employeeId).filter(Boolean) ?? [];
-
-  if (selected.length > 0) {
-    return selected;
+  if (!defaultEmployeeId) {
+    return [""];
   }
 
-  if (defaultEmployeeId) {
-    return [defaultEmployeeId];
+  const selected = (assignments?.map((assignment) => assignment.employeeId).filter(Boolean) ?? []).filter(
+    (employeeId, index, array) => employeeId && array.indexOf(employeeId) === index,
+  );
+
+  const orderedSelection = [...selected];
+  if (!orderedSelection.includes(defaultEmployeeId)) {
+    orderedSelection.push(defaultEmployeeId);
   }
 
-  return [""];
+  return orderedSelection.length > 0 ? orderedSelection : [""];
 }
 
 function getUniqueSelected(rows: string[]) {
