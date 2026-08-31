@@ -30,17 +30,21 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`h-full bg-[#eef6ff] antialiased ${nunitoSans.variable}`}>
       <head>
-        <Script id="theme-init" strategy="beforeInteractive">
-          {`
-            try {
-              var storedTheme = localStorage.getItem("srs-theme");
-              var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-              var theme = storedTheme || (prefersDark ? "dark" : "light");
-              document.documentElement.classList.toggle("dark", theme === "dark");
-              document.documentElement.dataset.theme = theme;
-            } catch (_) {}
-          `}
-        </Script>
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var storedTheme = localStorage.getItem("srs-theme");
+                var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                var theme = storedTheme || (prefersDark ? "dark" : "light");
+                document.documentElement.classList.toggle("dark", theme === "dark");
+                document.documentElement.dataset.theme = theme;
+              } catch (_) {}
+            `,
+          }}
+        />
       </head>
       <body
         suppressHydrationWarning

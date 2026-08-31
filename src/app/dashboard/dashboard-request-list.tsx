@@ -440,7 +440,7 @@ export function DashboardRequestList({
                     ) : null}
                   </div>
                   <AssignmentPicker
-                    key={`${request.id}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? request.assignedToId ?? ""}`}
+                    key={`${request.id}:${request.assignedToId ?? "unassigned"}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`}
                     requestId={request.id}
                     employees={employees}
                     assignments={request.assignments}
