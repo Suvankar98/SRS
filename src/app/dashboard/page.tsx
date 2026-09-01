@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import CreatedToast from "./created-toast";
 import { DashboardFilters } from "./dashboard-filters";
+import { DashboardImagePopup } from "./dashboard-image-popup";
 import { DashboardRequestList } from "./dashboard-request-list";
 import { EmployeeReportPopup } from "./employee-report-popup";
 import { normalizeStatus } from "../status-utils";
@@ -30,6 +31,13 @@ type DashboardPageProps = {
 
 type DashboardStatus = "New Call" | "In Process" | "Completed" | "Cancel";
 
+type DashboardLoginImage = {
+  fileName: string;
+  imageData: string;
+  uploadedByName: string | null;
+  createdAt: Date;
+};
+
 const COMPLETED_DASHBOARD_VISIBILITY_MS = 72 * 60 * 60 * 1000;
 const DAY_WISE_MAX_POINTS = 20;
 const PRIORITY_DAY_FACTOR = 10000;
@@ -55,8 +63,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const canEditDocket = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const showSummaryCards = session.role === APP_ROLES.ADMIN || session.role === APP_ROLES.MANAGER;
   const canAssign = roleCanAssign(session.role);
+  const canSeeDashboardImage = session.role === APP_ROLES.MANAGER || session.role === APP_ROLES.EMPLOYEE;
 
-  const [employees, databaseProducts, currentUser, employeePointAdjustments, reviewNoteAdjustments] = await Promise.all([
+  const [employees, databaseProducts, currentUser, employeePointAdjustments, reviewNoteAdjustments, dashboardLoginImage] = await Promise.all([
     canAssign
       ? prisma.user.findMany({
           where: { role: APP_ROLES.EMPLOYEE },
@@ -99,6 +108,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       },
       orderBy: { createdAt: "desc" },
     }),
+    getLatestDashboardImage(canSeeDashboardImage),
   ]);
   const products = getProductOptions(databaseProducts);
 
@@ -416,6 +426,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {/* show created toast client-side when a new service is created */}
       <CreatedToast docket={createdDocket} newCompanyStored={newCompanyStored} />
       <section className="min-h-[calc(100vh-3rem)]">
+        {dashboardLoginImage ? <DashboardImagePopup image={dashboardLoginImage} /> : null}
 
         <div className="rounded-2xl border border-blue-200 bg-white p-2 shadow-[0_20px_80px_rgba(29,78,216,0.12)] sm:rounded-[2rem] sm:p-6">
           <div>
@@ -474,6 +485,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   canEditDocket={canEditDocket}
                   canAssign={canAssign}
                   isEmployee={isEmployee}
+                  currentUserId={session.userId}
                 />
               )}
             </div>
@@ -481,6 +493,33 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </section>
     </main>
   );
+}
+
+async function getLatestDashboardImage(canShow: boolean): Promise<DashboardLoginImage | null> {
+  if (!canShow) {
+    return null;
+  }
+
+  try {
+    return await prisma.dashboardImage.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: {
+        fileName: true,
+        imageData: true,
+        uploadedByName: true,
+        createdAt: true,
+      },
+    });
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+    if (code === "P2021" || message.includes("dashboardimage")) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 async function getDashboardCompanyHistoryRequests(requests: Array<{ company: string }>) {

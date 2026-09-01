@@ -72,9 +72,31 @@ type DashboardRequestListProps = {
   canEditDocket: boolean;
   canAssign: boolean;
   isEmployee: boolean;
+  currentUserId: string;
 };
 
 type DaysSortMode = "default" | "asc" | "desc";
+
+function getDashboardPageSizeStorageKey(currentUserId: string) {
+  return `srtec-dashboard-page-size:${currentUserId}`;
+}
+
+function getStoredDashboardPageSize(storageKey: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const storedValue = Number(window.localStorage.getItem(storageKey));
+  return PAGE_SIZE_OPTIONS.includes(storedValue) ? storedValue : null;
+}
+
+function saveStoredDashboardPageSize(storageKey: string, pageSize: number) {
+  if (typeof window === "undefined" || !PAGE_SIZE_OPTIONS.includes(pageSize)) {
+    return;
+  }
+
+  window.localStorage.setItem(storageKey, String(pageSize));
+}
 
 export function DashboardRequestList({
   requests,
@@ -83,6 +105,7 @@ export function DashboardRequestList({
   canEditDocket,
   canAssign,
   isEmployee,
+  currentUserId,
 }: DashboardRequestListProps) {
   const [items, setItems] = React.useState(requests);
   const [orderMessage, setOrderMessage] = React.useState("");
@@ -94,9 +117,21 @@ export function DashboardRequestList({
   const [daysSortMode, setDaysSortMode] = React.useState<DaysSortMode>("default");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZE_OPTIONS[0]);
+  const [isPageSizeLoaded, setIsPageSizeLoaded] = React.useState(false);
+  const pageSizeStorageKey = React.useMemo(() => getDashboardPageSizeStorageKey(currentUserId), [currentUserId]);
   const canReorder = canEditDocket && canAssign && !isEmployee;
   const canDragRows = canReorder && daysSortMode === "default";
 
+  React.useEffect(() => {
+    const storedPageSize = getStoredDashboardPageSize(pageSizeStorageKey);
+
+    if (storedPageSize !== null) {
+      setPageSize(storedPageSize);
+      setCurrentPage(1);
+    }
+
+    setIsPageSizeLoaded(true);
+  }, [pageSizeStorageKey]);
   React.useEffect(() => {
     if (isEmployee) {
       document.documentElement.style.removeProperty("--dashboard-table-head-top");
@@ -302,6 +337,15 @@ export function DashboardRequestList({
       setOrderMessage("Order was not saved");
     }
   };
+
+
+  if (!isPageSizeLoaded) {
+    return (
+      <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white px-4 py-10 text-center text-sm font-semibold text-blue-700">
+        Loading services...
+      </section>
+    );
+  }
 
   return (
     <section className="overflow-visible rounded-2xl border border-blue-200 bg-white">
@@ -535,6 +579,7 @@ export function DashboardRequestList({
           onPageChange={setCurrentPage}
           onPageSizeChange={(nextPageSize) => {
             setPageSize(nextPageSize);
+            saveStoredDashboardPageSize(pageSizeStorageKey, nextPageSize);
             setCurrentPage(1);
           }}
         />
@@ -566,7 +611,8 @@ function DashboardPagination({
     <div className="flex flex-col gap-3 border-t border-blue-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs font-semibold text-blue-800">
         Showing <span className="text-blue-950">{startItem}-{endItem}</span> of{" "}
-        <span className="text-blue-950">{totalItems}</span>
+        <span className="text-blue-950">{totalItems}</span>{" "}
+        <span className="text-blue-500">({pageSize} services per page)</span>
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">

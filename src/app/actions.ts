@@ -1254,6 +1254,20 @@ export async function deleteServiceRequest(formData: FormData) {
   revalidatePath("/report");
 }
 
+async function isStaffUsernameTaken(username: string, excludeUserId?: string) {
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      username: {
+        equals: username,
+        mode: "insensitive",
+      },
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    select: { id: true },
+  });
+
+  return Boolean(existingUser);
+}
 export async function addStaff(formData: FormData) {
   await requireRole([APP_ROLES.ADMIN]);
 
@@ -1279,6 +1293,10 @@ export async function addStaff(formData: FormData) {
 
   if (role !== APP_ROLES.MANAGER && role !== APP_ROLES.EMPLOYEE) {
     throw new Error("Invalid role selected");
+  }
+
+  if (await isStaffUsernameTaken(username)) {
+    redirect("/admin?tab=staff&duplicate=staff");
   }
 
   await prisma.user.create({
@@ -1352,6 +1370,10 @@ export async function updateStaff(formData: FormData) {
 
   if (!user || (user.role !== APP_ROLES.MANAGER && user.role !== APP_ROLES.EMPLOYEE)) {
     redirect("/admin?tab=staff");
+  }
+
+  if (await isStaffUsernameTaken(username, id)) {
+    redirect("/admin?tab=staff&duplicate=staff");
   }
 
   const updateData: Record<string, unknown> = {
@@ -2558,6 +2580,60 @@ export async function addEmployeePerformanceAdjustment(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+const DASHBOARD_IMAGE_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const DASHBOARD_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
+
+async function ensureDashboardImageTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "DashboardImage" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "fileName" TEXT NOT NULL,
+      "mimeType" TEXT NOT NULL,
+      "imageData" TEXT NOT NULL,
+      "uploadedById" UUID,
+      "uploadedByName" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+export async function uploadDashboardImage(formData: FormData) {
+  const session = await requireRole([APP_ROLES.ADMIN]);
+  const file = formData.get("dashboardImage");
+
+  if (!file || typeof file === "string" || file.size === 0 || !file.name) {
+    throw new Error("Please select a valid image file.");
+  }
+
+  if (file.size > DASHBOARD_IMAGE_MAX_UPLOAD_BYTES) {
+    throw new Error("This image is too large. Please upload an image up to 5 MB.");
+  }
+
+  const mimeType = file.type || "application/octet-stream";
+  if (!DASHBOARD_IMAGE_MIME_TYPES.includes(mimeType)) {
+    throw new Error("Please upload a PNG, JPG, WEBP, or GIF image.");
+  }
+
+  const [actor, buffer] = await Promise.all([
+    prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } }),
+    file.arrayBuffer().then((arrayBuffer) => Buffer.from(arrayBuffer)),
+  ]);
+
+  await ensureDashboardImageTable();
+  await prisma.dashboardImage.create({
+    data: {
+      fileName: sanitizeFileName(file.name),
+      mimeType,
+      imageData: `data:${mimeType};base64,${buffer.toString("base64")}`,
+      uploadedById: session.userId,
+      uploadedByName: actor?.name ?? "Admin",
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  redirect("/admin?dashboardImage=uploaded");
+}
 export async function canOpenAdmin(): Promise<boolean> {
   const session = await getSession();
   return !!session && roleCanAdmin(session.role);

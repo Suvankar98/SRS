@@ -6,6 +6,7 @@ import {
   deleteStaff,
   deleteProduct,
   updateProduct,
+  uploadDashboardImage,
 } from "../actions";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { FixedCallTypesSection } from "./fixed-call-types-section";
@@ -41,12 +42,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const isAdmin = session.role === APP_ROLES.ADMIN;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const duplicateParam = resolvedSearchParams.duplicate;
-  const showDuplicateWarning = (Array.isArray(duplicateParam) ? duplicateParam[0] : duplicateParam) === "1";
+  const duplicateValue = Array.isArray(duplicateParam) ? duplicateParam[0] : duplicateParam;
+  const showDuplicateWarning = duplicateValue === "1" || duplicateValue === "staff";
   const tabParam = resolvedSearchParams.tab;
   const activeTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
   const phoneErrorParam = resolvedSearchParams.phoneError;
   const showPhoneError = (Array.isArray(phoneErrorParam) ? phoneErrorParam[0] : phoneErrorParam) === "1";
-  const duplicateItemLabel = activeTab === "call-types" ? "call type" : "product";
+  const dashboardImageParam = resolvedSearchParams.dashboardImage;
+  const showDashboardImageUploaded = (Array.isArray(dashboardImageParam) ? dashboardImageParam[0] : dashboardImageParam) === "uploaded";
+  const duplicateItemLabel = duplicateValue === "staff" ? "username" : activeTab === "call-types" ? "call type" : "product";
 
   if ((await prisma.product.count()) === 0) {
     await prisma.product.createMany({
@@ -55,7 +59,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     });
   }
 
-  const [staffMembers, products, callTypes, savedCustomerDetails, importedSavedCustomers] = await Promise.all([
+  const [staffMembers, products, callTypes, savedCustomerDetails, importedSavedCustomers, latestDashboardImage] = await Promise.all([
     prisma.user.findMany({
       where: { role: { in: [APP_ROLES.MANAGER, APP_ROLES.EMPLOYEE] } },
       orderBy: { createdAt: "desc" },
@@ -82,6 +86,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     prisma.savedCustomer.findMany({
       orderBy: { createdAt: "asc" },
     }),
+    getLatestDashboardImageForAdmin(isAdmin),
   ]);
   const visibleProducts = products.slice(0, 14);
   const remainingProducts = products.slice(14);
@@ -157,7 +162,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
         {showDuplicateWarning ? (
           <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-            This {duplicateItemLabel} already exists. Please use a different name.
+            This {duplicateItemLabel} already exists. Please use a different {duplicateItemLabel === "username" ? "username" : "name"}.
+          </div>
+        ) : null}
+
+        {showDashboardImageUploaded ? (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+            Dashboard image uploaded successfully.
           </div>
         ) : null}
 
@@ -232,6 +243,44 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </article>
           ) : null}
 
+          {isAdmin ? (
+            <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-blue-950">Dashboard image</h2>
+                  <p className="mt-1 text-sm text-blue-600">Upload the image shown to managers and employees after login.</p>
+                </div>
+                {latestDashboardImage ? (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                    {formatAdminDate(latestDashboardImage.createdAt)}
+                  </span>
+                ) : null}
+              </div>
+              <form action={uploadDashboardImage} className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input
+                  name="dashboardImage"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="min-w-0 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 file:mr-3 file:rounded-full file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-800 focus:border-blue-400 focus:outline-none"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-2xl bg-blue-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                >
+                  Upload image
+                </button>
+              </form>
+              {latestDashboardImage ? (
+                <div className="mt-5 overflow-hidden rounded-2xl border border-blue-100 bg-blue-50/50">
+                  <img src={latestDashboardImage.imageData} alt={latestDashboardImage.fileName} className="max-h-72 w-full object-contain" />
+                  <p className="border-t border-blue-100 px-4 py-3 text-xs font-medium text-blue-600">
+                    Uploaded by {latestDashboardImage.uploadedByName ?? "Admin"}
+                  </p>
+                </div>
+              ) : null}
+            </article>
+          ) : null}
           <div className={`grid items-start gap-6 ${isAdmin ? "xl:grid-cols-2" : ""}`}>
             {isAdmin ? (
             <article className="rounded-[2rem] border border-blue-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
@@ -469,6 +518,32 @@ function EditIcon() {
   );
 }
 
+async function getLatestDashboardImageForAdmin(isAdmin: boolean) {
+  if (!isAdmin) {
+    return null;
+  }
+
+  try {
+    return await prisma.dashboardImage.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: {
+        fileName: true,
+        imageData: true,
+        uploadedByName: true,
+        createdAt: true,
+      },
+    });
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+    if (code === "P2021" || message.includes("dashboardimage")) {
+      return null;
+    }
+
+    throw error;
+  }
+}
 function formatStaffDepartment(department: string | null) {
   return STAFF_DEPARTMENT_OPTIONS.find((option) => option.value === department)?.label ?? "Not selected";
 }

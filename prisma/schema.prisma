@@ -179,7 +179,15 @@ model MonthlyPerformanceHistory {
   
   @@unique([employeeId, year, month])
 }
-
+model DashboardImage {
+  id             String   @id @default(uuid()) @db.Uuid
+  fileName       String
+  mimeType       String
+  imageData      String
+  uploadedById   String?  @db.Uuid
+  uploadedByName String?
+  createdAt      DateTime @default(now())
+}
 model TechManualFolder {
   id          String   @id @default(uuid()) @db.Uuid
   category    String
