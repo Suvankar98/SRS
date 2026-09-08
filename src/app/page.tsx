@@ -72,7 +72,7 @@ export default async function Home({ searchParams }: HomeProps) {
           </form>
         </div>
       </section>
-      <p className="fixed bottom-3 left-3 text-xs font-semibold tracking-wide text-[#0170C3]/80 sm:bottom-4 sm:left-4">
+      <p className="fixed bottom-4 left-4 z-[80] rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-bold tracking-wide text-[#0170C3] shadow-sm">
         version-1.0
       </p>
     </main>
