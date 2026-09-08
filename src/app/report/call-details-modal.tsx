@@ -258,25 +258,50 @@ function TimelineDetails({ event }: { event: TimelineEvent }) {
   }
 
   const commentIndex = event.details.indexOf(event.commentText);
+  const highlightedComment = <HighlightedTimelineComment comment={event.commentText} />;
 
   if (commentIndex < 0) {
     return (
-      <p className="mt-2 break-words text-sm leading-6 text-slate-700">
-        {event.details}{" "}
-        <span className="font-medium text-rose-700">{event.commentText}</span>
-      </p>
+      <div className="mt-2 break-words text-sm leading-6 text-slate-700">
+        <p>{event.details}</p>
+        {highlightedComment}
+      </div>
     );
   }
 
+  const prefix = event.details.slice(0, commentIndex).trimEnd();
+  const suffix = event.details.slice(commentIndex + event.commentText.length).trimStart();
+
   return (
-    <p className="mt-2 break-words text-sm leading-6 text-slate-700">
-      {event.details.slice(0, commentIndex)}
-      <span className="font-medium text-rose-700">{event.commentText}</span>
-      {event.details.slice(commentIndex + event.commentText.length)}
-    </p>
+    <div className="mt-2 break-words text-sm leading-6 text-slate-700">
+      {prefix ? <p>{prefix}</p> : null}
+      {highlightedComment}
+      {suffix ? <p>{suffix}</p> : null}
+    </div>
   );
 }
 
+function HighlightedTimelineComment({ comment }: { comment: string }) {
+  const beforeIndex = comment.indexOf("Before:");
+  const afterIndex = comment.indexOf("After:");
+
+  if (beforeIndex === -1 && afterIndex === -1) {
+    return <p className="font-semibold text-purple-700">{comment}</p>;
+  }
+
+  const firstSectionIndex = Math.min(...[beforeIndex, afterIndex].filter((index) => index >= 0));
+  const prefix = comment.slice(0, firstSectionIndex).trim();
+  const beforeText = beforeIndex >= 0 ? comment.slice(beforeIndex, afterIndex > beforeIndex ? afterIndex : undefined).trim() : "";
+  const afterText = afterIndex >= 0 ? comment.slice(afterIndex).trim() : "";
+
+  return (
+    <div className="space-y-1 font-semibold">
+      {prefix ? <p className="text-purple-700">{prefix}</p> : null}
+      {beforeText ? <p className="text-red-600">{beforeText}</p> : null}
+      {afterText ? <p className="text-green-600">{afterText}</p> : null}
+    </div>
+  );
+}
 function getRelatedTimelineRequests(request: TimelineRequest): RelatedTimelineRequest[] {
   const relatedRequests = request.relatedRequests ?? [];
   const byId = new Map<string, RelatedTimelineRequest>();
