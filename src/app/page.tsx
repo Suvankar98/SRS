@@ -1,4 +1,4 @@
-﻿import { login } from "./actions";
+import { login } from "./actions";
 import { BrandLogo } from "./brand-logo";
 import { PasswordField } from "./password-field";
 
@@ -72,6 +72,9 @@ export default async function Home({ searchParams }: HomeProps) {
           </form>
         </div>
       </section>
+      <p className="fixed bottom-3 left-3 text-xs font-semibold tracking-wide text-[#0170C3]/80 sm:bottom-4 sm:left-4">
+        version-1.0
+      </p>
     </main>
   );
 }
