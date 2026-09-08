@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { updateAssignmentStatusPointApproval } from "../actions";
 import { DocketDetailsModal } from "../docket-details-modal";
 import { StatusUpdateModal } from "../status-update-modal";
 import { AdminManagerStatusSelect } from "./admin-manager-status-select";
@@ -14,7 +13,6 @@ import {
   normalizeStatus,
 } from "../status-utils";
 import { formatDocketNumber } from "@/lib/docket";
-import { formatPointDelta } from "@/lib/points";
 import type { DashboardRequestMediaItem } from "@/lib/gallery";
 
 const COMPLETED_REASSIGN_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -956,7 +954,6 @@ export function PrintServicePdfLink({ requestId, docketNumber }: { requestId: st
 export function PreviousStatusButton({ request }: { request: DashboardRequestRowRequest }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
-  const [lockedApprovalByEntryId, setLockedApprovalByEntryId] = React.useState<Record<string, string>>({});
   const historyRequests = React.useMemo(
     () => getUniqueHistoryRequests(request.companyHistoryRequests ?? [request]),
     [request],
@@ -1077,83 +1074,6 @@ export function PreviousStatusButton({ request }: { request: DashboardRequestRow
                             >
                               {entry.remark}
                             </p>
-                          ) : null}
-                          {entry.activityId || entry.assignmentId ? (
-                            <>
-                              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-blue-100 bg-white px-2.5 py-2">
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
-                                    entry.approval === "approved"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : entry.approval === "not_approved"
-                                        ? "bg-red-100 text-red-800"
-                                        : "bg-amber-100 text-amber-800"
-                                  }`}
-                                >
-                                  {entry.approval === "approved"
-                                    ? "Approved"
-                                    : entry.approval === "not_approved"
-                                      ? "Not Approved"
-                                      : "Pending"}
-                                </span>
-                                {entry.approval === "approved" ? (
-                                  <span className="text-[10px] font-semibold text-emerald-700">{formatPointDelta(entry.points ?? 0)}</span>
-                                ) : entry.approval === "not_approved" ? (
-                                  <span className="text-[10px] font-semibold text-red-700">Points: 0</span>
-                                ) : null}
-                              </div>
-
-                              <div className="mt-3 rounded-lg border border-blue-100 bg-white p-2.5">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <p className="text-[10px] font-semibold text-blue-700">
-                                    {entry.approval === "approved"
-                                      ? `Points: ${formatPointDelta(entry.points ?? 0)}`
-                                      : entry.approval === "not_approved"
-                                        ? "Points: 0"
-                                        : "Points pending"}
-                                  </p>
-
-                                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                                    <form
-                                      action={updateAssignmentStatusPointApproval}
-                                      onSubmit={() => setLockedApprovalByEntryId((current) => ({ ...current, [entry.id]: "approved" }))}
-                                      className="inline-block"
-                                    >
-                                      <input type="hidden" name="activityId" value={entry.activityId ?? ""} />
-
-                                      <input type="hidden" name="assignmentId" value={entry.assignmentId ?? ""} />
-                                      <input type="hidden" name="requestId" value={selectedRequest?.id ?? request.id} />
-                                      <input type="hidden" name="approval" value="approved" />
-                                      <button
-                                        type="submit"
-                                        disabled={entry.approval === "approved" || entry.approval === "not_approved" || lockedApprovalByEntryId[entry.id] === "approved"}
-                                        className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-emerald-600"
-                                      >
-                                        Approved
-                                      </button>
-                                    </form>
-                                    <form
-                                      action={updateAssignmentStatusPointApproval}
-                                      onSubmit={() => setLockedApprovalByEntryId((current) => ({ ...current, [entry.id]: "not_approved" }))}
-                                      className="inline-block"
-                                    >
-                                      <input type="hidden" name="activityId" value={entry.activityId ?? ""} />
-
-                                      <input type="hidden" name="assignmentId" value={entry.assignmentId ?? ""} />
-                                      <input type="hidden" name="requestId" value={selectedRequest?.id ?? request.id} />
-                                      <input type="hidden" name="approval" value="not_approved" />
-                                      <button
-                                        type="submit"
-                                        disabled={entry.approval === "approved" || entry.approval === "not_approved" || lockedApprovalByEntryId[entry.id] === "not_approved"}
-                                        className="inline-flex items-center justify-center rounded-lg bg-red-600 px-2.5 py-1.5 text-[11px] font-bold uppercase text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-red-600"
-                                      >
-                                        Not Approved
-                                      </button>
-                                    </form>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
                           ) : null}
                           <p className="mt-2 text-[10px] font-medium text-blue-500">{formatPreviousStatusDateTime(entry.createdAt)}</p>
                         </article>
