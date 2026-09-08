@@ -386,7 +386,6 @@ export function DashboardRequestRow({
   const isCompletedRequest = isClosedStatus(request.status);
   const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
   const priority = getDashboardPriority(request);
-  const assignedEmployeeNames = getAssignedEmployeeNames(request);
 
   return (
     <tr
@@ -530,15 +529,6 @@ export function DashboardRequestRow({
       {canAssign ? (
         <td className="px-2 py-2.5 align-top whitespace-normal break-words text-xs" onClick={(event) => event.stopPropagation()}>
           <div className="space-y-2">
-            {assignedEmployeeNames.length > 1 ? (
-              <div className="flex flex-wrap gap-1">
-                {assignedEmployeeNames.map((name) => (
-                  <span key={name} className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                    {name}
-                  </span>
-                ))}
-              </div>
-            ) : null}
             {isClosedStatus(request.status) ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
                 <p className="text-xs font-semibold text-emerald-900">
@@ -562,18 +552,6 @@ export function DashboardRequestRow({
       ) : null}
     </tr>
   );
-}
-
-function getAssignedEmployeeNames(request: DashboardRequestRowRequest) {
-  const names = request.assignments
-    ?.map((assignment) => assignment.employee?.name)
-    .filter((name): name is string => Boolean(name?.trim())) ?? [];
-
-  if (names.length === 0 && request.assignedTo?.name) {
-    names.push(request.assignedTo.name);
-  }
-
-  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
 }
 
 function getDashboardPriority(request: DashboardRequestRowRequest) {

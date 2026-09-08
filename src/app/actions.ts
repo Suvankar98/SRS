@@ -1860,24 +1860,17 @@ export async function updateServiceCallStatus(formData: FormData) {
     const shouldClearPriorityStar = aggregateStatus === "Completed" || aggregateStatus === "Cancel";
     const hadPriorityStar = (assignment.request.dashboardOrder ?? 0) < 0;
 
-    const shouldReleaseActiveAssignment = session.role === APP_ROLES.EMPLOYEE && normalizeStatus(status) !== "New Call";
-    const shouldClearAssignments = shouldReleaseActiveAssignment || aggregateStatus === "Completed" || aggregateStatus === "Cancel";
-
     await transaction.serviceRequest.update({
       where: { id: requestId },
       data: {
         assignedToId:
-          shouldReleaseActiveAssignment
+          aggregateStatus === "Completed" || aggregateStatus === "Cancel"
             ? null
-            : aggregateStatus === "Completed" || aggregateStatus === "Cancel"
-              ? null
-              : primaryOpenAssignment?.employeeId ?? null,
+            : primaryOpenAssignment?.employeeId ?? null,
         assignedAt:
-          shouldReleaseActiveAssignment
+          aggregateStatus === "Completed" || aggregateStatus === "Cancel"
             ? null
-            : aggregateStatus === "Completed" || aggregateStatus === "Cancel"
-              ? null
-              : primaryOpenAssignment?.assignedAt ?? null,
+            : primaryOpenAssignment?.assignedAt ?? null,
         status: aggregateStatus,
         statusReason: (latestAssignment?.statusReason ?? reasonValue) || null,
         customerReview: customerReviewValue || null,
@@ -1891,12 +1884,6 @@ export async function updateServiceCallStatus(formData: FormData) {
         closedAt: completedAssignment?.closedAt ?? null,
       },
     });
-
-    if (shouldClearAssignments) {
-      await transaction.serviceAssignment.deleteMany({
-        where: { requestId },
-      });
-    }
 
     await addServiceActivity(transaction, {
       requestId,

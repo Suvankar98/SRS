@@ -26,21 +26,44 @@ type AssignmentPickerProps = {
   disabledMessage?: string;
 };
 
-function getInitialRows(assignments: AssignmentPickerAssignment[] | undefined, defaultEmployeeId?: string | null) {
-  if (!defaultEmployeeId) {
-    return [""];
+function getAssignedEmployeeIds(assignments: AssignmentPickerAssignment[] | undefined, defaultEmployeeId?: string | null) {
+  const selected = assignments?.map((assignment) => assignment.employeeId).filter(Boolean) ?? [];
+
+  if (defaultEmployeeId) {
+    selected.push(defaultEmployeeId);
   }
 
-  const selected = (assignments?.map((assignment) => assignment.employeeId).filter(Boolean) ?? []).filter(
-    (employeeId, index, array) => employeeId && array.indexOf(employeeId) === index,
-  );
+  return selected.filter((employeeId, index, array) => employeeId && array.indexOf(employeeId) === index);
+}
 
-  const orderedSelection = [...selected];
-  if (!orderedSelection.includes(defaultEmployeeId)) {
-    orderedSelection.push(defaultEmployeeId);
+function getAssignedEmployeeRows(
+  assignments: AssignmentPickerAssignment[] | undefined,
+  employees: Array<{ id: string; name: string }>,
+  defaultEmployeeId?: string | null,
+) {
+  const byEmployeeId = new Map<string, { employeeId: string; name: string; isSubmitted: boolean }>();
+
+  for (const assignment of assignments ?? []) {
+    if (!assignment.employeeId) {
+      continue;
+    }
+
+    byEmployeeId.set(assignment.employeeId, {
+      employeeId: assignment.employeeId,
+      name: assignment.employee?.name ?? employees.find((employee) => employee.id === assignment.employeeId)?.name ?? "Employee",
+      isSubmitted: Boolean(assignment.statusSubmittedAt || assignment.closedAt),
+    });
   }
 
-  return orderedSelection.length > 0 ? orderedSelection : [""];
+  if (defaultEmployeeId && !byEmployeeId.has(defaultEmployeeId)) {
+    byEmployeeId.set(defaultEmployeeId, {
+      employeeId: defaultEmployeeId,
+      name: employees.find((employee) => employee.id === defaultEmployeeId)?.name ?? "Employee",
+      isSubmitted: false,
+    });
+  }
+
+  return Array.from(byEmployeeId.values());
 }
 
 function getUniqueSelected(rows: string[]) {
@@ -57,16 +80,27 @@ export function AssignmentPicker({
   disabledMessage,
 }: AssignmentPickerProps) {
   const router = useRouter();
-  const [rows, setRows] = React.useState(() => getInitialRows(assignments, defaultEmployeeId));
+  const assignedEmployeeIds = React.useMemo(
+    () => getAssignedEmployeeIds(assignments, defaultEmployeeId),
+    [assignments, defaultEmployeeId],
+  );
+  const assignedEmployeeRows = React.useMemo(
+    () => getAssignedEmployeeRows(assignments, employees, defaultEmployeeId),
+    [assignments, employees, defaultEmployeeId],
+  );
+  const [rows, setRows] = React.useState([""]);
   const [isSaving, setIsSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
   const [successMessage, setSuccessMessage] = React.useState("");
 
-  const saveAssignments = async (nextRows: string[]) => {
+  React.useEffect(() => {
+    setRows([""]);
+  }, [requestId, assignedEmployeeIds.join(",")]);
+
+  const saveAssignments = async (selectedEmployeeIds: string[]) => {
     setIsSaving(true);
     setErrorMessage("");
     setSuccessMessage("");
-    const selectedEmployeeIds = getUniqueSelected(nextRows);
 
     try {
       const response = await fetch("/api/assign", {
@@ -81,14 +115,17 @@ export function AssignmentPicker({
 
       if (!json.success) {
         setErrorMessage(json.message || "Allocation failed");
-        return;
+        return false;
       }
 
       setSuccessMessage(selectedEmployeeIds.length > 0 ? "Assigned successfully." : "Allocation removed successfully.");
+      setRows([""]);
       router.refresh();
+      return true;
     } catch (error) {
       console.error(error);
       setErrorMessage("Allocation failed");
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -100,9 +137,10 @@ export function AssignmentPicker({
 
     const compactRows = nextRows.filter((row) => row !== "");
     const rowsToShow = compactRows.length > 0 ? compactRows : [""];
+    const selectedEmployeeIds = getUniqueSelected([...assignedEmployeeIds, ...rowsToShow]);
 
     setRows(rowsToShow);
-    void saveAssignments(rowsToShow);
+    void saveAssignments(selectedEmployeeIds);
   };
 
   const addRow = () => {
@@ -111,10 +149,11 @@ export function AssignmentPicker({
 
   const removeRow = (index: number) => {
     const nextRows = rows.filter((_, rowIndex) => rowIndex !== index);
-    const rowsToShow = nextRows.length > 0 ? nextRows : [""];
+    setRows(nextRows.length > 0 ? nextRows : [""]);
+  };
 
-    setRows(rowsToShow);
-    void saveAssignments(rowsToShow);
+  const removeAssignedEmployee = (employeeId: string) => {
+    void saveAssignments(assignedEmployeeIds.filter((assignedEmployeeId) => assignedEmployeeId !== employeeId));
   };
 
   return (
@@ -125,8 +164,30 @@ export function AssignmentPicker({
             {disabledMessage}
           </p>
         ) : null}
+        {assignedEmployeeRows.length > 0 ? (
+          <div className="space-y-1">
+            {assignedEmployeeRows.map((assignedEmployee) => (
+              <div
+                key={assignedEmployee.employeeId}
+                className="flex items-center gap-1.5 rounded-lg border border-blue-100 bg-white px-2 py-1.5 text-xs font-semibold text-blue-900"
+              >
+                <span className="min-w-0 flex-1 truncate">{assignedEmployee.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAssignedEmployee(assignedEmployee.employeeId)}
+                  disabled={disabled || isSaving || assignedEmployee.isSubmitted}
+                  aria-label={`Remove ${assignedEmployee.name} allocation`}
+                  title={assignedEmployee.isSubmitted ? "Submitted allocation is kept for history" : "Remove employee"}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <MinusIcon />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {rows.map((employeeId, index) => {
-          const selectedInOtherRows = new Set(rows.filter((_, rowIndex) => rowIndex !== index));
+          const selectedInOtherRows = new Set([...assignedEmployeeIds, ...rows.filter((_, rowIndex) => rowIndex !== index)]);
           const isLastRow = index === rows.length - 1;
 
           return (
@@ -163,8 +224,8 @@ export function AssignmentPicker({
                   type="button"
                   onClick={() => removeRow(index)}
                   disabled={disabled || isSaving}
-                  aria-label="Remove employee allocation"
-                  title="Remove employee"
+                  aria-label="Remove employee selection"
+                  title="Remove selection"
                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <MinusIcon />

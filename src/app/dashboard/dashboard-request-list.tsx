@@ -359,7 +359,6 @@ export function DashboardRequestList({
           const isCompletedRequest = isClosedStatus(request.status);
           const isReassignLocked = isCompletedRequest && !isCompletedReassignWindowOpen(request);
           const priority = getDashboardPriority(request);
-          const assignedEmployeeNames = getAssignedEmployeeNames(request);
           const displayDocketNumber = formatDocketNumber(request.docketNumber);
 
           return (
@@ -463,15 +462,6 @@ export function DashboardRequestList({
               <div className="flex-1" />
               {canAssign ? (
                 <div className="space-y-2">
-                  {assignedEmployeeNames.length > 1 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {assignedEmployeeNames.map((name) => (
-                        <span key={name} className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
                     <p className="text-xs font-semibold text-blue-900">
                       <span className="text-[10px] uppercase tracking-[0.08em] text-blue-600">Assigned to:</span> {request.assignedTo?.name ?? "Unassigned"}
@@ -971,18 +961,6 @@ function getDayNumberInTimeZone(value: Date, timeZone: string) {
 
 function isClosedStatus(status: string | null) {
   return normalizeStatus(status) === "Completed";
-}
-
-function getAssignedEmployeeNames(request: DashboardListRequest) {
-  const names = request.assignments
-    ?.map((assignment) => assignment.employee?.name)
-    .filter((name): name is string => Boolean(name?.trim())) ?? [];
-
-  if (names.length === 0 && request.assignedTo?.name) {
-    names.push(request.assignedTo.name);
-  }
-
-  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
 }
 
 function getDashboardPriority(request: DashboardListRequest) {
