@@ -78,7 +78,3 @@ export default async function Home({ searchParams }: HomeProps) {
     </main>
   );
 }
-
-
-
-
