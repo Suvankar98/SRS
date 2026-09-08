@@ -1671,10 +1671,26 @@ function compareDashboardOrder(aOrder: number, bOrder: number) {
   }
 
   if (aStarred && bStarred) {
+    const dayComparison = getDashboardPriorityDay(bOrder) - getDashboardPriorityDay(aOrder);
+
+    if (dayComparison !== 0) {
+      return dayComparison;
+    }
+
     return getDashboardPriorityRank(aOrder) - getDashboardPriorityRank(bOrder);
   }
 
   return aOrder - bOrder;
+}
+
+function getDashboardPriorityDay(order: number) {
+  const absoluteOrder = Math.abs(order);
+
+  if (absoluteOrder < PRIORITY_DAY_FACTOR) {
+    return 0;
+  }
+
+  return Math.floor(absoluteOrder / PRIORITY_DAY_FACTOR);
 }
 
 function getDashboardPriorityRank(order: number) {
