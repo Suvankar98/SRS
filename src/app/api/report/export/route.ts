@@ -51,6 +51,13 @@ type ExportRequestRow = {
     statusSubmittedAt: Date | null;
     employee: { name: string } | null;
   }>;
+  activities: Array<{
+    type: string;
+    employeeId: string | null;
+    employeeName: string | null;
+    statusAssignedAt: Date | null;
+    createdAt: Date;
+  }>;
 };
 
 export async function GET(request: Request) {
@@ -119,6 +126,16 @@ export async function GET(request: Request) {
           closedAt: true,
           statusSubmittedAt: true,
           employee: { select: { name: true } },
+        },
+      },
+      activities: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          type: true,
+          employeeId: true,
+          employeeName: true,
+          statusAssignedAt: true,
+          createdAt: true,
         },
       },
     },
@@ -549,6 +566,7 @@ function buildReportWhere({
         { closedByName: { contains: searchQuery, mode: "insensitive" } },
         { deletedByName: { contains: searchQuery, mode: "insensitive" } },
         { assignments: { some: { employee: { name: { contains: searchQuery, mode: "insensitive" } } } } },
+        { activities: { some: { employeeName: { contains: searchQuery, mode: "insensitive" } } } },
       ],
     });
   }
@@ -575,6 +593,16 @@ function buildReportWhere({
         { assignments: { some: { employeeId: selectedEmployee } } },
         { closedByName: { equals: employee.name, mode: "insensitive" } },
         { lastAttemptByName: { equals: employee.name, mode: "insensitive" } },
+        {
+          activities: {
+            some: {
+              OR: [
+                { employeeId: selectedEmployee },
+                { employeeName: { equals: employee.name, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
       ],
     });
   }
@@ -598,6 +626,16 @@ function buildReportWhere({
       OR: [
         { assignedAt: assignedAtFilter },
         { assignments: { some: { assignedAt: assignedAtFilter } } },
+        {
+          activities: {
+            some: {
+              OR: [
+                { statusAssignedAt: assignedAtFilter },
+                { type: "assigned", createdAt: assignedAtFilter },
+              ],
+            },
+          },
+        },
       ],
     });
   }
@@ -746,6 +784,13 @@ function getExportEmployeeNames(row: ExportRequestRow) {
     .map((assignment) => assignment.employee?.name)
     .filter((name): name is string => Boolean(name?.trim()));
 
+  names.push(
+    ...row.activities
+      .filter(isHistoricalAssignmentActivity)
+      .map((activity) => activity.employeeName)
+      .filter((name): name is string => Boolean(name?.trim())),
+  );
+
   if (names.length === 0 && row.assignedTo?.name) {
     names.push(row.assignedTo.name);
   }
@@ -776,12 +821,29 @@ function getExportCompletedByNames(row: ExportRequestRow) {
 }
 
 function getExportAssignedAt(row: ExportRequestRow) {
-  const assignmentDates = row.assignments
-    .map((assignment) => assignment.assignedAt)
+  const assignmentDates = [
+    ...row.assignments.map((assignment) => assignment.assignedAt),
+    ...row.activities
+      .map((activity) => getHistoricalAssignmentDate(activity))
+      .filter((date): date is Date => Boolean(date)),
+    row.assignedAt,
+  ]
     .filter((date): date is Date => Boolean(date))
-    .sort((a, b) => a.getTime() - b.getTime());
+    .sort((a, b) => b.getTime() - a.getTime());
 
-  return assignmentDates[0] ?? row.assignedAt;
+  return assignmentDates[0] ?? null;
+}
+
+function isHistoricalAssignmentActivity(activity: ExportRequestRow["activities"][number]) {
+  return activity.type === "assigned" || Boolean(activity.statusAssignedAt);
+}
+
+function getHistoricalAssignmentDate(activity: ExportRequestRow["activities"][number]) {
+  if (activity.statusAssignedAt) {
+    return activity.statusAssignedAt;
+  }
+
+  return activity.type === "assigned" ? activity.createdAt : null;
 }
 
 function getChargeableTotal(requests: ExportRequestRow[]) {

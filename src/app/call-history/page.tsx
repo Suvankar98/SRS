@@ -91,7 +91,9 @@ const CALL_HISTORY_REQUEST_SELECT = {
       statusReason: true,
       actorName: true,
       actorRole: true,
+      employeeId: true,
       employeeName: true,
+      statusAssignedAt: true,
       createdAt: true,
     },
   },
@@ -514,7 +516,16 @@ function buildReportWhere({
         { assignments: { some: { employeeId: selectedEmployee } } },
         { closedByName: { equals: employee.name, mode: "insensitive" } },
         { lastAttemptByName: { equals: employee.name, mode: "insensitive" } },
-        { activities: { some: { employeeName: { equals: employee.name, mode: "insensitive" } } } },
+        {
+          activities: {
+            some: {
+              OR: [
+                { employeeId: selectedEmployee },
+                { employeeName: { equals: employee.name, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
       ],
     });
   }
@@ -538,6 +549,16 @@ function buildReportWhere({
       OR: [
         { assignedAt: assignedAtFilter },
         { assignments: { some: { assignedAt: assignedAtFilter } } },
+        {
+          activities: {
+            some: {
+              OR: [
+                { statusAssignedAt: assignedAtFilter },
+                { type: "assigned", createdAt: assignedAtFilter },
+              ],
+            },
+          },
+        },
       ],
     });
   }
@@ -743,6 +764,14 @@ type CallHistoryAssignmentDisplay = {
   employee: { id: string; name: string } | null;
 };
 
+type CallHistoryAssignmentActivityDisplay = {
+  type: string;
+  employeeId: string | null;
+  employeeName: string | null;
+  statusAssignedAt: Date | null;
+  createdAt: Date;
+};
+
 type CallHistoryRequestDisplay = {
   status: string | null;
   assignedAt: Date | null;
@@ -751,6 +780,7 @@ type CallHistoryRequestDisplay = {
   assignedToId?: string | null;
   assignedTo: { name: string } | null;
   assignments?: CallHistoryAssignmentDisplay[];
+  activities?: CallHistoryAssignmentActivityDisplay[];
 };
 
 type EmployeeFilterChip = {
@@ -790,6 +820,13 @@ function getCallHistoryEmployeeChips(request: CallHistoryRequestDisplay) {
     .map((assignment) => getEmployeeChip(assignment.employee?.name, assignment.employee?.id ?? null))
     .filter((chip): chip is EmployeeFilterChip => Boolean(chip));
 
+  chips.push(
+    ...(request.activities ?? [])
+      .filter(isHistoricalAssignmentActivity)
+      .map((activity) => getEmployeeChip(activity.employeeName, activity.employeeId))
+      .filter((chip): chip is EmployeeFilterChip => Boolean(chip)),
+  );
+
   if (chips.length === 0) {
     const fallbackChip = getEmployeeChip(request.assignedTo?.name, request.assignedToId ?? null);
     if (fallbackChip) {
@@ -827,12 +864,29 @@ function getCallHistoryCompletedByChips(request: CallHistoryRequestDisplay) {
 }
 
 function getCallHistoryAssignedAt(request: CallHistoryRequestDisplay) {
-  const assignmentDates = (request.assignments ?? [])
-    .map((assignment) => assignment.assignedAt)
+  const assignmentDates = [
+    ...(request.assignments ?? []).map((assignment) => assignment.assignedAt),
+    ...(request.activities ?? [])
+      .map((activity) => getHistoricalAssignmentDate(activity))
+      .filter((date): date is Date => Boolean(date)),
+    request.assignedAt,
+  ]
     .filter((date): date is Date => Boolean(date))
-    .sort((a, b) => a.getTime() - b.getTime());
+    .sort((a, b) => b.getTime() - a.getTime());
 
-  return assignmentDates[0] ?? request.assignedAt;
+  return assignmentDates[0] ?? null;
+}
+
+function isHistoricalAssignmentActivity(activity: CallHistoryAssignmentActivityDisplay) {
+  return activity.type === "assigned" || Boolean(activity.statusAssignedAt);
+}
+
+function getHistoricalAssignmentDate(activity: CallHistoryAssignmentActivityDisplay) {
+  if (activity.statusAssignedAt) {
+    return activity.statusAssignedAt;
+  }
+
+  return activity.type === "assigned" ? activity.createdAt : null;
 }
 
 function getEmployeeChip(name: string | null | undefined, id: string | null): EmployeeFilterChip | null {
