@@ -1,6 +1,8 @@
 import {
   ATTENDANCE_IN_POINTS,
   ATTENDANCE_OUT_POINTS,
+  getDocumentSubmissionPoints,
+  getMaterialHandoverPoints,
 } from "@/lib/employee-performance-rules";
 import { formatDocketNumber } from "@/lib/docket";
 
@@ -99,8 +101,14 @@ export function buildEmployeeReportRows({
     addEmployeeReportPoints(row.attendanceIn, attendancePoints.inPoints);
     addEmployeeReportPoints(row.attendanceOut, attendancePoints.outPoints);
     addEmployeeReportPoints(row.review, adjustment.reviewPoints);
-    addEmployeeReportPoints(row.documentSubmission, adjustment.documentSubmissionPoints);
-    addEmployeeReportPoints(row.materialHandover, adjustment.materialHandoverPoints);
+    addEmployeeReportPoints(
+      row.documentSubmission,
+      getDocumentSubmissionPoints(adjustment.documentSubmissionOption, adjustment.documentSubmissionPoints),
+    );
+    addEmployeeReportPoints(
+      row.materialHandover,
+      getMaterialHandoverPoints(adjustment.materialHandoverOption, adjustment.materialHandoverPoints),
+    );
   }
 
   const sortedRows = Array.from(rows.values()).sort((a, b) => getNullableDateTime(b.date) - getNullableDateTime(a.date));
@@ -186,17 +194,18 @@ function getAttendanceOutPoints(value: string) {
   return 0;
 }
 
-function calculateEmployeeReportTotal(rows: EmployeeReportRow[]) {
-  return rows.reduce(
-    (total, row) =>
-      total +
-      (row.workSubmission.points ?? 0) +
-      (row.attendanceIn.points ?? 0) +
-      (row.attendanceOut.points ?? 0) +
-      (row.review.points ?? 0) +
-      (row.documentSubmission.points ?? 0) +
-      (row.materialHandover.points ?? 0),
-    0,
+export function calculateEmployeeReportTotal(rows: EmployeeReportRow[]) {
+  return rows.reduce((total, row) => total + getEmployeeReportDayTotal(row), 0);
+}
+
+export function getEmployeeReportDayTotal(row: EmployeeReportRow) {
+  return (
+    (row.workSubmission.points ?? 0) +
+    (row.attendanceIn.points ?? 0) +
+    (row.attendanceOut.points ?? 0) +
+    (row.review.points ?? 0) +
+    (row.documentSubmission.points ?? 0) +
+    (row.materialHandover.points ?? 0)
   );
 }
 

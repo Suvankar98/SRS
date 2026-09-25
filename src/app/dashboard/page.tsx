@@ -9,15 +9,19 @@ import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import { formatDocketNumber } from "@/lib/docket";
+import {
+  buildEmployeeReportRows,
+  calculateEmployeeReportTotal,
+  getEmployeeReportDayTotal,
+  type EmployeeReportCompanyDocket,
+  type EmployeeReportPointCell,
+  type EmployeeReportRow,
+} from "@/lib/employee-report";
+import { getEmployeeReportData } from "@/lib/employee-report-data";
 import { formatPerformancePoints, formatPointDelta } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 import { getProductOptions } from "@/lib/product-options";
-import {
-  ATTENDANCE_IN_POINTS,
-  ATTENDANCE_OUT_POINTS,
-  getDocumentSubmissionPoints,
-  getMaterialHandoverPoints,
-} from "@/lib/employee-performance-rules";
+
 import {
   getDashboardMediaItemsByRequestIds,
   type DashboardRequestMediaItem,
@@ -111,6 +115,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     getLatestDashboardImage(canSeeDashboardImage),
   ]);
   const products = getProductOptions(databaseProducts);
+  const employeeReportDataPromise = isEmployee
+    ? getEmployeeReportData([{ id: session.userId, name: currentUser?.name ?? "" }])
+    : Promise.resolve(null);
 
   const allRequests = isEmployee
     ? [
@@ -329,96 +336,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         },
       });
 
-  const [employeeReportActivities, employeeReportRequests] = await Promise.all([
-    isEmployee
-      ? prisma.serviceRequestActivity.findMany({
-          where: {
-            employeeId: session.userId,
-            statusPointsDelta: { not: null },
-            request: { deletedAt: null },
-          },
-          orderBy: [{ statusSubmittedAt: "desc" }, { createdAt: "desc" }],
-          select: {
-            id: true,
-            status: true,
-            statusReason: true,
-            statusAssignedAt: true,
-            statusSubmittedAt: true,
-            statusPointsDelta: true,
-            createdAt: true,
-            request: {
-              select: {
-                id: true,
-                docketNumber: true,
-                name: true,
-                company: true,
-                area: true,
-                status: true,
-                statusReason: true,
-                statusPointsDelta: true,
-                createdAt: true,
-                assignedAt: true,
-                statusSubmittedAt: true,
-                lastAttemptAt: true,
-                closedAt: true,
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
-    isEmployee && currentUser?.name
-      ? prisma.serviceRequest.findMany({
-          where: {
-            deletedAt: null,
-            OR: [
-              { lastAttemptByName: { equals: currentUser.name, mode: "insensitive" } },
-              { closedByName: { equals: currentUser.name, mode: "insensitive" } },
-            ],
-          },
-          select: {
-            id: true,
-            docketNumber: true,
-            name: true,
-            company: true,
-            area: true,
-            status: true,
-            statusReason: true,
-            statusPointsDelta: true,
-            createdAt: true,
-            assignedAt: true,
-            statusSubmittedAt: true,
-            lastAttemptAt: true,
-            closedAt: true,
-          },
-          orderBy: [{ lastAttemptAt: "desc" }, { statusSubmittedAt: "desc" }, { createdAt: "desc" }],
-          take: 20,
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const employeeReportActivityRequestIds = new Set(
-    employeeReportActivities.map((activity) => activity.request.id),
-  );
-  const employeeReportActiveRequests: EmployeeReportRequest[] = [
-    ...allRequests.map((request) => ({
-      ...request,
-      statusPointsDelta: employeeReportActivityRequestIds.has(request.id) ? null : request.statusPointsDelta,
-    })),
-    ...employeeReportActivities.map((activity) => ({
-      ...activity.request,
-      id: "activity:" + activity.id,
-      assignedAt: activity.statusAssignedAt ?? activity.request.assignedAt,
-      status: activity.status ?? activity.request.status,
-      statusReason: activity.statusReason ?? activity.request.statusReason,
-      statusSubmittedAt: activity.statusSubmittedAt ?? activity.createdAt,
-      statusPointsDelta: activity.statusPointsDelta,
-      lastAttemptAt: null,
-    })),
-  ];
-  const employeeReportFallbackRequests = employeeReportRequests.filter(
-    (request) => !employeeReportActivityRequestIds.has(request.id),
-  );
-
+  const employeeReportData = await employeeReportDataPromise;
+  const employeeReportInputs = employeeReportData?.inputsByEmployeeId.get(session.userId);
   const requestIds = allRequests.map((request) => request.id);
   const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
     ? await getDashboardMediaItemsByRequestIds(requestIds)
@@ -469,8 +388,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ).length;
   const employeeReport = isEmployee
     ? buildEmployeeReportRows({
-        activeRequests: employeeReportActiveRequests,
-        reportRequests: employeeReportFallbackRequests,
+        activeRequests: employeeReportInputs?.activeRequests ?? [],
+        reportRequests: employeeReportInputs?.reportRequests ?? [],
         pointAdjustments: employeePointAdjustments,
       })
     : { rows: [], totalPoints: 0 };
@@ -813,57 +732,6 @@ function getKolkataDateKey(value: Date | string | null | undefined) {
     day: "2-digit",
   }).format(date);
 }
-type EmployeeReportRequest = {
-  id: string;
-  docketNumber: string;
-  name: string;
-  company: string;
-  area: string;
-  status: string | null;
-  statusReason: string | null;
-  statusPointsDelta: number | null;
-  createdAt: Date;
-  assignedAt?: Date | string | null;
-  statusSubmittedAt?: Date | string | null;
-  lastAttemptAt?: Date | string | null;
-  closedAt?: Date | string | null;
-};
-
-type EmployeeReportPointAdjustment = {
-  id: string;
-  attendanceOption: string;
-  attendancePoints: number;
-  reviewOption: string;
-  reviewPoints: number;
-  documentSubmissionOption: string;
-  documentSubmissionPoints: number;
-  materialHandoverOption: string;
-  materialHandoverPoints: number;
-  createdAt: Date;
-};
-
-type EmployeeReportPointCell = {
-  label: string;
-  points: number | null;
-};
-
-type EmployeeReportCompanyDocket = {
-  companyName: string;
-  docketNumber: string;
-};
-
-type EmployeeReportRow = {
-  id: string;
-  companyDockets: EmployeeReportCompanyDocket[];
-  date: Date;
-  workSubmission: EmployeeReportPointCell;
-  attendanceIn: EmployeeReportPointCell;
-  attendanceOut: EmployeeReportPointCell;
-  review: EmployeeReportPointCell;
-  documentSubmission: EmployeeReportPointCell;
-  materialHandover: EmployeeReportPointCell;
-};
-
 function EmployeeReportTable({
   rows,
   totalPoints,
@@ -1134,191 +1002,6 @@ function Td({ children, strong = false }: { children: React.ReactNode; strong?: 
       {children}
     </td>
   );
-}
-
-function buildEmployeeReportRows({
-  activeRequests,
-  reportRequests,
-  pointAdjustments,
-}: {
-  activeRequests: EmployeeReportRequest[];
-  reportRequests: EmployeeReportRequest[];
-  pointAdjustments: EmployeeReportPointAdjustment[];
-}) {
-  const rows = new Map<string, EmployeeReportRow>();
-  const countedRequestIds = new Set<string>();
-
-  for (const request of [...activeRequests, ...reportRequests]) {
-    if (countedRequestIds.has(request.id)) {
-      continue;
-    }
-
-    const reportDate = getEmployeeReportDate(request);
-
-    if (!reportDate) {
-      continue;
-    }
-
-    const row = getOrCreateEmployeeReportRow(rows, reportDate);
-    addCompanyDocketToEmployeeReportRow(row, request);
-
-    if (typeof request.statusPointsDelta === "number") {
-      addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
-    }
-
-    countedRequestIds.add(request.id);
-  }
-
-  for (const adjustment of pointAdjustments) {
-    const row = getOrCreateEmployeeReportRow(rows, adjustment.createdAt);
-    const attendancePoints = getEmployeeReportAttendancePoints(adjustment);
-    addEmployeeReportPoints(row.attendanceIn, attendancePoints.inPoints);
-    addEmployeeReportPoints(row.attendanceOut, attendancePoints.outPoints);
-    addEmployeeReportPoints(row.review, adjustment.reviewPoints);
-    addEmployeeReportPoints(
-      row.documentSubmission,
-      getDocumentSubmissionPoints(adjustment.documentSubmissionOption, adjustment.documentSubmissionPoints),
-    );
-    addEmployeeReportPoints(
-      row.materialHandover,
-      getMaterialHandoverPoints(adjustment.materialHandoverOption, adjustment.materialHandoverPoints),
-    );
-  }
-
-  const sortedRows = Array.from(rows.values())
-    .sort((a, b) => getNullableDateTime(b.date) - getNullableDateTime(a.date))
-    .slice(0, 20);
-
-  return {
-    rows: sortedRows,
-    totalPoints: calculateEmployeeReportTotal(sortedRows),
-  };
-}
-
-function getOrCreateEmployeeReportRow(rows: Map<string, EmployeeReportRow>, date: Date) {
-  const dateKey = getEmployeeReportDateKey(date);
-  const existingRow = rows.get(dateKey);
-
-  if (existingRow) {
-    return existingRow;
-  }
-
-  const row: EmployeeReportRow = {
-    id: dateKey,
-    companyDockets: [],
-    date,
-    workSubmission: emptyEmployeeReportPointCell(),
-    attendanceIn: emptyEmployeeReportPointCell(),
-    attendanceOut: emptyEmployeeReportPointCell(),
-    review: emptyEmployeeReportPointCell(),
-    documentSubmission: emptyEmployeeReportPointCell(),
-    materialHandover: emptyEmployeeReportPointCell(),
-  };
-
-  rows.set(dateKey, row);
-  return row;
-}
-
-function addCompanyDocketToEmployeeReportRow(row: EmployeeReportRow, request: EmployeeReportRequest) {
-  const docketNumber = formatDocketNumber(request.docketNumber);
-  const exists = row.companyDockets.some((entry) => entry.docketNumber === docketNumber);
-
-  if (!exists) {
-    row.companyDockets.push({
-      companyName: request.company,
-      docketNumber,
-    });
-  }
-}
-
-function addEmployeeReportPoints(cell: EmployeeReportPointCell, points: number) {
-  cell.points = (cell.points ?? 0) + points;
-}
-
-
-function getEmployeeReportAttendancePoints(adjustment: EmployeeReportPointAdjustment) {
-  try {
-    const parsed = JSON.parse(adjustment.attendanceOption) as { inOption?: unknown; outOption?: unknown };
-    const inOption = typeof parsed.inOption === "string" ? parsed.inOption : "";
-    const outOption = typeof parsed.outOption === "string" ? parsed.outOption : "";
-
-    return {
-      inPoints: getAttendanceInPoints(inOption),
-      outPoints: getAttendanceOutPoints(outOption),
-    };
-  } catch {
-    return {
-      inPoints: adjustment.attendancePoints,
-      outPoints: 0,
-    };
-  }
-}
-
-function getAttendanceInPoints(value: string) {
-  if (value in ATTENDANCE_IN_POINTS) {
-    return ATTENDANCE_IN_POINTS[value as keyof typeof ATTENDANCE_IN_POINTS].points;
-  }
-
-  return 0;
-}
-
-function getAttendanceOutPoints(value: string) {
-  if (value in ATTENDANCE_OUT_POINTS) {
-    return ATTENDANCE_OUT_POINTS[value as keyof typeof ATTENDANCE_OUT_POINTS].points;
-  }
-
-  return 0;
-}
-
-function calculateEmployeeReportTotal(rows: EmployeeReportRow[]) {
-  return rows.reduce((total, row) => total + getEmployeeReportDayTotal(row), 0);
-}
-
-function getEmployeeReportDayTotal(row: EmployeeReportRow) {
-  return (
-    (row.workSubmission.points ?? 0) +
-    (row.attendanceIn.points ?? 0) +
-    (row.attendanceOut.points ?? 0) +
-    (row.review.points ?? 0) +
-    (row.documentSubmission.points ?? 0) +
-    (row.materialHandover.points ?? 0)
-  );
-}
-
-function emptyEmployeeReportPointCell(): EmployeeReportPointCell {
-  return { label: "-", points: null };
-}
-
-function getEmployeeReportDate(request: EmployeeReportRequest) {
-  return (
-    getDateValue(request.lastAttemptAt) ??
-    getDateValue(request.statusSubmittedAt) ??
-    getDateValue(request.closedAt) ??
-    getDateValue(request.assignedAt) ??
-    getDateValue(request.createdAt)
-  );
-}
-
-function getDateValue(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getNullableDateTime(value: Date | null) {
-  return value ? value.getTime() : 0;
-}
-
-function getEmployeeReportDateKey(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
 }
 
 function formatEmployeeReportDate(value: Date | null) {
@@ -1652,6 +1335,15 @@ function getDateTime(value: Date | string | null | undefined) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function getDateValue(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isVisibleOnAdminManagerDashboard(request: {

@@ -1,6 +1,4 @@
 import { redirect } from "next/navigation";
-import type { Prisma } from "@prisma/client";
-
 import { normalizeStatus } from "../status-utils";
 import { EmployeePointsPopup } from "./employee-points-popup";
 import { EmployeeReportPopup } from "./employee-report-popup";
@@ -9,9 +7,10 @@ import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession, roleCanAssign } from "@/lib/auth";
 import {
   buildEmployeeReportRows,
-  type EmployeeReportRequest,
+  calculateEmployeeReportTotal,
   type EmployeeReportRow,
 } from "@/lib/employee-report";
+import { getEmployeeReportData } from "@/lib/employee-report-data";
 import { formatPerformancePoints } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 
@@ -20,25 +19,6 @@ export const dynamic = "force-dynamic";
 type ReportPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
-
-const employeeReportRequestSelect = {
-  id: true,
-  docketNumber: true,
-  name: true,
-  company: true,
-  area: true,
-  status: true,
-  statusReason: true,
-  statusPointsDelta: true,
-  assignedToId: true,
-  createdAt: true,
-  assignedAt: true,
-  statusSubmittedAt: true,
-  lastAttemptAt: true,
-  lastAttemptByName: true,
-  closedAt: true,
-  closedByName: true,
-} satisfies Prisma.ServiceRequestSelect;
 
 export default async function ReportPage({ searchParams }: ReportPageProps) {
   const session = await getSession();
@@ -88,81 +68,10 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     orderBy: { name: "asc" },
   });
 
-  const employeeIds = employees.map((employee) => employee.id);
-  const employeeNames = employees.map((employee) => employee.name).filter((name) => name.trim() !== "");
-  const employeeNameFilters = employeeNames.flatMap((name) => [
-    { lastAttemptByName: { equals: name, mode: "insensitive" as const } },
-    { closedByName: { equals: name, mode: "insensitive" as const } },
-  ]);
-
-  const [employeeReportAssignments, employeeReportActivities, employeeReportRequests] = await Promise.all([
-    employeeIds.length > 0
-      ? prisma.serviceAssignment.findMany({
-          where: {
-            employeeId: { in: employeeIds },
-            request: { deletedAt: null },
-          },
-          orderBy: { assignedAt: "desc" },
-          select: {
-            id: true,
-            employeeId: true,
-            assignedAt: true,
-            status: true,
-            statusReason: true,
-            statusSubmittedAt: true,
-            statusPointsDelta: true,
-            closedAt: true,
-            request: {
-              select: employeeReportRequestSelect,
-            },
-          },
-        })
-      : Promise.resolve([]),
-    employeeIds.length > 0
-      ? prisma.serviceRequestActivity.findMany({
-          where: {
-            employeeId: { in: employeeIds },
-            statusPointsDelta: { not: null },
-            request: { deletedAt: null },
-          },
-          orderBy: [{ statusSubmittedAt: "desc" }, { createdAt: "desc" }],
-          select: {
-            id: true,
-            employeeId: true,
-            statusAssignmentId: true,
-            status: true,
-            statusReason: true,
-            statusAssignedAt: true,
-            statusSubmittedAt: true,
-            statusPointsDelta: true,
-            createdAt: true,
-            request: {
-              select: employeeReportRequestSelect,
-            },
-          },
-        })
-      : Promise.resolve([]),
-    employeeIds.length > 0
-      ? prisma.serviceRequest.findMany({
-          where: {
-            deletedAt: null,
-            OR: [
-              { assignedToId: { in: employeeIds } },
-              ...employeeNameFilters,
-            ],
-          },
-          select: employeeReportRequestSelect,
-          orderBy: [{ lastAttemptAt: "desc" }, { statusSubmittedAt: "desc" }, { createdAt: "desc" }],
-        })
-      : Promise.resolve([]),
-  ]);
-  const employeeReportInputsByEmployeeId = buildEmployeeReportInputsByEmployeeId({
-    employees,
-    assignments: employeeReportAssignments,
-    activities: employeeReportActivities,
+  const {
+    inputsByEmployeeId: employeeReportInputsByEmployeeId,
     linkedRequests: employeeReportRequests,
-  });
-
+  } = await getEmployeeReportData(employees);
   const employeeRows = employees
     .map((employee) => {
       const completedRequests = employeeReportRequests.filter(
@@ -181,7 +90,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
       });
       const periodPoints = hasDateRange ? calculateReportPointsForDateRange(report.rows, dateRange) : employee.monthlyPerformancePoints;
       const popupRows = hasDateRange ? filterReportRowsForDateRange(report.rows, dateRange) : report.rows;
-      const popupTotalPoints = calculateReportPoints(popupRows);
+      const popupTotalPoints = calculateEmployeeReportTotal(popupRows);
 
       return {
         id: employee.id,
@@ -423,156 +332,6 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   );
 }
 
-type EmployeeReportLinkedRequest = EmployeeReportRequest & {
-  assignedToId: string | null;
-  lastAttemptByName: string | null;
-  closedByName: string | null;
-};
-
-type EmployeeReportAssignmentInput = {
-  id: string;
-  employeeId: string;
-  assignedAt: Date;
-  status: string | null;
-  statusReason: string | null;
-  statusSubmittedAt: Date | null;
-  statusPointsDelta: number | null;
-  closedAt: Date | null;
-  request: EmployeeReportLinkedRequest;
-};
-
-type EmployeeReportActivityInput = {
-  id: string;
-  employeeId: string | null;
-  statusAssignmentId: string | null;
-  status: string | null;
-  statusReason: string | null;
-  statusAssignedAt: Date | null;
-  statusSubmittedAt: Date | null;
-  statusPointsDelta: number | null;
-  createdAt: Date;
-  request: EmployeeReportLinkedRequest;
-};
-
-type EmployeeReportInputs = {
-  activeRequests: EmployeeReportRequest[];
-  reportRequests: EmployeeReportRequest[];
-};
-
-function buildEmployeeReportInputsByEmployeeId({
-  employees,
-  assignments,
-  activities,
-  linkedRequests,
-}: {
-  employees: Array<{ id: string; name: string }>;
-  assignments: EmployeeReportAssignmentInput[];
-  activities: EmployeeReportActivityInput[];
-  linkedRequests: EmployeeReportLinkedRequest[];
-}) {
-  const inputsByEmployeeId = new Map<string, EmployeeReportInputs>();
-  const employeeIdsByName = new Map<string, string[]>();
-  const activityAssignmentIds = new Set(
-    activities.flatMap((activity) => activity.statusAssignmentId ? [activity.statusAssignmentId] : []),
-  );
-  const activityRequestKeys = new Set(
-    activities.flatMap((activity) => activity.employeeId ? [`${activity.employeeId}:${activity.request.id}`] : []),
-  );
-  const linkedRequestKeys = new Set<string>();
-
-  for (const employee of employees) {
-    inputsByEmployeeId.set(employee.id, { activeRequests: [], reportRequests: [] });
-
-    const nameKey = getEmployeeNameKey(employee.name);
-    if (!nameKey) {
-      continue;
-    }
-
-    const ids = employeeIdsByName.get(nameKey) ?? [];
-    ids.push(employee.id);
-    employeeIdsByName.set(nameKey, ids);
-  }
-
-  for (const assignment of assignments) {
-    const input = inputsByEmployeeId.get(assignment.employeeId);
-
-    if (!input) {
-      continue;
-    }
-
-    input.activeRequests.push({
-      ...assignment.request,
-      assignedAt: assignment.assignedAt,
-      status: assignment.status ?? assignment.request.status,
-      statusReason: assignment.statusReason ?? assignment.request.statusReason,
-      statusSubmittedAt: assignment.statusSubmittedAt,
-      statusPointsDelta:
-        activityAssignmentIds.has(assignment.id) || activityRequestKeys.has(`${assignment.employeeId}:${assignment.request.id}`)
-          ? null
-          : assignment.statusPointsDelta,
-      closedAt: assignment.closedAt ?? assignment.request.closedAt,
-    });
-
-    linkedRequestKeys.add(`${assignment.employeeId}:${assignment.request.id}`);
-  }
-
-  for (const activity of activities) {
-    if (!activity.employeeId || typeof activity.statusPointsDelta !== "number") {
-      continue;
-    }
-
-    const input = inputsByEmployeeId.get(activity.employeeId);
-
-    if (!input) {
-      continue;
-    }
-
-    input.activeRequests.push({
-      ...activity.request,
-      reportEntryId: `activity:${activity.id}`,
-      assignedAt: activity.statusAssignedAt ?? activity.request.assignedAt,
-      status: activity.status ?? activity.request.status,
-      statusReason: activity.statusReason ?? activity.request.statusReason,
-      statusSubmittedAt: activity.statusSubmittedAt ?? activity.createdAt,
-      statusPointsDelta: activity.statusPointsDelta,
-      lastAttemptAt: null,
-    });
-
-    linkedRequestKeys.add(`${activity.employeeId}:${activity.request.id}`);
-  }
-
-  for (const request of linkedRequests) {
-    const matchingEmployeeIds = new Set<string>();
-
-    if (request.assignedToId) {
-      matchingEmployeeIds.add(request.assignedToId);
-    }
-
-    for (const name of [request.lastAttemptByName, request.closedByName]) {
-      const nameKey = getEmployeeNameKey(name);
-      const employeeIds = nameKey ? employeeIdsByName.get(nameKey) : null;
-
-      for (const employeeId of employeeIds ?? []) {
-        matchingEmployeeIds.add(employeeId);
-      }
-    }
-
-    for (const employeeId of matchingEmployeeIds) {
-      const input = inputsByEmployeeId.get(employeeId);
-
-      if (input && !linkedRequestKeys.has(`${employeeId}:${request.id}`)) {
-        input.reportRequests.push(request);
-      }
-    }
-  }
-
-  return inputsByEmployeeId;
-}
-
-function getEmployeeNameKey(value: string | null) {
-  return value?.trim().toLowerCase() ?? "";
-}
-
 function getSearchParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
     return value[0] ?? "";
@@ -652,24 +411,7 @@ function calculateReportPointsForDateRange(
   rows: EmployeeReportRow[],
   dateRange: { startAt: Date | null; endAt: Date | null },
 ) {
-  return calculateReportPoints(filterReportRowsForDateRange(rows, dateRange));
-}
-
-function calculateReportPoints(rows: EmployeeReportRow[]) {
-  return rows.reduce((total, row) => {
-    return total + getReportRowPoints(row);
-  }, 0);
-}
-
-function getReportRowPoints(row: EmployeeReportRow) {
-  return (
-    (row.workSubmission.points ?? 0) +
-    (row.attendanceIn.points ?? 0) +
-    (row.attendanceOut.points ?? 0) +
-    (row.review.points ?? 0) +
-    (row.documentSubmission.points ?? 0) +
-    (row.materialHandover.points ?? 0)
-  );
+  return calculateEmployeeReportTotal(filterReportRowsForDateRange(rows, dateRange));
 }
 
 function equalsIgnoreCase(a: string | null, b: string) {
