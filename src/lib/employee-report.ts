@@ -6,6 +6,7 @@ import { formatDocketNumber } from "@/lib/docket";
 
 export type EmployeeReportRequest = {
   id: string;
+  reportEntryId?: string;
   docketNumber: string;
   name: string;
   company: string;
@@ -67,10 +68,12 @@ export function buildEmployeeReportRows({
   limit?: number | null;
 }) {
   const rows = new Map<string, EmployeeReportRow>();
-  const countedRequestIds = new Set<string>();
+  const countedEntryIds = new Set<string>();
 
   for (const request of [...activeRequests, ...reportRequests]) {
-    if (countedRequestIds.has(request.id)) {
+    const reportEntryId = request.reportEntryId ?? request.id;
+
+    if (countedEntryIds.has(reportEntryId)) {
       continue;
     }
 
@@ -87,7 +90,7 @@ export function buildEmployeeReportRows({
       addEmployeeReportPoints(row.workSubmission, request.statusPointsDelta);
     }
 
-    countedRequestIds.add(request.id);
+    countedEntryIds.add(reportEntryId);
   }
 
   for (const adjustment of pointAdjustments) {

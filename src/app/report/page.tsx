@@ -95,7 +95,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     { closedByName: { equals: name, mode: "insensitive" as const } },
   ]);
 
-  const [employeeReportAssignments, employeeReportRequests] = await Promise.all([
+  const [employeeReportAssignments, employeeReportActivities, employeeReportRequests] = await Promise.all([
     employeeIds.length > 0
       ? prisma.serviceAssignment.findMany({
           where: {
@@ -104,6 +104,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
           },
           orderBy: { assignedAt: "desc" },
           select: {
+            id: true,
             employeeId: true,
             assignedAt: true,
             status: true,
@@ -111,6 +112,30 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
             statusSubmittedAt: true,
             statusPointsDelta: true,
             closedAt: true,
+            request: {
+              select: employeeReportRequestSelect,
+            },
+          },
+        })
+      : Promise.resolve([]),
+    employeeIds.length > 0
+      ? prisma.serviceRequestActivity.findMany({
+          where: {
+            employeeId: { in: employeeIds },
+            statusPointsDelta: { not: null },
+            request: { deletedAt: null },
+          },
+          orderBy: [{ statusSubmittedAt: "desc" }, { createdAt: "desc" }],
+          select: {
+            id: true,
+            employeeId: true,
+            statusAssignmentId: true,
+            status: true,
+            statusReason: true,
+            statusAssignedAt: true,
+            statusSubmittedAt: true,
+            statusPointsDelta: true,
+            createdAt: true,
             request: {
               select: employeeReportRequestSelect,
             },
@@ -134,6 +159,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const employeeReportInputsByEmployeeId = buildEmployeeReportInputsByEmployeeId({
     employees,
     assignments: employeeReportAssignments,
+    activities: employeeReportActivities,
     linkedRequests: employeeReportRequests,
   });
 
@@ -404,6 +430,7 @@ type EmployeeReportLinkedRequest = EmployeeReportRequest & {
 };
 
 type EmployeeReportAssignmentInput = {
+  id: string;
   employeeId: string;
   assignedAt: Date;
   status: string | null;
@@ -411,6 +438,19 @@ type EmployeeReportAssignmentInput = {
   statusSubmittedAt: Date | null;
   statusPointsDelta: number | null;
   closedAt: Date | null;
+  request: EmployeeReportLinkedRequest;
+};
+
+type EmployeeReportActivityInput = {
+  id: string;
+  employeeId: string | null;
+  statusAssignmentId: string | null;
+  status: string | null;
+  statusReason: string | null;
+  statusAssignedAt: Date | null;
+  statusSubmittedAt: Date | null;
+  statusPointsDelta: number | null;
+  createdAt: Date;
   request: EmployeeReportLinkedRequest;
 };
 
@@ -422,14 +462,23 @@ type EmployeeReportInputs = {
 function buildEmployeeReportInputsByEmployeeId({
   employees,
   assignments,
+  activities,
   linkedRequests,
 }: {
   employees: Array<{ id: string; name: string }>;
   assignments: EmployeeReportAssignmentInput[];
+  activities: EmployeeReportActivityInput[];
   linkedRequests: EmployeeReportLinkedRequest[];
 }) {
   const inputsByEmployeeId = new Map<string, EmployeeReportInputs>();
   const employeeIdsByName = new Map<string, string[]>();
+  const activityAssignmentIds = new Set(
+    activities.flatMap((activity) => activity.statusAssignmentId ? [activity.statusAssignmentId] : []),
+  );
+  const activityRequestKeys = new Set(
+    activities.flatMap((activity) => activity.employeeId ? [`${activity.employeeId}:${activity.request.id}`] : []),
+  );
+  const linkedRequestKeys = new Set<string>();
 
   for (const employee of employees) {
     inputsByEmployeeId.set(employee.id, { activeRequests: [], reportRequests: [] });
@@ -457,9 +506,39 @@ function buildEmployeeReportInputsByEmployeeId({
       status: assignment.status ?? assignment.request.status,
       statusReason: assignment.statusReason ?? assignment.request.statusReason,
       statusSubmittedAt: assignment.statusSubmittedAt,
-      statusPointsDelta: assignment.statusPointsDelta,
+      statusPointsDelta:
+        activityAssignmentIds.has(assignment.id) || activityRequestKeys.has(`${assignment.employeeId}:${assignment.request.id}`)
+          ? null
+          : assignment.statusPointsDelta,
       closedAt: assignment.closedAt ?? assignment.request.closedAt,
     });
+
+    linkedRequestKeys.add(`${assignment.employeeId}:${assignment.request.id}`);
+  }
+
+  for (const activity of activities) {
+    if (!activity.employeeId || typeof activity.statusPointsDelta !== "number") {
+      continue;
+    }
+
+    const input = inputsByEmployeeId.get(activity.employeeId);
+
+    if (!input) {
+      continue;
+    }
+
+    input.activeRequests.push({
+      ...activity.request,
+      reportEntryId: `activity:${activity.id}`,
+      assignedAt: activity.statusAssignedAt ?? activity.request.assignedAt,
+      status: activity.status ?? activity.request.status,
+      statusReason: activity.statusReason ?? activity.request.statusReason,
+      statusSubmittedAt: activity.statusSubmittedAt ?? activity.createdAt,
+      statusPointsDelta: activity.statusPointsDelta,
+      lastAttemptAt: null,
+    });
+
+    linkedRequestKeys.add(`${activity.employeeId}:${activity.request.id}`);
   }
 
   for (const request of linkedRequests) {
@@ -481,7 +560,7 @@ function buildEmployeeReportInputsByEmployeeId({
     for (const employeeId of matchingEmployeeIds) {
       const input = inputsByEmployeeId.get(employeeId);
 
-      if (input) {
+      if (input && !linkedRequestKeys.has(`${employeeId}:${request.id}`)) {
         input.reportRequests.push(request);
       }
     }
