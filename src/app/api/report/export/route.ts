@@ -94,7 +94,7 @@ export async function GET(request: Request) {
     employees,
   });
 
-  const requests = await prisma.serviceRequest.findMany({
+  const candidateRequests = await prisma.serviceRequest.findMany({
     where,
     select: {
       docketNumber: true,
@@ -124,6 +124,9 @@ export async function GET(request: Request) {
     },
     orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
+  const requests = candidateRequests.filter((row) =>
+    isDateWithinInputRange(getExportAssignedAt(row), assignedFromDate, assignedToDate),
+  );
 
   if (format === "pdf") {
     const pdfBuffer = await generatePdf(requests, visibleColumns, isChargeableServiceExport);
@@ -669,6 +672,22 @@ function parseDateInput(value: string, endOfDay: boolean): Date | null {
   }
 
   return date;
+}
+
+function isDateWithinInputRange(value: Date | null, fromDate: string, toDate: string) {
+  const from = parseDateInput(fromDate, false);
+  const to = parseDateInput(toDate, true);
+
+  if (!from && !to) {
+    return true;
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  const timestamp = value.getTime();
+  return (!from || timestamp >= from.getTime()) && (!to || timestamp <= to.getTime());
 }
 
 function getCanonicalStatus(value: string): CanonicalStatus | "" {

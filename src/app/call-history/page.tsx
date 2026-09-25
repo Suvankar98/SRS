@@ -150,11 +150,14 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     employees,
   });
 
-  const calls = await prisma.serviceRequest.findMany({
+  const candidateCalls = await prisma.serviceRequest.findMany({
     where,
     select: CALL_HISTORY_REQUEST_SELECT,
     orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
   });
+  const calls = candidateCalls.filter((request) =>
+    isDateWithinInputRange(getCallHistoryAssignedAt(request), assignedFromDate, assignedToDate),
+  );
   const visibleCompanyNames = getUniqueCompanyNames(calls);
   const relatedCompanyCalls =
     visibleCompanyNames.length > 0
@@ -208,9 +211,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     ? calls.reduce((total, request) => total + (request.chargeableAmount ?? 0), 0)
     : 0;
   const serviceCountLabel = calls.length === 1 ? "1 service" : `${calls.length} services`;
-  const reportRangeLabel = reportFromDate
-    ? `From ${formatDateInputLabel(reportFromDate)} to ${formatDateInputLabel(reportToDate)}`
-    : `Till ${formatDateInputLabel(reportToDate)}`;
+  const reportRangeLabel =
+    assignedFromDate || assignedToDate
+      ? getAssignedDateRangeLabel(assignedFromDate, assignedToDate)
+      : reportFromDate
+        ? `From ${formatDateInputLabel(reportFromDate)} to ${formatDateInputLabel(reportToDate)}`
+        : `Till ${formatDateInputLabel(reportToDate)}`;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[95rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -640,6 +646,34 @@ function parseDateInput(value: string, endOfDay: boolean): Date | null {
   }
 
   return date;
+}
+
+function isDateWithinInputRange(value: Date | null, fromDate: string, toDate: string) {
+  const from = parseDateInput(fromDate, false);
+  const to = parseDateInput(toDate, true);
+
+  if (!from && !to) {
+    return true;
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  const timestamp = value.getTime();
+  return (!from || timestamp >= from.getTime()) && (!to || timestamp <= to.getTime());
+}
+
+function getAssignedDateRangeLabel(fromDate: string, toDate: string) {
+  if (fromDate && toDate) {
+    return `Assigned from ${formatDateInputLabel(fromDate)} to ${formatDateInputLabel(toDate)}`;
+  }
+
+  if (fromDate) {
+    return `Assigned from ${formatDateInputLabel(fromDate)}`;
+  }
+
+  return `Assigned till ${formatDateInputLabel(toDate)}`;
 }
 
 function getCanonicalStatus(value: string): CanonicalStatus | "" {
