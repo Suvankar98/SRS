@@ -329,9 +329,45 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         },
       });
 
-  const employeeReportRequests =
+  const [employeeReportActivities, employeeReportRequests] = await Promise.all([
+    isEmployee
+      ? prisma.serviceRequestActivity.findMany({
+          where: {
+            employeeId: session.userId,
+            statusPointsDelta: { not: null },
+            request: { deletedAt: null },
+          },
+          orderBy: [{ statusSubmittedAt: "desc" }, { createdAt: "desc" }],
+          select: {
+            id: true,
+            status: true,
+            statusReason: true,
+            statusAssignedAt: true,
+            statusSubmittedAt: true,
+            statusPointsDelta: true,
+            createdAt: true,
+            request: {
+              select: {
+                id: true,
+                docketNumber: true,
+                name: true,
+                company: true,
+                area: true,
+                status: true,
+                statusReason: true,
+                statusPointsDelta: true,
+                createdAt: true,
+                assignedAt: true,
+                statusSubmittedAt: true,
+                lastAttemptAt: true,
+                closedAt: true,
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
     isEmployee && currentUser?.name
-      ? await prisma.serviceRequest.findMany({
+      ? prisma.serviceRequest.findMany({
           where: {
             deletedAt: null,
             OR: [
@@ -357,7 +393,31 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           orderBy: [{ lastAttemptAt: "desc" }, { statusSubmittedAt: "desc" }, { createdAt: "desc" }],
           take: 20,
         })
-      : [];
+      : Promise.resolve([]),
+  ]);
+
+  const employeeReportActivityRequestIds = new Set(
+    employeeReportActivities.map((activity) => activity.request.id),
+  );
+  const employeeReportActiveRequests: EmployeeReportRequest[] = [
+    ...allRequests.map((request) => ({
+      ...request,
+      statusPointsDelta: employeeReportActivityRequestIds.has(request.id) ? null : request.statusPointsDelta,
+    })),
+    ...employeeReportActivities.map((activity) => ({
+      ...activity.request,
+      id: "activity:" + activity.id,
+      assignedAt: activity.statusAssignedAt ?? activity.request.assignedAt,
+      status: activity.status ?? activity.request.status,
+      statusReason: activity.statusReason ?? activity.request.statusReason,
+      statusSubmittedAt: activity.statusSubmittedAt ?? activity.createdAt,
+      statusPointsDelta: activity.statusPointsDelta,
+      lastAttemptAt: null,
+    })),
+  ];
+  const employeeReportFallbackRequests = employeeReportRequests.filter(
+    (request) => !employeeReportActivityRequestIds.has(request.id),
+  );
 
   const requestIds = allRequests.map((request) => request.id);
   const mediaByRequestId: Map<string, DashboardRequestMediaItem[]> = canAssign
@@ -409,8 +469,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ).length;
   const employeeReport = isEmployee
     ? buildEmployeeReportRows({
-        activeRequests: allRequests,
-        reportRequests: employeeReportRequests,
+        activeRequests: employeeReportActiveRequests,
+        reportRequests: employeeReportFallbackRequests,
         pointAdjustments: employeePointAdjustments,
       })
     : { rows: [], totalPoints: 0 };
