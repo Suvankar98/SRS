@@ -120,7 +120,7 @@ function buildSavedAdjustments(adjustments: EmployeePerformanceAdjustment[]) {
   const saved = new Map<string, SavedDailyAdjustment>();
   for (const adjustment of adjustments) {
     const taskNote = decodeTaskReviewNote(adjustment.teamworkOption);
-    if (!taskNote) continue;
+    if (!taskNote?.assignmentId) continue;
     const attendance = parseAttendance(adjustment.attendanceOption);
     saved.set(`${getDateInputValue(adjustment.createdAt)}|${taskNote.assignmentId}`, { attendanceInOption: attendance.inOption, attendanceOutOption: attendance.outOption, reviewOption: getOptionValue(adjustment.reviewOption, REVIEW_OPTIONS), reviewNote: taskNote.note, documentSubmissionOption: getOptionValue(adjustment.documentSubmissionOption, DOCUMENT_OPTIONS), materialHandoverOption: getOptionValue(adjustment.materialHandoverOption, MATERIAL_OPTIONS), totalDelta: adjustment.totalDelta });
   }
