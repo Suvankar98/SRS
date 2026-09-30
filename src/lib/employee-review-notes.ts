@@ -36,10 +36,6 @@ export function decodeTaskReviewNote(value: string): DecodedTaskReviewNote | nul
     }
 
     const note = parsed.note.trim();
-    if (!note) {
-      return null;
-    }
-
     return {
       assignmentId: typeof parsed.assignmentId === "string" && parsed.assignmentId.trim()
         ? parsed.assignmentId.trim()

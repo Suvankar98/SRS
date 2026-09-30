@@ -183,16 +183,21 @@ export async function saveEmployeePerformanceTag(formData: FormData) {
     const materialHandover = materialHandoverRaw && isMaterialHandoverOption(materialHandoverRaw) ? MATERIAL_HANDOVER_POINTS[materialHandoverRaw] : null;
     const attendancePoints = (attendanceIn?.points ?? 0) + (attendanceOut?.points ?? 0);
     const totalDelta = attendancePoints + (review?.points ?? 0) + (documentSubmission?.points ?? 0) + (materialHandover?.points ?? 0);
-    const encodedNote = reviewNote
-      ? encodeTaskReviewNote({ assignmentId, requestId: assignment.requestId, note: reviewNote })
-      : "N/A";
+    const encodedNote = encodeTaskReviewNote({
+      assignmentId,
+      requestId: assignment.requestId,
+      note: reviewNote,
+    });
 
     const adjustments = await transaction.employeePointAdjustment.findMany({
       where: { employeeId, createdAt: { gte: adjustmentDateRange.startAt, lt: new Date(adjustmentDateRange.endAt) } },
       select: { id: true, totalDelta: true, teamworkOption: true },
       orderBy: { createdAt: "desc" },
     });
-    const existing = adjustments.find((item) => decodeTaskReviewNote(item.teamworkOption)?.assignmentId === assignmentId) ?? null;
+    const existing =
+      adjustments.find((item) => decodeTaskReviewNote(item.teamworkOption)?.assignmentId === assignmentId) ??
+      adjustments.find((item) => !decodeTaskReviewNote(item.teamworkOption)?.assignmentId) ??
+      null;
     const previousDelta = existing?.totalDelta ?? 0;
 
     const data = {

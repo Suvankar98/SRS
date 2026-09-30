@@ -17,6 +17,8 @@ const REVIEW_OPTIONS = Object.entries(REVIEW_POINTS) as Array<[ReviewOption, (ty
 const DOCUMENT_OPTIONS = Object.entries(DOCUMENT_SUBMISSION_POINTS) as Array<[DocumentSubmissionOption, (typeof DOCUMENT_SUBMISSION_POINTS)[DocumentSubmissionOption]]>;
 const MATERIAL_OPTIONS = Object.entries(MATERIAL_HANDOVER_POINTS) as Array<[MaterialHandoverOption, (typeof MATERIAL_HANDOVER_POINTS)[MaterialHandoverOption]]>;
 
+const LEGACY_ASSIGNMENT_KEY = "__legacy__";
+
 export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, pointAdjustments, performanceTasks = [] }: EmployeePointsPopupProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -45,7 +47,9 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
         if (cancelled) return;
         const nextTasks = Array.isArray(data.tasks) ? data.tasks : [];
         setTasks(nextTasks);
-        const savedTaskId = Array.from(savedAdjustments.keys()).find((key) => key.startsWith(`${adjustmentDate}|`))?.split("|")[1] ?? "";
+        const savedTaskId = Array.from(savedAdjustments.keys()).find((key) =>
+          key.startsWith(adjustmentDate + "|") && !key.endsWith("|" + LEGACY_ASSIGNMENT_KEY),
+        )?.split("|")[1] ?? "";
         const nextId = nextTasks.some((task) => task.id === assignmentId) ? assignmentId : nextTasks.some((task) => task.id === savedTaskId) ? savedTaskId : nextTasks[0]?.id ?? "";
         setAssignmentId(nextId);
         applySaved(nextId, adjustmentDate, savedAdjustments, setAttendanceInOption, setAttendanceOutOption, setReviewOption, setReviewNote, setDocumentSubmissionOption, setMaterialHandoverOption);
@@ -112,21 +116,38 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
 }
 
 function applySaved(assignmentId: string, date: string, saved: Map<string, SavedDailyAdjustment>, setIn: (v: AttendanceInOption | "") => void, setOut: (v: AttendanceOutOption | "") => void, setReview: (v: ReviewOption | "") => void, setNote: (v: string) => void, setDoc: (v: DocumentSubmissionOption | "") => void, setMaterial: (v: MaterialHandoverOption | "") => void) {
-  const value = saved.get(`${date}|${assignmentId}`);
+  const value = saved.get(date + "|" + assignmentId) ?? saved.get(date + "|" + LEGACY_ASSIGNMENT_KEY);
   setIn(value?.attendanceInOption ?? ""); setOut(value?.attendanceOutOption ?? ""); setReview(value?.reviewOption ?? ""); setNote(value?.reviewNote ?? ""); setDoc(value?.documentSubmissionOption ?? ""); setMaterial(value?.materialHandoverOption ?? "");
 }
 
 function buildSavedAdjustments(adjustments: EmployeePerformanceAdjustment[]) {
   const saved = new Map<string, SavedDailyAdjustment>();
+
   for (const adjustment of adjustments) {
-    const taskNote = decodeTaskReviewNote(adjustment.teamworkOption);
-    if (!taskNote?.assignmentId) continue;
+    const dateKey = getDateInputValue(adjustment.createdAt);
+    const rawNote = adjustment.teamworkOption.trim();
+    const taskNote = decodeTaskReviewNote(rawNote);
+    const assignmentKey = taskNote?.assignmentId ?? LEGACY_ASSIGNMENT_KEY;
+    const key = dateKey + "|" + assignmentKey;
+
+    if (saved.has(key)) {
+      continue;
+    }
+
     const attendance = parseAttendance(adjustment.attendanceOption);
-    saved.set(`${getDateInputValue(adjustment.createdAt)}|${taskNote.assignmentId}`, { attendanceInOption: attendance.inOption, attendanceOutOption: attendance.outOption, reviewOption: getOptionValue(adjustment.reviewOption, REVIEW_OPTIONS), reviewNote: taskNote.note, documentSubmissionOption: getOptionValue(adjustment.documentSubmissionOption, DOCUMENT_OPTIONS), materialHandoverOption: getOptionValue(adjustment.materialHandoverOption, MATERIAL_OPTIONS), totalDelta: adjustment.totalDelta });
+    saved.set(key, {
+      attendanceInOption: attendance.inOption,
+      attendanceOutOption: attendance.outOption,
+      reviewOption: getOptionValue(adjustment.reviewOption, REVIEW_OPTIONS),
+      reviewNote: taskNote?.note ?? (rawNote === "N/A" ? "" : rawNote),
+      documentSubmissionOption: getOptionValue(adjustment.documentSubmissionOption, DOCUMENT_OPTIONS),
+      materialHandoverOption: getOptionValue(adjustment.materialHandoverOption, MATERIAL_OPTIONS),
+      totalDelta: adjustment.totalDelta,
+    });
   }
+
   return saved;
 }
-
 function parseAttendance(value: string) { try { const parsed = JSON.parse(value) as { inOption?: unknown; outOption?: unknown }; return { inOption: getOptionValue(typeof parsed.inOption === "string" ? parsed.inOption : "", ATTENDANCE_IN_OPTIONS) as AttendanceInOption | "", outOption: getOptionValue(typeof parsed.outOption === "string" ? parsed.outOption : "", ATTENDANCE_OUT_OPTIONS) as AttendanceOutOption | "" }; } catch { return { inOption: "" as AttendanceInOption | "", outOption: "" as AttendanceOutOption | "" }; } }
 function getOptionValue<T extends string>(value: string, options: Array<[T, { label: string; points: number }]>) { return options.find(([key, option]) => key === value || option.label === value)?.[0] ?? ""; }
 function getTodayInputValue() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }

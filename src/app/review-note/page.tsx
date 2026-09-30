@@ -1,9 +1,10 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { normalizeStatus } from "../status-utils";
 import { APP_ROLES } from "@/lib/auth-constants";
 import { getSession } from "@/lib/auth";
 import { formatDocketNumber } from "@/lib/docket";
+import { decodeTaskReviewNote } from "@/lib/employee-review-notes";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -127,21 +128,25 @@ export default async function ReviewNotePage() {
   ];
 
   const rows = reviewAdjustments.flatMap((adjustment): ReviewNoteRow[] => {
-    const note = adjustment.teamworkOption.trim();
+    const rawNote = adjustment.teamworkOption.trim();
+    const taskNote = decodeTaskReviewNote(rawNote);
+    const note = taskNote?.note ?? rawNote;
     const noteDateKey = getKolkataDateKey(adjustment.createdAt);
 
     if (!note || note === "N/A" || !noteDateKey) {
       return [];
     }
 
-    const matchingServices = services.filter((service) => service.dateKeys.has(noteDateKey));
+    const matchingServices = taskNote
+      ? services.filter((service) => service.id === taskNote.requestId)
+      : services.filter((service) => service.dateKeys.has(noteDateKey));
 
     if (matchingServices.length === 0) {
       return [
         {
           id: adjustment.id,
           docketNumber: "-",
-          company: "No matching service",
+          company: taskNote ? "No matching service" : "Docket not selected",
           customerName: "-",
           status: "New Call",
           note,
@@ -151,7 +156,7 @@ export default async function ReviewNotePage() {
     }
 
     return matchingServices.map((service) => ({
-      id: `${adjustment.id}-${service.id}`,
+      id: adjustment.id + "-" + service.id,
       docketNumber: service.docketNumber,
       company: service.company,
       customerName: service.customerName,
@@ -160,7 +165,6 @@ export default async function ReviewNotePage() {
       submittedAt: adjustment.createdAt,
     }));
   });
-
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-blue-200 bg-white p-5 shadow-[0_20px_70px_rgba(29,78,216,0.12)] sm:p-7">
