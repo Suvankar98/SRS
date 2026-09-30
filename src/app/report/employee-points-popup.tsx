@@ -24,7 +24,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
   const [adjustmentDate, setAdjustmentDate] = useState(getTodayInputValue());
   const [assignmentId, setAssignmentId] = useState("");
   const [tasks, setTasks] = useState<EmployeePerformanceTask[]>(performanceTasks);
-  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   const [attendanceInOption, setAttendanceInOption] = useState<AttendanceInOption | "">("");
   const [attendanceOutOption, setAttendanceOutOption] = useState<AttendanceOutOption | "">("");
   const [reviewOption, setReviewOption] = useState<ReviewOption | "">("");
@@ -35,7 +35,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingTasks(true);
+
     fetch(`/api/report/employee-tasks?employeeId=${encodeURIComponent(employeeId)}&date=${encodeURIComponent(adjustmentDate)}`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to load allotted tasks.");
@@ -60,7 +60,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
   const totalDelta = useMemo(() => (attendanceInOption === "" ? 0 : ATTENDANCE_IN_POINTS[attendanceInOption].points) + (attendanceOutOption === "" ? 0 : ATTENDANCE_OUT_POINTS[attendanceOutOption].points) + (reviewOption === "" ? 0 : REVIEW_POINTS[reviewOption].points) + (documentSubmissionOption === "" ? 0 : DOCUMENT_SUBMISSION_POINTS[documentSubmissionOption].points) + (materialHandoverOption === "" ? 0 : MATERIAL_HANDOVER_POINTS[materialHandoverOption].points), [attendanceInOption, attendanceOutOption, reviewOption, documentSubmissionOption, materialHandoverOption]);
 
   const openModal = () => { setIsOpen(true); setErrorMessage(""); };
-  const changeDate = (value: string) => { setAdjustmentDate(value); setAssignmentId(""); setErrorMessage(""); };
+  const changeDate = (value: string) => { setLoadingTasks(true); setAdjustmentDate(value); setAssignmentId(""); setErrorMessage(""); };
   const changeAssignment = (value: string) => { setAssignmentId(value); applySaved(value, adjustmentDate, savedAdjustments, setAttendanceInOption, setAttendanceOutOption, setReviewOption, setReviewNote, setDocumentSubmissionOption, setMaterialHandoverOption); setErrorMessage(""); };
 
   const submitPoints = () => {
@@ -77,7 +77,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
   return <>
     <button type="button" onClick={openModal} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"><TagIcon />Update Tag</button>
     {isOpen ? <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 sm:p-5" onClick={() => !isPending && setIsOpen(false)}>
-      <div className="my-2 w-full max-w-2xl max-h-[calc(100vh-1rem)] overflow-hidden rounded-[1.5rem] border border-blue-100 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.25)] sm:my-4 sm:max-h-[calc(100vh-2rem)]" onClick={(event) => event.stopPropagation()}>
+      <div className="my-auto w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-blue-100 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.25)]" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-4 py-3 sm:px-5">
           <div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700"><TagIcon />Employee Performance Tag</span><label className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-blue-600">Date<input type="date" value={adjustmentDate} max={getTodayInputValue()} onChange={(event) => changeDate(event.target.value)} className="rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-blue-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" /></label></div><h3 className="mt-2 text-xl font-bold tracking-tight text-slate-900">{employeeName}</h3><p className="mt-0.5 text-xs font-medium text-blue-600">Current monthly points: {formatPerformancePoints(currentPoints)}</p></div><button type="button" onClick={() => setIsOpen(false)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600" aria-label="Close"><CloseIcon /></button></div>
         </div>
