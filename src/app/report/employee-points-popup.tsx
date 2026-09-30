@@ -64,7 +64,7 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
   const changeAssignment = (value: string) => { setAssignmentId(value); applySaved(value, adjustmentDate, savedAdjustments, setAttendanceInOption, setAttendanceOutOption, setReviewOption, setReviewNote, setDocumentSubmissionOption, setMaterialHandoverOption); setErrorMessage(""); };
 
   const submitPoints = () => {
-    if (!selectedTask) { setErrorMessage("No task was allotted to this employee on the selected date."); return; }
+    if (!selectedTask) { setErrorMessage("No task was assigned to this employee by the selected date."); return; }
     startTransition(async () => {
       try {
         const formData = new FormData();
@@ -87,9 +87,9 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
             <SelectField label="Attendance OUT" value={attendanceOutOption} onChange={(v) => setAttendanceOutOption(v as AttendanceOutOption)} options={ATTENDANCE_OUT_OPTIONS} />
             <SelectField label="Review" value={reviewOption} onChange={(v) => setReviewOption(v as ReviewOption)} options={REVIEW_OPTIONS} />
             <label className="grid gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700">Task allotted on selected date</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700">Service Docket</span>
               <select value={selectedTask?.id ?? ""} onChange={(event) => changeAssignment(event.target.value)} disabled={loadingTasks || tasks.length === 0} className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
-                <option value="">{loadingTasks ? "Loading allotted tasks…" : tasks.length ? "Choose task / docket" : "No task allotted on this date"}</option>
+                <option value="">{loadingTasks ? "Loading allotted tasks…" : tasks.length ? "Choose task / docket" : "No task assigned by this date"}</option>
                 {tasks.map((task) => <option key={task.id} value={task.id}>{task.docketNumber} — {task.company}{task.name ? ` / ${task.name}` : ""}</option>)}
               </select>
               

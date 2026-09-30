@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getSession, roleCanAssign } from "@/lib/auth";
-import { APP_ROLES } from "@/lib/auth-constants";
+
 import { prisma } from "@/lib/prisma";
 import {
   ATTENDANCE_IN_POINTS,
@@ -172,10 +172,8 @@ export async function saveEmployeePerformanceTag(formData: FormData) {
       throw new Error("The selected task is not assigned to this employee.");
     }
 
-    const assignmentDateKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(assignment.assignedAt);
-    const selectedDateKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(adjustmentDate);
-    if (assignmentDateKey !== selectedDateKey) {
-      throw new Error("The selected task was not allotted on the selected date.");
+    if (assignment.assignedAt >= new Date(adjustmentDateRange.endAt)) {
+      throw new Error("The selected task was assigned after the selected date.");
     }
 
     const attendanceIn = attendanceInRaw && isAttendanceInOption(attendanceInRaw) ? ATTENDANCE_IN_POINTS[attendanceInRaw] : null;
