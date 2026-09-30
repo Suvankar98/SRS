@@ -6,23 +6,32 @@ export type TaskReviewNote = {
   note: string;
 };
 
+type DecodedTaskReviewNote = {
+  assignmentId?: string;
+  requestId: string;
+  note: string;
+};
+
 export function encodeTaskReviewNote(value: TaskReviewNote) {
   return `${TASK_REVIEW_NOTE_PREFIX}${JSON.stringify(value)}`;
 }
 
-export function decodeTaskReviewNote(value: string): TaskReviewNote | null {
-  if (!value.startsWith(TASK_REVIEW_NOTE_PREFIX)) {
+export function decodeTaskReviewNote(value: string): DecodedTaskReviewNote | null {
+  const rawValue = value.trim();
+  if (!rawValue) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(value.slice(TASK_REVIEW_NOTE_PREFIX.length)) as Partial<TaskReviewNote>;
+    const jsonValue = rawValue.startsWith(TASK_REVIEW_NOTE_PREFIX)
+      ? rawValue.slice(TASK_REVIEW_NOTE_PREFIX.length)
+      : rawValue;
 
-    if (
-      typeof parsed.assignmentId !== "string" ||
-      typeof parsed.requestId !== "string" ||
-      typeof parsed.note !== "string"
-    ) {
+    const parsed = JSON.parse(jsonValue) as Partial<TaskReviewNote> & {
+      version?: unknown;
+    };
+
+    if (typeof parsed.requestId !== "string" || typeof parsed.note !== "string") {
       return null;
     }
 
@@ -32,8 +41,10 @@ export function decodeTaskReviewNote(value: string): TaskReviewNote | null {
     }
 
     return {
-      assignmentId: parsed.assignmentId,
-      requestId: parsed.requestId,
+      assignmentId: typeof parsed.assignmentId === "string" && parsed.assignmentId.trim()
+        ? parsed.assignmentId.trim()
+        : undefined,
+      requestId: parsed.requestId.trim(),
       note,
     };
   } catch {
@@ -42,5 +53,5 @@ export function decodeTaskReviewNote(value: string): TaskReviewNote | null {
 }
 
 export function isTaskReviewNote(value: string) {
-  return value.startsWith(TASK_REVIEW_NOTE_PREFIX);
+  return decodeTaskReviewNote(value) !== null;
 }
