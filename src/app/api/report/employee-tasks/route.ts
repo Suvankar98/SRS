@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const assignments = await prisma.serviceAssignment.findMany({
     where: {
       employeeId,
-      assignedAt: { lt: endAt },
+      assignedAt: { gte: startAt, lt: endAt },
       request: { deletedAt: null },
     },
     orderBy: { assignedAt: "desc" },

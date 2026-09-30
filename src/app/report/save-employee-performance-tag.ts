@@ -172,8 +172,11 @@ export async function saveEmployeePerformanceTag(formData: FormData) {
       throw new Error("The selected task is not assigned to this employee.");
     }
 
-    if (assignment.assignedAt >= new Date(adjustmentDateRange.endAt)) {
-      throw new Error("The selected task was assigned after the selected date.");
+    if (
+      assignment.assignedAt < adjustmentDateRange.startAt ||
+      assignment.assignedAt >= new Date(adjustmentDateRange.endAt)
+    ) {
+      throw new Error("The selected task was not assigned on the selected date.");
     }
 
     const attendanceIn = attendanceInRaw && isAttendanceInOption(attendanceInRaw) ? ATTENDANCE_IN_POINTS[attendanceInRaw] : null;
