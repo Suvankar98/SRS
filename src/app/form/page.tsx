@@ -11,6 +11,7 @@ import { CustomerDetailsFields, type SavedCompanyOption } from "./customer-detai
 import { ProductAutocomplete } from "../product-autocomplete";
 import { PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { normalizeStatus } from "../status-utils";
+import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function FormPage({ searchParams }: FormPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const phoneErrorParam = resolvedSearchParams.phoneError;
   const showPhoneError = (Array.isArray(phoneErrorParam) ? phoneErrorParam[0] : phoneErrorParam) === "1";
-  const [databaseProducts, savedRequests, importedSavedCustomers] = await Promise.all([
+  const [databaseProducts, savedRequests, importedSavedCustomers, callTypes] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.serviceRequest.findMany({
       where: { deletedAt: null },
@@ -56,6 +57,7 @@ export default async function FormPage({ searchParams }: FormPageProps) {
         fullAddress: true,
       },
     }),
+    prisma.callType.findMany({ orderBy: { name: "asc" }, select: { name: true } }),
   ]);
   const products = getProductOptions(databaseProducts);
   const savedCompanies = buildSavedCompanyOptions(savedRequests, importedSavedCustomers);
@@ -82,7 +84,9 @@ export default async function FormPage({ searchParams }: FormPageProps) {
             <CustomerDetailsFields savedCompanies={savedCompanies} />
             <ProductAutocomplete products={products} name="product" placeholder="Type product name" required />
 
-            <ServiceCallBillingFields />
+            <ServiceCallBillingFields
+              callTypeOptions={callTypes.length > 0 ? callTypes.map((item) => item.name) : [...CALL_TYPE_OPTIONS]}
+            />
 
             <label className="md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-blue-700">Complaint Details</span>

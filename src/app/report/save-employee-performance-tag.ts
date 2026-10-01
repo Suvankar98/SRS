@@ -246,17 +246,20 @@ export async function saveEmployeeDailyPerformance(formData: FormData) {
   const date = parseDate(getRequiredField(formData, "adjustmentDate"));
   const inOption = getOptionalField(formData, "attendanceInOption");
   const outOption = getOptionalField(formData, "attendanceOutOption");
+  const reviewOption = getOptionalField(formData, "reviewOption");
   const documentOption = getOptionalField(formData, "documentSubmissionOption");
   const materialOption = getOptionalField(formData, "materialHandoverOption");
   if (inOption && !isAttendanceInOption(inOption)) throw new Error("Invalid attendance IN option");
   if (outOption && !isAttendanceOutOption(outOption)) throw new Error("Invalid attendance OUT option");
+  if (reviewOption && !isReviewOption(reviewOption)) throw new Error("Invalid review option");
   if (documentOption && !isDocumentSubmissionOption(documentOption)) throw new Error("Invalid document submission option");
   if (materialOption && !isMaterialHandoverOption(materialOption)) throw new Error("Invalid material handover option");
   const attendancePoints = (isAttendanceInOption(inOption) ? ATTENDANCE_IN_POINTS[inOption].points : 0)
     + (isAttendanceOutOption(outOption) ? ATTENDANCE_OUT_POINTS[outOption].points : 0);
   const documentPoints = isDocumentSubmissionOption(documentOption) ? DOCUMENT_SUBMISSION_POINTS[documentOption].points : 0;
   const materialPoints = isMaterialHandoverOption(materialOption) ? MATERIAL_HANDOVER_POINTS[materialOption].points : 0;
-  const dailyTotal = attendancePoints + documentPoints + materialPoints;
+  const reviewPoints = isReviewOption(reviewOption) ? REVIEW_POINTS[reviewOption].points : 0;
+  const dailyTotal = attendancePoints + reviewPoints + documentPoints + materialPoints;
   const range = getDateRange(date);
 
   await prisma.$transaction(async (transaction) => {
@@ -266,24 +269,26 @@ export async function saveEmployeeDailyPerformance(formData: FormData) {
       where: { employeeId, createdAt: { gte: range.startAt, lt: new Date(range.endAt) } },
       orderBy: { createdAt: "desc" },
     });
-    const previousDailyTotal = existing.reduce((sum, item) => sum + item.attendancePoints + item.documentSubmissionPoints + item.materialHandoverPoints, 0);
+    const previousDailyTotal = existing.reduce((sum, item) => sum + item.attendancePoints + item.reviewPoints + item.documentSubmissionPoints + item.materialHandoverPoints, 0);
     const dailyFields = {
       attendanceOption: JSON.stringify({ inOption, outOption }), attendancePoints,
+      reviewOption, reviewPoints,
       documentSubmissionOption: documentOption, documentSubmissionPoints: documentPoints,
       materialHandoverOption: materialOption, materialHandoverPoints: materialPoints,
     };
     if (existing.length === 0) {
       await transaction.employeePointAdjustment.create({ data: {
         employeeId, updatedById: session.userId, createdAt: date, ...dailyFields,
-        reviewOption: "", reviewPoints: 0, teamworkOption: "", teamworkPoints: 0, totalDelta: dailyTotal,
+        teamworkOption: "", teamworkPoints: 0, totalDelta: dailyTotal,
       } });
     } else {
       for (const [index, item] of existing.entries()) {
-        const oldDaily = item.attendancePoints + item.documentSubmissionPoints + item.materialHandoverPoints;
+        const oldDaily = item.attendancePoints + item.reviewPoints + item.documentSubmissionPoints + item.materialHandoverPoints;
         await transaction.employeePointAdjustment.update({ where: { id: item.id }, data: {
           updatedById: session.userId,
           ...(index === 0 ? dailyFields : {
             attendanceOption: JSON.stringify({ inOption: "", outOption: "" }), attendancePoints: 0,
+            reviewOption: "", reviewPoints: 0,
             documentSubmissionOption: "", documentSubmissionPoints: 0,
             materialHandoverOption: "", materialHandoverPoints: 0,
           }),

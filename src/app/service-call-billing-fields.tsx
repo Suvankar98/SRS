@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { CALL_TYPE_OPTIONS } from "@/lib/service-request-options";
 
 type BillingType = "warranty" | "amc" | "chargeable";
 const BILLING_TYPE_OPTIONS: Array<{ id: BillingType; label: string }> = [
@@ -10,7 +9,7 @@ const BILLING_TYPE_OPTIONS: Array<{ id: BillingType; label: string }> = [
   { id: "chargeable", label: "Chargeable" },
 ];
 
-export function ServiceCallBillingFields() {
+export function ServiceCallBillingFields({ callTypeOptions }: { callTypeOptions: string[] }) {
   const [callType, setCallType] = React.useState("");
   const [serviceBillingType, setServiceBillingType] = React.useState<BillingType | "">("");
   const [chargeableAmount, setChargeableAmount] = React.useState("");
@@ -56,7 +55,7 @@ export function ServiceCallBillingFields() {
           <option value="" disabled>
             Select a call type
           </option>
-          {CALL_TYPE_OPTIONS.map((item) => (
+          {callTypeOptions.map((item) => (
             <option key={item} value={item}>
               {item}
             </option>

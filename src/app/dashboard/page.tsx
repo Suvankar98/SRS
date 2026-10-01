@@ -804,7 +804,7 @@ function EmployeeReportTable({
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <EmployeeReportCompanyField companyDockets={row.companyDockets} />
                   <EmployeeReportMobileField label="Date" value={formatEmployeeReportDate(row.date)} />
-                  <EmployeeReportPointField label="Work Submission" value={row.workSubmission} />
+                  <EmployeeReportPointField label="Daily Reporting" value={row.workSubmission} />
                   <EmployeeReportAttendancePointField attendanceIn={row.attendanceIn} attendanceOut={row.attendanceOut} />
                   <EmployeeReportPointField label="Review" value={row.review} />
                   <EmployeeReportPointField label="Documents Submission" value={row.documentSubmission} />
@@ -821,7 +821,7 @@ function EmployeeReportTable({
                 <tr>
                   <EmployeeReportTh>Company Name / Docket Number</EmployeeReportTh>
                   <EmployeeReportTh>Date</EmployeeReportTh>
-                  <EmployeeReportTh>Work Submission</EmployeeReportTh>
+                  <EmployeeReportTh>Daily Reporting</EmployeeReportTh>
                   <EmployeeReportTh>Attendance</EmployeeReportTh>
                   <EmployeeReportTh>Review</EmployeeReportTh>
                   <EmployeeReportTh>Documents Submission</EmployeeReportTh>

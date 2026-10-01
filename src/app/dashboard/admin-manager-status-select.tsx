@@ -288,6 +288,12 @@ function AssignmentRemarksPopup({
               </button>
             </div>
 
+            <p className="mb-3 text-xs leading-relaxed text-blue-600">
+              Daily Reporting: approved remarks submitted by 9 PM earn +10 points;
+              9:01 PM to 11:59 PM earn +6. Submission after midnight scores −4.
+              Points are shared across the employee&apos;s assigned calls for that day;
+              additional remarks for the same call do not earn extra points. Times are IST.
+            </p>
             <div className="space-y-3">
               {remarks.map((remark) => {
                 const reviewTargetId =
@@ -432,6 +438,7 @@ function formatRemarkDateTime(value: Date | string) {
   }
 
   return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",

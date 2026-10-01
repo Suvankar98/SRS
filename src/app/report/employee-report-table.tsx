@@ -34,7 +34,7 @@ export function EmployeeReportTable({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-blue-950">{employeeName} Report</h2>
-          <p className="mt-0.5 text-xs text-blue-600">Work submission and performance points summary</p>
+          <p className="mt-0.5 text-xs text-blue-600">Daily reporting from Individual Remarks and performance points summary</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <EmployeeReportDownloadButton employeeName={employeeName} totalPoints={totalPoints} rows={pdfRows} />
@@ -58,7 +58,7 @@ export function EmployeeReportTable({
                     <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-500">Company Name / Docket Number</p>
                     <EmployeeReportCompanyDockets companyDockets={row.companyDockets} />
                   </div>
-                  <EmployeeReportPointBadge label="Work Submission" value={row.workSubmission} />
+                  <EmployeeReportPointBadge label="Daily Reporting" value={row.workSubmission} />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <EmployeeReportMobileField label="Date" value={formatEmployeeReportDate(row.date)} />
@@ -78,7 +78,7 @@ export function EmployeeReportTable({
                 <tr>
                   <EmployeeReportTh>Company Name / Docket Number</EmployeeReportTh>
                   <EmployeeReportTh>Date</EmployeeReportTh>
-                  <EmployeeReportTh>Work Submission</EmployeeReportTh>
+                  <EmployeeReportTh>Daily Reporting</EmployeeReportTh>
                   <EmployeeReportTh>Attendance</EmployeeReportTh>
                   <EmployeeReportTh>Review</EmployeeReportTh>
                   <EmployeeReportTh>Documents Submission</EmployeeReportTh>

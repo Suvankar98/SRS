@@ -33,7 +33,7 @@ export function EmployeeReportDownloadButton({
     const margin = 28;
     const rowHeight = 24;
     const columnWidths = [150, 72, 82, 82, 58, 108, 108, 64];
-    const headers = ["Company / Docket", "Date", "Work", "Attendance", "Review", "Documents", "Material", "Day Total"];
+    const headers = ["Company / Docket", "Date", "Daily Reporting", "Attendance", "Review", "Documents", "Material", "Day Total"];
     let y = 552;
     const drawPdfRow = (
       values: string[],

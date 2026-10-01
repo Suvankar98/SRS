@@ -13,9 +13,9 @@ export const ATTENDANCE_OUT_POINTS = {
 } as const;
 
 export const REVIEW_POINTS = {
-  positiveFeedback: { label: "Positive Feedback from client / Service Manager", points: 4 },
-  negativeFeedback: { label: "Negative Feedback from client / Service Manager", points: -2 },
-  complaint: { label: "Complaint from client / Service Manager", points: -4 },
+  positiveFeedback: { label: "Positive Feedback from client / Service Manager", points: 6 },
+  negativeFeedback: { label: "Negative Feedback from client / Service Manager", points: -3 },
+  complaint: { label: "Complaint from client / Service Manager", points: -6 },
 } as const;
 
 export const DOCUMENT_SUBMISSION_POINTS = {

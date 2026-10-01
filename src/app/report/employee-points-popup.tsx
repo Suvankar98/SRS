@@ -218,6 +218,7 @@ export function EmployeePointsPopup({
       (attendanceOutOption === ""
         ? 0
         : ATTENDANCE_OUT_POINTS[attendanceOutOption].points) +
+      (reviewOption === "" ? 0 : REVIEW_POINTS[reviewOption].points) +
       (documentSubmissionOption === ""
         ? 0
         : DOCUMENT_SUBMISSION_POINTS[documentSubmissionOption].points) +
@@ -227,6 +228,7 @@ export function EmployeePointsPopup({
     [
       attendanceInOption,
       attendanceOutOption,
+      reviewOption,
       documentSubmissionOption,
       materialHandoverOption,
     ],
@@ -377,6 +379,12 @@ export function EmployeePointsPopup({
                       setAttendanceOutOption(value as AttendanceOutOption)
                     }
                     options={ATTENDANCE_OUT_OPTIONS}
+                  />
+                  <SelectField
+                    label="Review"
+                    value={reviewOption}
+                    onChange={(value) => setReviewOption(value as ReviewOption)}
+                    options={REVIEW_OPTIONS}
                   />
                   <SelectField
                     label="Document Submission"
@@ -670,7 +678,7 @@ function SelectField<T extends string>({
         <option value="">Choose</option>
         {options.map(([key, option]) => (
           <option key={key} value={key}>
-            {option.label}
+            {option.label} ({formatPointDelta(option.points)} points)
           </option>
         ))}
       </select>
