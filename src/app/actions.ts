@@ -2046,19 +2046,8 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
         employeeId: activity.employeeId,
         assignedAt,
       });
-      const allocationDayRange = getLocalDayRange(assignedAt, STATUS_SCORING_TIME_ZONE);
-      const previousApprovedRemarks = await transaction.serviceRequestActivity.findMany({
-        where: {
-          id: { not: activity.id }, requestId: activity.requestId, employeeId: activity.employeeId,
-          statusAssignedAt: { gte: allocationDayRange.startAt, lte: allocationDayRange.endAt },
-          statusPointsApproval: "approved",
-        },
-        select: { statusPointsDelta: true },
-      });
-      const previousReportingPoints = previousApprovedRemarks.reduce((sum, remark) => sum + (remark.statusPointsDelta ?? 0), 0);
       const nextPoints = approval === "approved"
-        ? previousApprovedRemarks.length > 0 ? 0
-          : getStatusSubmissionPoints(assignedAt, submittedAt, Math.max(1, assignedCallCount))
+        ? getStatusSubmissionPoints(assignedAt, submittedAt, Math.max(1, assignedCallCount))
         : null;
       const previousPoints = activity.statusPointsDelta ?? 0;
       const pointsDelta = (nextPoints ?? 0) - previousPoints;
@@ -2081,7 +2070,7 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
         await transaction.serviceAssignment.update({
           where: { id: assignment.id },
           data: {
-            statusPointsDelta: previousApprovedRemarks.length > 0 ? previousReportingPoints : nextPoints,
+            statusPointsDelta: nextPoints,
             statusPointsApproval: approval,
             statusPointsReviewedAt: reviewedAt,
             statusPointsReviewedByName: reviewerName,
