@@ -4,7 +4,6 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatDocketNumber } from "@/lib/docket";
 import { PHONE_VALIDATION_MESSAGE, normalizePhoneNumberForStorage } from "@/lib/phone";
-import { getDailyReportingSubmissionPoints } from "@/lib/daily-reporting-rules";
 import { sendAssignmentWhatsApp, sendCustomerComplaintRegisteredWhatsApp } from "@/lib/whatsapp";
 import { APP_ROLES, AUTH_ROLE_COOKIE, AUTH_USER_ID_COOKIE, type AppRole } from "@/lib/auth-constants";
 import { getSession, roleCanAdmin, roleCanAssign, roleCanCreateService } from "@/lib/auth";
@@ -85,7 +84,21 @@ function getLocalDateTimeParts(value: Date, timeZone: string) {
 
 // Approval can happen any day; points are based only on the employee's allocation day and submission time.
 function getStatusSubmissionPoints(assignedAt: Date, submittedAt: Date, assignedCallCount: number) {
-  return getDailyReportingSubmissionPoints(assignedAt, submittedAt, assignedCallCount);
+  const assignedParts = getLocalDateTimeParts(assignedAt, STATUS_SCORING_TIME_ZONE);
+  const submittedParts = getLocalDateTimeParts(submittedAt, STATUS_SCORING_TIME_ZONE);
+
+  const isSameAllocationDay =
+    assignedParts.year === submittedParts.year &&
+    assignedParts.month === submittedParts.month &&
+    assignedParts.day === submittedParts.day;
+
+  if (!isSameAllocationDay) {
+    return -4;
+  }
+
+  const submittedMinutes = submittedParts.hour * 60 + submittedParts.minute;
+  const dailySubmissionPoints = submittedMinutes <= 21 * 60 ? 10 : 6;
+  return dailySubmissionPoints / Math.max(1, assignedCallCount);
 }
 
 function getLocalDateKey(value: Date, timeZone: string) {

@@ -432,7 +432,6 @@ function formatRemarkDateTime(value: Date | string) {
   }
 
   return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
