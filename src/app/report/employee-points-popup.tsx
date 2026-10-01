@@ -1,25 +1,102 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { saveEmployeePerformanceTag } from "./save-employee-performance-tag";
-import { ATTENDANCE_IN_POINTS, ATTENDANCE_OUT_POINTS, DOCUMENT_SUBMISSION_POINTS, MATERIAL_HANDOVER_POINTS, REVIEW_POINTS, type AttendanceInOption, type AttendanceOutOption, type DocumentSubmissionOption, type MaterialHandoverOption, type ReviewOption } from "@/lib/employee-performance-rules";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+
+import { saveEmployeeDailyPerformance, saveEmployeeDocketReviews } from "./save-employee-performance-tag";
+import {
+  ATTENDANCE_IN_POINTS,
+  ATTENDANCE_OUT_POINTS,
+  DOCUMENT_SUBMISSION_POINTS,
+  MATERIAL_HANDOVER_POINTS,
+  REVIEW_POINTS,
+  type AttendanceInOption,
+  type AttendanceOutOption,
+  type DocumentSubmissionOption,
+  type MaterialHandoverOption,
+  type ReviewOption,
+} from "@/lib/employee-performance-rules";
 import { decodeTaskReviewNote } from "@/lib/employee-review-notes";
 import { formatPerformancePoints, formatPointDelta } from "@/lib/points";
 
-type EmployeePerformanceTask = { id: string; requestId: string; docketNumber: string; company: string; name: string; assignedAt: string };
-type EmployeePointsPopupProps = { employeeId: string; employeeName: string; currentPoints: number; pointAdjustments: EmployeePerformanceAdjustment[]; performanceTasks?: EmployeePerformanceTask[] };
-type EmployeePerformanceAdjustment = { id: string; attendanceOption: string; attendancePoints: number; reviewOption: string; reviewPoints: number; teamworkOption: string; documentSubmissionOption: string; documentSubmissionPoints: number; materialHandoverOption: string; materialHandoverPoints: number; totalDelta: number; createdAt: string };
-type SavedDailyAdjustment = { attendanceInOption: AttendanceInOption | ""; attendanceOutOption: AttendanceOutOption | ""; reviewOption: ReviewOption | ""; reviewNote: string; documentSubmissionOption: DocumentSubmissionOption | ""; materialHandoverOption: MaterialHandoverOption | ""; totalDelta: number };
+type EmployeePerformanceTask = {
+  id: string;
+  requestId: string;
+  docketNumber: string;
+  company: string;
+  name: string;
+  assignedAt: string;
+};
 
-const ATTENDANCE_IN_OPTIONS = Object.entries(ATTENDANCE_IN_POINTS) as Array<[AttendanceInOption, (typeof ATTENDANCE_IN_POINTS)[AttendanceInOption]]>;
-const ATTENDANCE_OUT_OPTIONS = Object.entries(ATTENDANCE_OUT_POINTS) as Array<[AttendanceOutOption, (typeof ATTENDANCE_OUT_POINTS)[AttendanceOutOption]]>;
-const REVIEW_OPTIONS = Object.entries(REVIEW_POINTS) as Array<[ReviewOption, (typeof REVIEW_POINTS)[ReviewOption]]>;
-const DOCUMENT_OPTIONS = Object.entries(DOCUMENT_SUBMISSION_POINTS) as Array<[DocumentSubmissionOption, (typeof DOCUMENT_SUBMISSION_POINTS)[DocumentSubmissionOption]]>;
-const MATERIAL_OPTIONS = Object.entries(MATERIAL_HANDOVER_POINTS) as Array<[MaterialHandoverOption, (typeof MATERIAL_HANDOVER_POINTS)[MaterialHandoverOption]]>;
+type EmployeePointsPopupProps = {
+  mode?: "tag" | "review";
+  employeeId: string;
+  employeeName: string;
+  currentPoints: number;
+  pointAdjustments: EmployeePerformanceAdjustment[];
+  performanceTasks?: EmployeePerformanceTask[];
+};
 
-const LEGACY_ASSIGNMENT_KEY = "__legacy__";
+type EmployeePerformanceAdjustment = {
+  id: string;
+  attendanceOption: string;
+  attendancePoints: number;
+  reviewOption: string;
+  reviewPoints: number;
+  teamworkOption: string;
+  documentSubmissionOption: string;
+  documentSubmissionPoints: number;
+  materialHandoverOption: string;
+  materialHandoverPoints: number;
+  totalDelta: number;
+  createdAt: string;
+};
 
-export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, pointAdjustments, performanceTasks = [] }: EmployeePointsPopupProps) {
+type DailyPerformanceDraft = {
+  attendanceInOption: AttendanceInOption | "";
+  attendanceOutOption: AttendanceOutOption | "";
+  reviewOption: ReviewOption | "";
+  documentSubmissionOption: DocumentSubmissionOption | "";
+  materialHandoverOption: MaterialHandoverOption | "";
+};
+
+type SavedPerformanceData = {
+  dailyByDate: Map<string, DailyPerformanceDraft>;
+  reviewByTask: Map<string, string>;
+  legacyReviewByDate: Map<string, string>;
+};
+
+const ATTENDANCE_IN_OPTIONS = Object.entries(ATTENDANCE_IN_POINTS) as Array<
+  [AttendanceInOption, (typeof ATTENDANCE_IN_POINTS)[AttendanceInOption]]
+>;
+const ATTENDANCE_OUT_OPTIONS = Object.entries(ATTENDANCE_OUT_POINTS) as Array<
+  [AttendanceOutOption, (typeof ATTENDANCE_OUT_POINTS)[AttendanceOutOption]]
+>;
+const REVIEW_OPTIONS = Object.entries(REVIEW_POINTS) as Array<
+  [ReviewOption, (typeof REVIEW_POINTS)[ReviewOption]]
+>;
+const DOCUMENT_OPTIONS = Object.entries(DOCUMENT_SUBMISSION_POINTS) as Array<
+  [DocumentSubmissionOption, (typeof DOCUMENT_SUBMISSION_POINTS)[DocumentSubmissionOption]]
+>;
+const MATERIAL_OPTIONS = Object.entries(MATERIAL_HANDOVER_POINTS) as Array<
+  [MaterialHandoverOption, (typeof MATERIAL_HANDOVER_POINTS)[MaterialHandoverOption]]
+>;
+
+const EMPTY_DAILY_DRAFT: DailyPerformanceDraft = {
+  attendanceInOption: "",
+  attendanceOutOption: "",
+  reviewOption: "",
+  documentSubmissionOption: "",
+  materialHandoverOption: "",
+};
+
+export function EmployeePointsPopup({
+  mode = "tag",
+  employeeId,
+  employeeName,
+  currentPoints,
+  pointAdjustments,
+  performanceTasks = [],
+}: EmployeePointsPopupProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState("");
@@ -30,128 +107,604 @@ export function EmployeePointsPopup({ employeeId, employeeName, currentPoints, p
   const [attendanceInOption, setAttendanceInOption] = useState<AttendanceInOption | "">("");
   const [attendanceOutOption, setAttendanceOutOption] = useState<AttendanceOutOption | "">("");
   const [reviewOption, setReviewOption] = useState<ReviewOption | "">("");
-  const [reviewNote, setReviewNote] = useState("");
-  const [documentSubmissionOption, setDocumentSubmissionOption] = useState<DocumentSubmissionOption | "">("");
-  const [materialHandoverOption, setMaterialHandoverOption] = useState<MaterialHandoverOption | "">("");
-  const savedAdjustments = useMemo(() => buildSavedAdjustments(pointAdjustments), [pointAdjustments]);
+  const [documentSubmissionOption, setDocumentSubmissionOption] =
+    useState<DocumentSubmissionOption | "">("");
+  const [materialHandoverOption, setMaterialHandoverOption] =
+    useState<MaterialHandoverOption | "">("");
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const reviewInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const savedPerformance = useMemo(
+    () => buildSavedPerformance(pointAdjustments),
+    [pointAdjustments],
+  );
 
   useEffect(() => {
+    if (!isOpen) return;
     let cancelled = false;
 
-    fetch(`/api/report/employee-tasks?employeeId=${encodeURIComponent(employeeId)}&date=${encodeURIComponent(adjustmentDate)}`, { cache: "no-store" })
+    if (mode === "tag") {
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        applyDailyDraft(
+          savedPerformance.dailyByDate.get(adjustmentDate) ?? EMPTY_DAILY_DRAFT,
+          setAttendanceInOption,
+          setAttendanceOutOption,
+          setReviewOption,
+          setDocumentSubmissionOption,
+          setMaterialHandoverOption,
+        );
+        setErrorMessage("");
+        setLoadingTasks(false);
+      });
+      return () => { cancelled = true; };
+    }
+
+    fetch(
+      `/api/report/employee-tasks?employeeId=${encodeURIComponent(employeeId)}&date=${encodeURIComponent(adjustmentDate)}`,
+      { cache: "no-store" },
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to load allotted tasks.");
         return response.json() as Promise<{ tasks: EmployeePerformanceTask[] }>;
       })
       .then((data) => {
         if (cancelled) return;
+
         const nextTasks = Array.isArray(data.tasks) ? data.tasks : [];
+        const legacyReview = savedPerformance.legacyReviewByDate.get(adjustmentDate);
+        const nextReviewNotes = Object.fromEntries(
+          nextTasks.map((task, index) => {
+            const key = getTaskReviewKey(adjustmentDate, task.id);
+            const exactReview = savedPerformance.reviewByTask.get(key);
+            return [task.id, exactReview ?? (index === 0 ? legacyReview ?? "" : "")];
+          }),
+        );
+        const dailyDraft =
+          savedPerformance.dailyByDate.get(adjustmentDate) ?? EMPTY_DAILY_DRAFT;
+        const firstUnreviewed =
+          nextTasks.find((task) => !(nextReviewNotes[task.id] ?? "").trim()) ??
+          nextTasks[0];
+
         setTasks(nextTasks);
-        const savedTaskId = Array.from(savedAdjustments.keys()).find((key) =>
-          key.startsWith(adjustmentDate + "|") && !key.endsWith("|" + LEGACY_ASSIGNMENT_KEY),
-        )?.split("|")[1] ?? "";
-        const nextId = nextTasks.some((task) => task.id === assignmentId) ? assignmentId : nextTasks.some((task) => task.id === savedTaskId) ? savedTaskId : nextTasks[0]?.id ?? "";
-        setAssignmentId(nextId);
-        applySaved(nextId, adjustmentDate, savedAdjustments, setAttendanceInOption, setAttendanceOutOption, setReviewOption, setReviewNote, setDocumentSubmissionOption, setMaterialHandoverOption);
+        setReviewNotes(nextReviewNotes);
+        setAssignmentId(firstUnreviewed?.id ?? "");
+        applyDailyDraft(
+          dailyDraft,
+          setAttendanceInOption,
+          setAttendanceOutOption,
+          setReviewOption,
+          setDocumentSubmissionOption,
+          setMaterialHandoverOption,
+        );
+        setErrorMessage("");
       })
-      .catch((error) => { if (!cancelled) setErrorMessage(error instanceof Error ? error.message : "Unable to load allotted tasks."); })
-      .finally(() => { if (!cancelled) setLoadingTasks(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, adjustmentDate, savedAdjustments]);
+      .catch((error) => {
+        if (cancelled) return;
+        setTasks([]);
+        setReviewNotes({});
+        setAssignmentId("");
+        applyDailyDraft(
+          savedPerformance.dailyByDate.get(adjustmentDate) ?? EMPTY_DAILY_DRAFT,
+          setAttendanceInOption,
+          setAttendanceOutOption,
+          setReviewOption,
+          setDocumentSubmissionOption,
+          setMaterialHandoverOption,
+        );
+        if (mode === "review") {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Unable to load allotted tasks.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTasks(false);
+      });
 
-  const selectedTask = tasks.find((task) => task.id === assignmentId) ?? tasks[0];
-  const totalDelta = useMemo(() => (attendanceInOption === "" ? 0 : ATTENDANCE_IN_POINTS[attendanceInOption].points) + (attendanceOutOption === "" ? 0 : ATTENDANCE_OUT_POINTS[attendanceOutOption].points) + (reviewOption === "" ? 0 : REVIEW_POINTS[reviewOption].points) + (documentSubmissionOption === "" ? 0 : DOCUMENT_SUBMISSION_POINTS[documentSubmissionOption].points) + (materialHandoverOption === "" ? 0 : MATERIAL_HANDOVER_POINTS[materialHandoverOption].points), [attendanceInOption, attendanceOutOption, reviewOption, documentSubmissionOption, materialHandoverOption]);
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, adjustmentDate, savedPerformance, isOpen, mode]);
 
-  const openModal = () => { setIsOpen(true); setErrorMessage(""); };
-  const changeDate = (value: string) => { setLoadingTasks(true); setAdjustmentDate(value); setAssignmentId(""); setErrorMessage(""); };
-  const changeAssignment = (value: string) => { setAssignmentId(value); applySaved(value, adjustmentDate, savedAdjustments, setAttendanceInOption, setAttendanceOutOption, setReviewOption, setReviewNote, setDocumentSubmissionOption, setMaterialHandoverOption); setErrorMessage(""); };
+  const selectedTask = tasks.find((task) => task.id === assignmentId) ?? null;
+  const reviewedCount = tasks.filter((task) =>
+    (reviewNotes[task.id] ?? "").trim(),
+  ).length;
+  const totalDelta = useMemo(
+    () =>
+      (attendanceInOption === ""
+        ? 0
+        : ATTENDANCE_IN_POINTS[attendanceInOption].points) +
+      (attendanceOutOption === ""
+        ? 0
+        : ATTENDANCE_OUT_POINTS[attendanceOutOption].points) +
+      (documentSubmissionOption === ""
+        ? 0
+        : DOCUMENT_SUBMISSION_POINTS[documentSubmissionOption].points) +
+      (materialHandoverOption === ""
+        ? 0
+        : MATERIAL_HANDOVER_POINTS[materialHandoverOption].points),
+    [
+      attendanceInOption,
+      attendanceOutOption,
+      documentSubmissionOption,
+      materialHandoverOption,
+    ],
+  );
+
+  const changeDate = (value: string) => {
+    setLoadingTasks(true);
+    setAdjustmentDate(value);
+    setAssignmentId("");
+    setReviewNotes({});
+    setErrorMessage("");
+  };
 
   const submitPoints = () => {
-    if (!selectedTask) { setErrorMessage("No task was assigned to this employee on the selected date."); return; }
+    if (mode === "review" && tasks.length === 0) {
+      setErrorMessage(
+        "No task was assigned to this employee on the selected date.",
+      );
+      return;
+    }
+
     startTransition(async () => {
       try {
         const formData = new FormData();
-        formData.append("employeeId", employeeId); formData.append("assignmentId", selectedTask.id); formData.append("attendanceInOption", attendanceInOption); formData.append("attendanceOutOption", attendanceOutOption); formData.append("reviewOption", reviewOption); formData.append("reviewNote", reviewNote); formData.append("documentSubmissionOption", documentSubmissionOption); formData.append("materialHandoverOption", materialHandoverOption); formData.append("adjustmentDate", adjustmentDate);
-        await saveEmployeePerformanceTag(formData); setIsOpen(false); window.location.reload();
-      } catch (error) { setErrorMessage(error instanceof Error ? error.message : "Unable to update points."); }
+        formData.append("employeeId", employeeId);
+        formData.append("adjustmentDate", adjustmentDate);
+        formData.append("attendanceInOption", attendanceInOption);
+        formData.append("attendanceOutOption", attendanceOutOption);
+        formData.append("reviewOption", reviewOption);
+        formData.append("documentSubmissionOption", documentSubmissionOption);
+        formData.append("materialHandoverOption", materialHandoverOption);
+        formData.append(
+          "entries",
+          JSON.stringify(
+            tasks.map((task) => ({
+              assignmentId: task.id,
+              reviewNote: reviewNotes[task.id] ?? "",
+            })),
+          ),
+        );
+
+        if (mode === "tag") {
+          await saveEmployeeDailyPerformance(formData);
+        } else {
+          await saveEmployeeDocketReviews(formData);
+        }
+        setIsOpen(false);
+        window.location.reload();
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to update points.",
+        );
+      }
     });
   };
 
-  return <>
-    <button type="button" onClick={openModal} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"><TagIcon />Update Tag</button>
-    {isOpen ? <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 sm:p-5" onClick={() => !isPending && setIsOpen(false)}>
-      <div className="my-auto w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-blue-100 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.25)]" onClick={(event) => event.stopPropagation()}>
-        <div className="border-b border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-4 py-3 sm:px-5">
-          <div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700"><TagIcon />Employee Performance Tag</span><label className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-blue-600">Date<input type="date" value={adjustmentDate} max={getTodayInputValue()} onChange={(event) => changeDate(event.target.value)} className="rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-blue-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" /></label></div><h3 className="mt-2 text-xl font-bold tracking-tight text-slate-900">{employeeName}</h3><p className="mt-0.5 text-xs font-medium text-blue-600">Current monthly points: {formatPerformancePoints(currentPoints)}</p></div><button type="button" onClick={() => setIsOpen(false)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600" aria-label="Close"><CloseIcon /></button></div>
-        </div>
-        <div className="space-y-3 p-4 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SelectField label="Attendance IN" value={attendanceInOption} onChange={(v) => setAttendanceInOption(v as AttendanceInOption)} options={ATTENDANCE_IN_OPTIONS} />
-            <SelectField label="Attendance OUT" value={attendanceOutOption} onChange={(v) => setAttendanceOutOption(v as AttendanceOutOption)} options={ATTENDANCE_OUT_OPTIONS} />
-            <SelectField label="Review" value={reviewOption} onChange={(v) => setReviewOption(v as ReviewOption)} options={REVIEW_OPTIONS} />
-            <label className="grid gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700">Service Docket</span>
-              <select value={selectedTask?.id ?? ""} onChange={(event) => changeAssignment(event.target.value)} disabled={loadingTasks || tasks.length === 0} className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
-                <option value="">{loadingTasks ? "Loading allotted tasks…" : tasks.length ? "Choose task / docket" : "No task assigned on this date"}</option>
-                {tasks.map((task) => <option key={task.id} value={task.id}>{task.docketNumber} — {task.company}{task.name ? ` / ${task.name}` : ""}</option>)}
-              </select>
-              
-            </label>
-            <label className="grid gap-1.5 sm:col-span-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700">Review Note</span>
-              <textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={2} maxLength={1000} placeholder="Write review details for this specific docket..." className="min-h-16 w-full resize-none rounded-xl border border-blue-200 bg-white px-3 py-3 text-sm leading-relaxed text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100" />
-              <span className="text-right text-[10px] text-slate-400">{reviewNote.length}/1000</span>
-            </label>
-            <SelectField label="Document Submission" value={documentSubmissionOption} onChange={(v) => setDocumentSubmissionOption(v as DocumentSubmissionOption)} options={DOCUMENT_OPTIONS} />
-            <SelectField label="Material Handover" value={materialHandoverOption} onChange={(v) => setMaterialHandoverOption(v as MaterialHandoverOption)} options={MATERIAL_OPTIONS} />
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setLoadingTasks(true);
+          setIsOpen(true);
+          setErrorMessage("");
+        }}
+        className="inline-flex items-center justify-center gap-1.5 rounded-full border border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+        <TagIcon />
+        {mode === "review" ? "Review" : "Update Tag"}
+      </button>
+
+      {isOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 sm:p-5"
+          onClick={() => !isPending && setIsOpen(false)}
+        >
+          <div
+            className="my-auto w-full max-w-3xl overflow-hidden rounded-[1.5rem] border border-blue-100 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.25)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 px-4 py-3 sm:px-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">
+                      <TagIcon />
+                      {mode === "review" ? "Employee Review" : "Employee Performance Tag"}
+                    </span>
+                    <label className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-blue-600">
+                      Date
+                      <input
+                        type="date"
+                        value={adjustmentDate}
+                        max={getTodayInputValue()}
+                        onChange={(event) => changeDate(event.target.value)}
+                        className="rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-blue-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                  </div>
+                  <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-900">
+                    {employeeName}
+                  </h3>
+                  <p className="mt-0.5 text-xs font-medium text-blue-600">
+                    Current monthly points: {formatPerformancePoints(currentPoints)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  aria-label="Close"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-5">
+              {mode === "tag" ? (
+              <section aria-labelledby={`daily-performance-${employeeId}`}>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <h4
+                      id={`daily-performance-${employeeId}`}
+                      className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700"
+                    >
+                      Daily performance
+                    </h4>
+                  </div>
+                  <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+                    {formatPointDelta(totalDelta)} points
+                  </span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SelectField
+                    label="Attendance IN"
+                    value={attendanceInOption}
+                    onChange={(value) =>
+                      setAttendanceInOption(value as AttendanceInOption)
+                    }
+                    options={ATTENDANCE_IN_OPTIONS}
+                  />
+                  <SelectField
+                    label="Attendance OUT"
+                    value={attendanceOutOption}
+                    onChange={(value) =>
+                      setAttendanceOutOption(value as AttendanceOutOption)
+                    }
+                    options={ATTENDANCE_OUT_OPTIONS}
+                  />
+                  <SelectField
+                    label="Document Submission"
+                    value={documentSubmissionOption}
+                    onChange={(value) =>
+                      setDocumentSubmissionOption(
+                        value as DocumentSubmissionOption,
+                      )
+                    }
+                    options={DOCUMENT_OPTIONS}
+                  />
+                  <SelectField
+                    label="Material Handover"
+                    value={materialHandoverOption}
+                    onChange={(value) =>
+                      setMaterialHandoverOption(value as MaterialHandoverOption)
+                    }
+                    options={MATERIAL_OPTIONS}
+                  />
+                </div>
+              </section>
+              ) : null}
+
+              {mode === "review" ? (
+              <section
+                aria-labelledby={`docket-reviews-${employeeId}`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <h4
+                      id={`docket-reviews-${employeeId}`}
+                      className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700"
+                    >
+                      Docket reviews
+                    </h4>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {loadingTasks
+                      ? "Loading..."
+                      : `${reviewedCount} of ${tasks.length} reviewed`}
+                  </span>
+                </div>
+
+                {loadingTasks ? (
+                  <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+                ) : tasks.length > 0 ? (
+                  <div className="overflow-hidden rounded-xl border border-slate-200">
+                    {tasks.map((task, index) => {
+                      const isActive = task.id === selectedTask?.id;
+                      const hasReview = Boolean(
+                        (reviewNotes[task.id] ?? "").trim(),
+                      );
+                      const wasSaved = savedPerformance.reviewByTask.has(
+                        getTaskReviewKey(adjustmentDate, task.id),
+                      );
+
+                      return (
+                        <div
+                          key={task.id}
+                          className={`grid gap-2 border-b border-slate-100 p-3 last:border-b-0 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:items-center ${isActive ? "bg-blue-50/70" : "bg-white"}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssignmentId(task.id);
+                              reviewInputRefs.current[task.id]?.focus();
+                            }}
+                            className="min-w-0 text-left"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-blue-700">
+                                {index + 1}. {task.docketNumber}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${hasReview ? "bg-emerald-100 text-emerald-700" : wasSaved ? "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-700"}`}
+                              >
+                                {hasReview ? "Reviewed" : wasSaved ? "Saved" : "Pending"}
+                              </span>
+                            </span>
+                            <span className="mt-1 block truncate text-xs text-slate-600">
+                              {task.company}
+                              {task.name ? ` / ${task.name}` : ""}
+                            </span>
+                          </button>
+                          <input
+                            ref={(element) => {
+                              reviewInputRefs.current[task.id] = element;
+                            }}
+                            type="text"
+                            value={reviewNotes[task.id] ?? ""}
+                            onFocus={() => setAssignmentId(task.id)}
+                            onChange={(event) =>
+                              setReviewNotes((current) => ({
+                                ...current,
+                                [task.id]: event.target.value,
+                              }))
+                            }
+                            maxLength={1000}
+                            aria-label={`Review for ${task.docketNumber}`}
+                            placeholder="Write review for this docket"
+                            className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+                    No task assigned on this date.
+                  </p>
+                )}
+              </section>
+              ) : null}
+
+              {errorMessage ? (
+                <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                  {errorMessage}
+                </p>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  disabled={isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitPoints}
+                  className="inline-flex items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isPending || loadingTasks || (mode === "review" && tasks.length === 0)}
+                >
+                  {isPending ? "Saving..." : mode === "review" ? "Save Review" : "Save Performance Tag"}
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-3 py-2"><div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-600">Points for selected task</p><p className="mt-0.5 text-sm font-semibold text-blue-950">Today’s Point: {formatPointDelta(totalDelta)}</p></div>{selectedTask ? <span className="max-w-[50%] truncate rounded-full bg-white px-3 py-1.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">{selectedTask.docketNumber}</span> : null}</div>
-          {errorMessage ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm text-red-700">{errorMessage}</p> : null}
-          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3"><button type="button" onClick={() => setIsOpen(false)} className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" disabled={isPending}>Cancel</button><button type="button" onClick={submitPoints} className="inline-flex items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" disabled={isPending}>{isPending ? "Saving..." : "Save Performance Tag"}</button></div>
         </div>
-      </div>
-    </div> : null}
-  </>;
+      ) : null}
+    </>
+  );
 }
 
-function applySaved(assignmentId: string, date: string, saved: Map<string, SavedDailyAdjustment>, setIn: (v: AttendanceInOption | "") => void, setOut: (v: AttendanceOutOption | "") => void, setReview: (v: ReviewOption | "") => void, setNote: (v: string) => void, setDoc: (v: DocumentSubmissionOption | "") => void, setMaterial: (v: MaterialHandoverOption | "") => void) {
-  const value = saved.get(date + "|" + assignmentId) ?? saved.get(date + "|" + LEGACY_ASSIGNMENT_KEY);
-  setIn(value?.attendanceInOption ?? ""); setOut(value?.attendanceOutOption ?? ""); setReview(value?.reviewOption ?? ""); setNote(value?.reviewNote ?? ""); setDoc(value?.documentSubmissionOption ?? ""); setMaterial(value?.materialHandoverOption ?? "");
+function applyDailyDraft(
+  value: DailyPerformanceDraft,
+  setIn: (option: AttendanceInOption | "") => void,
+  setOut: (option: AttendanceOutOption | "") => void,
+  setReview: (option: ReviewOption | "") => void,
+  setDocument: (option: DocumentSubmissionOption | "") => void,
+  setMaterial: (option: MaterialHandoverOption | "") => void,
+) {
+  setIn(value.attendanceInOption);
+  setOut(value.attendanceOutOption);
+  setReview(value.reviewOption);
+  setDocument(value.documentSubmissionOption);
+  setMaterial(value.materialHandoverOption);
 }
 
-function buildSavedAdjustments(adjustments: EmployeePerformanceAdjustment[]) {
-  const saved = new Map<string, SavedDailyAdjustment>();
+function buildSavedPerformance(
+  adjustments: EmployeePerformanceAdjustment[],
+): SavedPerformanceData {
+  const dailyByDate = new Map<string, DailyPerformanceDraft>();
+  const dailyPriority = new Map<string, number>();
+  const reviewByTask = new Map<string, string>();
+  const legacyReviewByDate = new Map<string, string>();
 
   for (const adjustment of adjustments) {
     const dateKey = getDateInputValue(adjustment.createdAt);
     const rawNote = adjustment.teamworkOption.trim();
     const taskNote = decodeTaskReviewNote(rawNote);
-    const assignmentKey = taskNote?.assignmentId ?? LEGACY_ASSIGNMENT_KEY;
-    const key = dateKey + "|" + assignmentKey;
-
-    if (saved.has(key)) {
-      continue;
-    }
-
     const attendance = parseAttendance(adjustment.attendanceOption);
-    saved.set(key, {
+    const dailyDraft: DailyPerformanceDraft = {
       attendanceInOption: attendance.inOption,
       attendanceOutOption: attendance.outOption,
       reviewOption: getOptionValue(adjustment.reviewOption, REVIEW_OPTIONS),
-      reviewNote: taskNote?.note ?? (rawNote === "N/A" ? "" : rawNote),
-      documentSubmissionOption: getOptionValue(adjustment.documentSubmissionOption, DOCUMENT_OPTIONS),
-      materialHandoverOption: getOptionValue(adjustment.materialHandoverOption, MATERIAL_OPTIONS),
-      totalDelta: adjustment.totalDelta,
-    });
+      documentSubmissionOption: getOptionValue(
+        adjustment.documentSubmissionOption,
+        DOCUMENT_OPTIONS,
+      ),
+      materialHandoverOption: getOptionValue(
+        adjustment.materialHandoverOption,
+        MATERIAL_OPTIONS,
+      ),
+    };
+    const priority = hasDailyValues(dailyDraft, adjustment.totalDelta) ? 2 : 1;
+
+    if ((dailyPriority.get(dateKey) ?? 0) < priority) {
+      dailyByDate.set(dateKey, dailyDraft);
+      dailyPriority.set(dateKey, priority);
+    }
+
+    if (taskNote?.assignmentId) {
+      const key = getTaskReviewKey(dateKey, taskNote.assignmentId);
+      if (!reviewByTask.has(key)) reviewByTask.set(key, taskNote.note);
+    } else if (rawNote && rawNote !== "N/A" && !legacyReviewByDate.has(dateKey)) {
+      legacyReviewByDate.set(dateKey, rawNote);
+    }
   }
 
-  return saved;
+  return { dailyByDate, reviewByTask, legacyReviewByDate };
 }
-function parseAttendance(value: string) { try { const parsed = JSON.parse(value) as { inOption?: unknown; outOption?: unknown }; return { inOption: getOptionValue(typeof parsed.inOption === "string" ? parsed.inOption : "", ATTENDANCE_IN_OPTIONS) as AttendanceInOption | "", outOption: getOptionValue(typeof parsed.outOption === "string" ? parsed.outOption : "", ATTENDANCE_OUT_OPTIONS) as AttendanceOutOption | "" }; } catch { return { inOption: "" as AttendanceInOption | "", outOption: "" as AttendanceOutOption | "" }; } }
-function getOptionValue<T extends string>(value: string, options: Array<[T, { label: string; points: number }]>) { return options.find(([key, option]) => key === value || option.label === value)?.[0] ?? ""; }
-function getTodayInputValue() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
-function getDateInputValue(value: string) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)); }
-function SelectField<T extends string>({ label, value, onChange, options }: { label: string; value: T | ""; onChange: (value: string) => void; options: Array<[T, { label: string; points: number }]> }) { return <label className="grid gap-1.5"><span className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"><option value="">Choose</option>{options.map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select></label>; }
-function TagIcon() { return <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden="true"><path d="M3.5 5.25A1.75 1.75 0 0 1 5.25 3.5H11l5.5 5.5-6.5 6.5a1.75 1.75 0 0 1-2.475 0L3.5 11.475V5.25Z" stroke="currentColor" strokeWidth="1.5"/><circle cx="7" cy="7" r="1" fill="currentColor"/></svg>; }
-function CloseIcon() { return <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 1 1.06 0L10 7.88l2.66-2.66a.75.75 0 1 1 1.06 1.06L11.06 8.94l2.66 2.66a.75.75 0 0 1-1.06 1.06L10 10l-2.66 2.66a.75.75 0 1 1-1.06-1.06l2.66-2.66-2.66-2.66a.75.75 0 0 1 0-1.06Z"/></svg>; }
+
+function hasDailyValues(draft: DailyPerformanceDraft, totalDelta: number) {
+  return (
+    totalDelta !== 0 ||
+    draft.attendanceInOption !== "" ||
+    draft.attendanceOutOption !== "" ||
+    draft.reviewOption !== "" ||
+    draft.documentSubmissionOption !== "" ||
+    draft.materialHandoverOption !== ""
+  );
+}
+
+function parseAttendance(value: string) {
+  try {
+    const parsed = JSON.parse(value) as {
+      inOption?: unknown;
+      outOption?: unknown;
+    };
+    return {
+      inOption: getOptionValue(
+        typeof parsed.inOption === "string" ? parsed.inOption : "",
+        ATTENDANCE_IN_OPTIONS,
+      ) as AttendanceInOption | "",
+      outOption: getOptionValue(
+        typeof parsed.outOption === "string" ? parsed.outOption : "",
+        ATTENDANCE_OUT_OPTIONS,
+      ) as AttendanceOutOption | "",
+    };
+  } catch {
+    return {
+      inOption: "" as AttendanceInOption | "",
+      outOption: "" as AttendanceOutOption | "",
+    };
+  }
+}
+
+function getOptionValue<T extends string>(
+  value: string,
+  options: Array<[T, { label: string; points: number }]>,
+) {
+  return options.find(([key, option]) => key === value || option.label === value)?.[0] ?? "";
+}
+
+function getTaskReviewKey(date: string, assignmentId: string) {
+  return `${date}|${assignmentId}`;
+}
+
+function getTodayInputValue() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getDateInputValue(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function SelectField<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: T | "";
+  onChange: (value: string) => void;
+  options: Array<[T, { label: string; points: number }]>;
+}) {
+  return (
+    <label className="grid gap-1.5">
+      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-blue-700">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+      >
+        <option value="">Choose</option>
+        {options.map(([key, option]) => (
+          <option key={key} value={key}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TagIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      className="h-3.5 w-3.5"
+      aria-hidden="true"
+    >
+      <path
+        d="M3.5 5.25A1.75 1.75 0 0 1 5.25 3.5H11l5.5 5.5-6.5 6.5a1.75 1.75 0 0 1-2.475 0L3.5 11.475V5.25Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <circle cx="7" cy="7" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M6.28 5.22a.75.75 0 0 1 1.06 0L10 7.88l2.66-2.66a.75.75 0 1 1 1.06 1.06L11.06 8.94l2.66 2.66a.75.75 0 0 1-1.06 1.06L10 10l-2.66 2.66a.75.75 0 1 1-1.06-1.06l2.66-2.66-2.66-2.66a.75.75 0 0 1 0-1.06Z" />
+    </svg>
+  );
+}

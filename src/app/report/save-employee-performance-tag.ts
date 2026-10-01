@@ -232,3 +232,164 @@ export async function saveEmployeePerformanceTag(formData: FormData) {
   revalidatePath("/report");
   revalidatePath("/dashboard");
 }
+
+type PerformanceReviewEntry = {
+  assignmentId: string;
+  reviewNote: string;
+};
+
+export async function saveEmployeeDailyPerformance(formData: FormData) {
+  const session = await getSession();
+  if (!session || !roleCanAssign(session.role)) redirect("/dashboard");
+
+  const employeeId = getRequiredField(formData, "employeeId");
+  const date = parseDate(getRequiredField(formData, "adjustmentDate"));
+  const inOption = getOptionalField(formData, "attendanceInOption");
+  const outOption = getOptionalField(formData, "attendanceOutOption");
+  const documentOption = getOptionalField(formData, "documentSubmissionOption");
+  const materialOption = getOptionalField(formData, "materialHandoverOption");
+  if (inOption && !isAttendanceInOption(inOption)) throw new Error("Invalid attendance IN option");
+  if (outOption && !isAttendanceOutOption(outOption)) throw new Error("Invalid attendance OUT option");
+  if (documentOption && !isDocumentSubmissionOption(documentOption)) throw new Error("Invalid document submission option");
+  if (materialOption && !isMaterialHandoverOption(materialOption)) throw new Error("Invalid material handover option");
+  const attendancePoints = (isAttendanceInOption(inOption) ? ATTENDANCE_IN_POINTS[inOption].points : 0)
+    + (isAttendanceOutOption(outOption) ? ATTENDANCE_OUT_POINTS[outOption].points : 0);
+  const documentPoints = isDocumentSubmissionOption(documentOption) ? DOCUMENT_SUBMISSION_POINTS[documentOption].points : 0;
+  const materialPoints = isMaterialHandoverOption(materialOption) ? MATERIAL_HANDOVER_POINTS[materialOption].points : 0;
+  const dailyTotal = attendancePoints + documentPoints + materialPoints;
+  const range = getDateRange(date);
+
+  await prisma.$transaction(async (transaction) => {
+    const employee = await transaction.user.findUnique({ where: { id: employeeId }, select: { id: true } });
+    if (!employee) throw new Error("Employee not found");
+    const existing = await transaction.employeePointAdjustment.findMany({
+      where: { employeeId, createdAt: { gte: range.startAt, lt: new Date(range.endAt) } },
+      orderBy: { createdAt: "desc" },
+    });
+    const previousDailyTotal = existing.reduce((sum, item) => sum + item.attendancePoints + item.documentSubmissionPoints + item.materialHandoverPoints, 0);
+    const dailyFields = {
+      attendanceOption: JSON.stringify({ inOption, outOption }), attendancePoints,
+      documentSubmissionOption: documentOption, documentSubmissionPoints: documentPoints,
+      materialHandoverOption: materialOption, materialHandoverPoints: materialPoints,
+    };
+    if (existing.length === 0) {
+      await transaction.employeePointAdjustment.create({ data: {
+        employeeId, updatedById: session.userId, createdAt: date, ...dailyFields,
+        reviewOption: "", reviewPoints: 0, teamworkOption: "", teamworkPoints: 0, totalDelta: dailyTotal,
+      } });
+    } else {
+      for (const [index, item] of existing.entries()) {
+        const oldDaily = item.attendancePoints + item.documentSubmissionPoints + item.materialHandoverPoints;
+        await transaction.employeePointAdjustment.update({ where: { id: item.id }, data: {
+          updatedById: session.userId,
+          ...(index === 0 ? dailyFields : {
+            attendanceOption: JSON.stringify({ inOption: "", outOption: "" }), attendancePoints: 0,
+            documentSubmissionOption: "", documentSubmissionPoints: 0,
+            materialHandoverOption: "", materialHandoverPoints: 0,
+          }),
+          totalDelta: item.totalDelta - oldDaily + (index === 0 ? dailyTotal : 0),
+        } });
+      }
+    }
+    await applyPointDelta(transaction, employeeId, dailyTotal - previousDailyTotal, date);
+  });
+  revalidatePath("/report");
+  revalidatePath("/dashboard");
+}
+
+export async function saveEmployeeDocketReviews(formData: FormData) {
+  const session = await getSession();
+  if (!session || !roleCanAssign(session.role)) redirect("/dashboard");
+  const employeeId = getRequiredField(formData, "employeeId");
+  const date = parseDate(getRequiredField(formData, "adjustmentDate"));
+  const range = getDateRange(date);
+  const entries = getPerformanceReviewEntries(formData);
+  await prisma.$transaction(async (transaction) => {
+    const assignments = await transaction.serviceAssignment.findMany({
+      where: { id: { in: entries.map((entry) => entry.assignmentId) }, employeeId,
+        assignedAt: { gte: range.startAt, lt: new Date(range.endAt) }, request: { deletedAt: null } },
+      select: { id: true, requestId: true },
+    });
+    if (assignments.length !== entries.length) throw new Error("The selected dockets are not assigned to this employee on this date.");
+    const existing = await transaction.employeePointAdjustment.findMany({
+      where: { employeeId, createdAt: { gte: range.startAt, lt: new Date(range.endAt) } },
+      orderBy: { createdAt: "desc" },
+    });
+    for (const entry of entries) {
+      const assignment = assignments.find((item) => item.id === entry.assignmentId)!;
+      const teamworkOption = encodeTaskReviewNote({ assignmentId: assignment.id, requestId: assignment.requestId, note: entry.reviewNote });
+      const saved = existing.find((item) => decodeTaskReviewNote(item.teamworkOption)?.assignmentId === assignment.id);
+      if (saved) {
+        await transaction.employeePointAdjustment.update({ where: { id: saved.id }, data: { teamworkOption, updatedById: session.userId } });
+      } else {
+        await transaction.employeePointAdjustment.create({ data: {
+          employeeId, updatedById: session.userId, createdAt: date, teamworkOption,
+          attendanceOption: JSON.stringify({ inOption: "", outOption: "" }), attendancePoints: 0,
+          reviewOption: "", reviewPoints: 0, documentSubmissionOption: "", documentSubmissionPoints: 0,
+          materialHandoverOption: "", materialHandoverPoints: 0, teamworkPoints: 0, totalDelta: 0,
+        } });
+      }
+    }
+  });
+  revalidatePath("/report");
+}
+
+function getPerformanceReviewEntries(formData: FormData): PerformanceReviewEntry[] {
+  const rawEntries = getRequiredField(formData, "entries");
+  let parsedEntries: unknown;
+
+  try {
+    parsedEntries = JSON.parse(rawEntries);
+  } catch {
+    throw new Error("Invalid docket reviews");
+  }
+
+  if (!Array.isArray(parsedEntries) || parsedEntries.length === 0 || parsedEntries.length > 100) {
+    throw new Error("Select at least one valid allotted docket");
+  }
+
+  const assignmentIds = new Set<string>();
+  return parsedEntries.map((entry) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error("Invalid docket review");
+    }
+
+    const assignmentId = "assignmentId" in entry && typeof entry.assignmentId === "string"
+      ? entry.assignmentId.trim()
+      : "";
+    const reviewNote = "reviewNote" in entry && typeof entry.reviewNote === "string"
+      ? entry.reviewNote.trim().slice(0, 1000)
+      : "";
+
+    if (!assignmentId || assignmentIds.has(assignmentId)) {
+      throw new Error("Invalid or duplicate allotted docket");
+    }
+
+    assignmentIds.add(assignmentId);
+    return { assignmentId, reviewNote };
+  });
+}
+
+export async function saveEmployeePerformanceTags(formData: FormData) {
+  const entries = getPerformanceReviewEntries(formData);
+
+  for (const [index, entry] of entries.entries()) {
+    const entryFormData = new FormData();
+    entryFormData.append("employeeId", getRequiredField(formData, "employeeId"));
+    entryFormData.append("assignmentId", entry.assignmentId);
+    entryFormData.append("adjustmentDate", getRequiredField(formData, "adjustmentDate"));
+    entryFormData.append("reviewNote", entry.reviewNote);
+
+    for (const field of [
+      "attendanceInOption",
+      "attendanceOutOption",
+      "reviewOption",
+      "documentSubmissionOption",
+      "materialHandoverOption",
+    ]) {
+      entryFormData.append(field, index === 0 ? getOptionalField(formData, field) : "");
+    }
+
+    await saveEmployeePerformanceTag(entryFormData);
+  }
+}

@@ -157,6 +157,7 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                   <tr>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Employee</th>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Tag</th>
+                    <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Review</th>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Last 7 Days</th>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Last 30 Days</th>
                     <th className="px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]">Last 90 Days</th>
@@ -180,6 +181,15 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
                       </td>
                       <td className="px-2.5 py-2.5 text-blue-900">
                         <EmployeePointsPopup
+                          employeeId={row.id}
+                          employeeName={row.name}
+                          currentPoints={row.monthlyPoints}
+                          pointAdjustments={row.pointAdjustments}
+                        />
+                      </td>
+                      <td className="px-2.5 py-2.5 text-blue-900">
+                        <EmployeePointsPopup
+                          mode="review"
                           employeeId={row.id}
                           employeeName={row.name}
                           currentPoints={row.monthlyPoints}
