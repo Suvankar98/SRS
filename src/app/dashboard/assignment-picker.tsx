@@ -26,11 +26,22 @@ type AssignmentPickerProps = {
   disabledMessage?: string;
 };
 
+function isSubmittedAssignment(assignment: AssignmentPickerAssignment) {
+  return Boolean(assignment.statusSubmittedAt || assignment.closedAt);
+}
+
 function getAssignedEmployeeIds(assignments: AssignmentPickerAssignment[] | undefined, defaultEmployeeId?: string | null) {
-  const selected = assignments?.map((assignment) => assignment.employeeId).filter(Boolean) ?? [];
+  const selected =
+    assignments
+      ?.filter((assignment) => !isSubmittedAssignment(assignment))
+      .map((assignment) => assignment.employeeId)
+      .filter(Boolean) ?? [];
 
   if (defaultEmployeeId) {
-    selected.push(defaultEmployeeId);
+    const defaultAssignment = assignments?.find((assignment) => assignment.employeeId === defaultEmployeeId);
+    if (!defaultAssignment || !isSubmittedAssignment(defaultAssignment)) {
+      selected.push(defaultEmployeeId);
+    }
   }
 
   return selected.filter((employeeId, index, array) => employeeId && array.indexOf(employeeId) === index);
@@ -41,25 +52,29 @@ function getAssignedEmployeeRows(
   employees: Array<{ id: string; name: string }>,
   defaultEmployeeId?: string | null,
 ) {
-  const byEmployeeId = new Map<string, { employeeId: string; name: string; isSubmitted: boolean }>();
+  const byEmployeeId = new Map<string, { employeeId: string; name: string }>();
+  const submittedEmployeeIds = new Set<string>();
 
   for (const assignment of assignments ?? []) {
     if (!assignment.employeeId) {
       continue;
     }
 
+    if (isSubmittedAssignment(assignment)) {
+      submittedEmployeeIds.add(assignment.employeeId);
+      continue;
+    }
+
     byEmployeeId.set(assignment.employeeId, {
       employeeId: assignment.employeeId,
       name: assignment.employee?.name ?? employees.find((employee) => employee.id === assignment.employeeId)?.name ?? "Employee",
-      isSubmitted: Boolean(assignment.statusSubmittedAt || assignment.closedAt),
     });
   }
 
-  if (defaultEmployeeId && !byEmployeeId.has(defaultEmployeeId)) {
+  if (defaultEmployeeId && !byEmployeeId.has(defaultEmployeeId) && !submittedEmployeeIds.has(defaultEmployeeId)) {
     byEmployeeId.set(defaultEmployeeId, {
       employeeId: defaultEmployeeId,
       name: employees.find((employee) => employee.id === defaultEmployeeId)?.name ?? "Employee",
-      isSubmitted: false,
     });
   }
 
@@ -175,9 +190,9 @@ export function AssignmentPicker({
                 <button
                   type="button"
                   onClick={() => removeAssignedEmployee(assignedEmployee.employeeId)}
-                  disabled={disabled || isSaving || assignedEmployee.isSubmitted}
+                  disabled={disabled || isSaving}
                   aria-label={`Remove ${assignedEmployee.name} allocation`}
-                  title={assignedEmployee.isSubmitted ? "Submitted allocation is kept for history" : "Remove employee"}
+                  title="Remove employee"
                   className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <MinusIcon />
