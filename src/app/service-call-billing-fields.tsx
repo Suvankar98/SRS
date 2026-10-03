@@ -9,36 +9,27 @@ const BILLING_TYPE_OPTIONS: Array<{ id: BillingType; label: string }> = [
   { id: "chargeable", label: "Chargeable" },
 ];
 
+function isServiceCallType(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "service" || normalized === "service visit";
+}
+
 export function ServiceCallBillingFields({ callTypeOptions }: { callTypeOptions: string[] }) {
   const [callType, setCallType] = React.useState("");
   const [serviceBillingType, setServiceBillingType] = React.useState<BillingType | "">("");
   const [chargeableAmount, setChargeableAmount] = React.useState("");
 
-  const isServiceCall = callType === "Service";
+  const isServiceCall = isServiceCallType(callType);
   const isChargeable = isServiceCall && serviceBillingType === "chargeable";
 
   const handleCallTypeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextCallType = event.target.value;
     setCallType(nextCallType);
 
-    if (nextCallType !== "Service") {
+    if (!isServiceCallType(nextCallType)) {
       setServiceBillingType("");
       setChargeableAmount("");
     }
-  };
-
-  const handleBillingTypeToggle = (billingType: BillingType) => {
-    setServiceBillingType((currentValue) => {
-      if (currentValue === billingType) {
-        return "";
-      }
-
-      if (billingType !== "chargeable") {
-        setChargeableAmount("");
-      }
-
-      return billingType;
-    });
   };
 
   return (
