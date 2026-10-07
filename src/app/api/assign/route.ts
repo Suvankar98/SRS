@@ -93,7 +93,13 @@ export async function POST(request: Request) {
     await prisma.$transaction(async (transaction) => {
       const existingAssignments = await transaction.serviceAssignment.findMany({
         where: { requestId: String(requestId) },
-        select: { employeeId: true, employee: { select: { name: true } } },
+        select: {
+          id: true,
+          employeeId: true,
+          statusSubmittedAt: true,
+          closedAt: true,
+          employee: { select: { name: true } },
+        },
       });
       const existingEmployeeIds = new Set(existingAssignments.map((assignment) => assignment.employeeId));
 
@@ -126,9 +132,34 @@ export async function POST(request: Request) {
         });
 
         const newEmployeeIds = validEmployeeIds.filter((employeeId) => !existingEmployeeIds.has(employeeId));
+        const reactivatedAssignments = existingAssignments.filter(
+          (assignment) =>
+            validEmployeeIds.includes(assignment.employeeId) &&
+            Boolean(assignment.statusSubmittedAt || assignment.closedAt),
+        );
+        const reactivatedEmployeeIds = reactivatedAssignments.map((assignment) => assignment.employeeId);
         const removedAssignments = existingAssignments.filter(
           (assignment) => !validEmployeeIds.includes(assignment.employeeId),
         );
+
+        if (reactivatedAssignments.length > 0) {
+          await transaction.serviceAssignment.updateMany({
+            where: { id: { in: reactivatedAssignments.map((assignment) => assignment.id) } },
+            data: {
+              assignedAt,
+              status: assignmentStatus,
+              statusReason: serviceRequest.statusReason,
+              statusSubmittedAt: null,
+              statusPointsDelta: null,
+              statusPointsApproval: "pending",
+              statusPointsReviewedAt: null,
+              statusPointsReviewedByName: null,
+              mediaUploadedAt: null,
+              closedByName: null,
+              closedAt: null,
+            },
+          });
+        }
 
         if (newEmployeeIds.length > 0) {
           await transaction.serviceAssignment.createMany({
@@ -143,9 +174,12 @@ export async function POST(request: Request) {
             })),
             skipDuplicates: true,
           });
+        }
 
+        const assignedActivityEmployeeIds = [...newEmployeeIds, ...reactivatedEmployeeIds];
+        if (assignedActivityEmployeeIds.length > 0) {
           await transaction.serviceRequestActivity.createMany({
-            data: newEmployeeIds.map((employeeId) => ({
+            data: assignedActivityEmployeeIds.map((employeeId) => ({
               requestId: String(requestId),
               type: "assigned",
               title: "Service Request Assigned",

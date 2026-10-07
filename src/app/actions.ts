@@ -2079,7 +2079,7 @@ export async function updateAssignmentStatusPointApproval(formData: FormData) {
         },
       });
 
-      if (assignment) {
+      if (assignment && assignment.assignedAt.getTime() <= submittedAt.getTime()) {
         await transaction.serviceAssignment.update({
           where: { id: assignment.id },
           data: {

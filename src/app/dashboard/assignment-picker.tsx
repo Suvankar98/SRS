@@ -48,37 +48,13 @@ function getAssignedEmployeeIds(assignments: AssignmentPickerAssignment[] | unde
 }
 
 function getAssignedEmployeeRows(
-  assignments: AssignmentPickerAssignment[] | undefined,
+  employeeIds: string[],
   employees: Array<{ id: string; name: string }>,
-  defaultEmployeeId?: string | null,
 ) {
-  const byEmployeeId = new Map<string, { employeeId: string; name: string }>();
-  const submittedEmployeeIds = new Set<string>();
-
-  for (const assignment of assignments ?? []) {
-    if (!assignment.employeeId) {
-      continue;
-    }
-
-    if (isSubmittedAssignment(assignment)) {
-      submittedEmployeeIds.add(assignment.employeeId);
-      continue;
-    }
-
-    byEmployeeId.set(assignment.employeeId, {
-      employeeId: assignment.employeeId,
-      name: assignment.employee?.name ?? employees.find((employee) => employee.id === assignment.employeeId)?.name ?? "Employee",
-    });
-  }
-
-  if (defaultEmployeeId && !byEmployeeId.has(defaultEmployeeId) && !submittedEmployeeIds.has(defaultEmployeeId)) {
-    byEmployeeId.set(defaultEmployeeId, {
-      employeeId: defaultEmployeeId,
-      name: employees.find((employee) => employee.id === defaultEmployeeId)?.name ?? "Employee",
-    });
-  }
-
-  return Array.from(byEmployeeId.values());
+  return employeeIds.map((employeeId) => ({
+    employeeId,
+    name: employees.find((employee) => employee.id === employeeId)?.name ?? "Employee",
+  }));
 }
 
 function getUniqueSelected(rows: string[]) {
@@ -95,22 +71,20 @@ export function AssignmentPicker({
   disabledMessage,
 }: AssignmentPickerProps) {
   const router = useRouter();
-  const assignedEmployeeIds = React.useMemo(
+  const assignedEmployeeIdsFromProps = React.useMemo(
     () => getAssignedEmployeeIds(assignments, defaultEmployeeId),
     [assignments, defaultEmployeeId],
   );
+  const [optimisticAssignedEmployeeIds, setOptimisticAssignedEmployeeIds] = React.useState<string[] | null>(null);
+  const assignedEmployeeIds = optimisticAssignedEmployeeIds ?? assignedEmployeeIdsFromProps;
   const assignedEmployeeRows = React.useMemo(
-    () => getAssignedEmployeeRows(assignments, employees, defaultEmployeeId),
-    [assignments, employees, defaultEmployeeId],
+    () => getAssignedEmployeeRows(assignedEmployeeIds, employees),
+    [assignedEmployeeIds, employees],
   );
   const [rows, setRows] = React.useState([""]);
   const [isSaving, setIsSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
   const [successMessage, setSuccessMessage] = React.useState("");
-
-  React.useEffect(() => {
-    setRows([""]);
-  }, [requestId, assignedEmployeeIds.join(",")]);
 
   const saveAssignments = async (selectedEmployeeIds: string[]) => {
     setIsSaving(true);
@@ -133,6 +107,7 @@ export function AssignmentPicker({
         return false;
       }
 
+      setOptimisticAssignedEmployeeIds(selectedEmployeeIds);
       setSuccessMessage(selectedEmployeeIds.length > 0 ? "Assigned successfully." : "Allocation removed successfully.");
       setRows([""]);
       router.refresh();

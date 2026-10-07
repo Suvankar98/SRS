@@ -536,7 +536,7 @@ export function DashboardRequestRow({
               </div>
             ) : null}
             <AssignmentPicker
-              key={`${request.id}:${request.assignedToId ?? "unassigned"}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`}
+              key={`${request.id}:${request.assignedToId ?? "unassigned"}:${request.assignments?.map((assignment) => `${assignment.employeeId}:${assignment.assignedAt ?? ""}:${assignment.statusSubmittedAt ?? ""}:${assignment.closedAt ?? ""}`).join(",") ?? ""}`}
               requestId={request.id}
               employees={employees}
               assignments={request.assignments}
