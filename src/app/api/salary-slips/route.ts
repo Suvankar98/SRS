@@ -6,11 +6,12 @@ import { APP_ROLES } from "@/lib/auth-constants";
 import { prisma } from "@/lib/prisma";
 import {
   ensureSalarySlipTable,
+  getSalarySlipMaxFileSize,
   isSalarySlipMimeType,
   isValidSalarySlipMonth,
   isValidSalarySlipYear,
-  SALARY_SLIP_MAX_FILE_SIZE,
   SALARY_SLIP_MAX_FILES_PER_UPLOAD,
+  SALARY_SLIP_MAX_TOTAL_UPLOAD_SIZE,
   type SalarySlipMetadataRow,
 } from "@/lib/salary-slips";
 
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
   }
 
   if (files.length === 0) {
-    return NextResponse.json({ error: "Choose one or more PNG or PDF files" }, { status: 400 });
+    return NextResponse.json({ error: "Choose one or more PNG, JPG, JPEG, or PDF files" }, { status: 400 });
   }
 
   if (files.length > SALARY_SLIP_MAX_FILES_PER_UPLOAD) {
@@ -98,11 +99,15 @@ export async function POST(request: Request) {
   }
 
   if (files.some((file) => !isSalarySlipMimeType(file.type))) {
-    return NextResponse.json({ error: "Only PNG and PDF files are allowed" }, { status: 400 });
+    return NextResponse.json({ error: "Only PNG, JPG, JPEG, and PDF files are allowed" }, { status: 400 });
   }
 
-  if (files.some((file) => file.size > SALARY_SLIP_MAX_FILE_SIZE)) {
-    return NextResponse.json({ error: "Each salary-slip file must be 10 MB or smaller" }, { status: 400 });
+  if (files.some((file) => file.size > getSalarySlipMaxFileSize(file.type))) {
+    return NextResponse.json({ error: "Images must be 10 MB or smaller, and PDFs must be 20 MB or smaller" }, { status: 400 });
+  }
+
+  if (files.reduce((totalSize, file) => totalSize + file.size, 0) > SALARY_SLIP_MAX_TOTAL_UPLOAD_SIZE) {
+    return NextResponse.json({ error: "The combined upload must be 100 MB or smaller" }, { status: 400 });
   }
 
   const [employee, actor] = await Promise.all([

@@ -1,7 +1,9 @@
 import { prisma } from "./prisma";
 
-export const SALARY_SLIP_MIME_TYPES = ["application/pdf", "image/png"] as const;
-export const SALARY_SLIP_MAX_FILE_SIZE = 10 * 1024 * 1024;
+export const SALARY_SLIP_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
+export const SALARY_SLIP_MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024;
+export const SALARY_SLIP_MAX_PDF_FILE_SIZE = 20 * 1024 * 1024;
+export const SALARY_SLIP_MAX_TOTAL_UPLOAD_SIZE = 100 * 1024 * 1024;
 export const SALARY_SLIP_MAX_FILES_PER_UPLOAD = 10;
 
 export type SalarySlipMetadataRow = {
@@ -51,4 +53,8 @@ export function isValidSalarySlipMonth(value: number) {
 
 export function isSalarySlipMimeType(value: string): value is (typeof SALARY_SLIP_MIME_TYPES)[number] {
   return SALARY_SLIP_MIME_TYPES.includes(value as (typeof SALARY_SLIP_MIME_TYPES)[number]);
+}
+
+export function getSalarySlipMaxFileSize(mimeType: string) {
+  return mimeType === "application/pdf" ? SALARY_SLIP_MAX_PDF_FILE_SIZE : SALARY_SLIP_MAX_IMAGE_FILE_SIZE;
 }
