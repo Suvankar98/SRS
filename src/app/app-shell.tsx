@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 
 import { logout } from "./actions";
+import { SalarySlipPopup, type SalarySlipEmployee } from "./salary-slip-popup";
 import { APP_ROLES, type AppRole } from "@/lib/auth-constants";
 
 type AppShellUser = {
+  id: string;
   name: string;
   role: AppRole;
 };
@@ -16,6 +18,7 @@ type AppShellUser = {
 type AppShellProps = {
   children: ReactNode;
   user: AppShellUser | null;
+  salarySlipEmployees: SalarySlipEmployee[];
 };
 
 type NavItem = {
@@ -31,7 +34,7 @@ type ManualItem = {
   description: string;
 };
 
-type IconName = "dashboard" | "call" | "gallery" | "report" | "history" | "admin" | "note" | "gear" | "folder" | "logout" | "menu" | "collapse";
+type IconName = "dashboard" | "call" | "gallery" | "report" | "history" | "admin" | "note" | "gear" | "folder" | "salary" | "logout" | "menu" | "collapse";
 
 const navItems: NavItem[] = [
   {
@@ -78,10 +81,11 @@ const techManualItems: ManualItem[] = [
   { href: "/tech-manual/automation", label: "Automation", description: "Automation product manuals and install notes" },
 ];
 
-export function AppShell({ children, user }: AppShellProps) {
+export function AppShell({ children, user, salarySlipEmployees }: AppShellProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isTechManualOpen, setIsTechManualOpen] = useState(false);
+  const [isSalarySlipOpen, setIsSalarySlipOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDetailsElement | null>(null);
 
   if (!user || pathname === "/") {
@@ -145,6 +149,13 @@ export function AppShell({ children, user }: AppShellProps) {
             {visibleItems.map((item) => (
               <SidebarLink key={item.href} item={item} active={isActivePath(pathname, item.href)} collapsed={isCollapsed} />
             ))}
+            <SidebarAction
+              label="Salary Slip"
+              icon="salary"
+              active={isSalarySlipOpen}
+              collapsed={isCollapsed}
+              onClick={() => setIsSalarySlipOpen(true)}
+            />
             {canSeeTechManual ? (
               <TechManualNav
                 activePath={pathname}
@@ -191,6 +202,15 @@ export function AppShell({ children, user }: AppShellProps) {
               {visibleItems.map((item) => (
                 <MobileSidebarLink key={item.href} item={item} active={isActivePath(pathname, item.href)} onNavigate={closeMobileMenu} />
               ))}
+              <MobileSidebarAction
+                label="Salary Slip"
+                icon="salary"
+                active={isSalarySlipOpen}
+                onClick={() => {
+                  closeMobileMenu();
+                  setIsSalarySlipOpen(true);
+                }}
+              />
               {canSeeTechManual ? (
                 <MobileTechManualNav
                   activePath={pathname}
@@ -217,9 +237,52 @@ export function AppShell({ children, user }: AppShellProps) {
       </header>
 
       {isTechManualOpen ? <TechManualPopup onClose={() => setIsTechManualOpen(false)} /> : null}
+      {isSalarySlipOpen ? (
+        <SalarySlipPopup
+          currentUserId={user.id}
+          employees={salarySlipEmployees}
+          role={user.role}
+          onClose={() => setIsSalarySlipOpen(false)}
+        />
+      ) : null}
 
       <div className="min-w-0 lg:col-start-2">{children}</div>
     </div>
+  );
+}
+
+function SidebarAction({
+  label,
+  icon,
+  active,
+  collapsed,
+  onClick,
+}: {
+  label: string;
+  icon: IconName;
+  active: boolean;
+  collapsed: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={`group grid w-full items-center gap-2 rounded-xl text-left text-xs font-semibold transition ${
+        collapsed ? "grid-cols-[2.25rem] justify-center px-0 py-1" : "grid-cols-[2.25rem_minmax(0,1fr)_0.75rem] px-2 py-1"
+      } ${active ? "bg-white text-[#0759b8] shadow-lg shadow-blue-950/10" : "text-white/92 hover:bg-white/14 hover:text-white"}`}
+    >
+      <span
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          active ? "bg-[#0759b8] text-white" : "bg-white/10 text-white group-hover:bg-white/18"
+        }`}
+      >
+        <AppIcon name={icon} />
+      </span>
+      <span className={`truncate ${collapsed ? "hidden" : ""}`}>{label}</span>
+      {active && !collapsed ? <span className="h-2 w-2 rounded-full bg-[#0759b8]" /> : null}
+    </button>
   );
 }
 
@@ -381,6 +444,33 @@ function formatRole(role: AppRole) {
   return role.toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
+function MobileSidebarAction({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: IconName;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold ${
+        active ? "bg-white text-[#0759b8]" : "text-white/90 hover:bg-white/14"
+      }`}
+    >
+      <span className="flex h-8 w-8 items-center justify-center">
+        <AppIcon name={icon} />
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function CloseIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -496,6 +586,17 @@ function AppIcon({ name }: { name: IconName }) {
       <svg {...common}>
         <path d="M4 6.5h6l1.6 2H20v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5Z" />
         <path d="M4 9h16" />
+      </svg>
+    );
+  }
+
+  if (name === "salary") {
+    return (
+      <svg {...common}>
+        <path d="M6 3h12v18l-2-1.25L14 21l-2-1.25L10 21l-2-1.25L6 21V3Z" />
+        <path d="M9 8h6" />
+        <path d="M9 12h6" />
+        <path d="M9 16h3" />
       </svg>
     );
   }

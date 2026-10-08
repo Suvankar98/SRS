@@ -4,6 +4,7 @@ import { Nunito_Sans } from "next/font/google";
 import { AppShell } from "./app-shell";
 import { ThemeToggle } from "./theme-toggle";
 import { getSession } from "@/lib/auth";
+import { APP_ROLES } from "@/lib/auth-constants";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import "./globals.css";
@@ -25,7 +26,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
-  const currentUserName = session ? await getCurrentUserName(session.userId) : null;
+  const [currentUserName, salarySlipEmployees] = session
+    ? await Promise.all([getCurrentUserName(session.userId), getSalarySlipEmployees(session.role, session.userId)])
+    : [null, []];
 
   return (
     <html lang="en" suppressHydrationWarning className={`h-full bg-[#eef6ff] antialiased ${nunitoSans.variable}`}>
@@ -52,9 +55,11 @@ export default async function RootLayout({
       >
         <ThemeToggle />
         <AppShell
+          salarySlipEmployees={salarySlipEmployees}
           user={
             session
               ? {
+                  id: session.userId,
                   name: currentUserName ?? "User",
                   role: session.role,
                 }
@@ -66,6 +71,31 @@ export default async function RootLayout({
       </body>
     </html>
   );
+}
+
+async function getSalarySlipEmployees(role: (typeof APP_ROLES)[keyof typeof APP_ROLES], userId: string) {
+  try {
+    return await prisma.user.findMany({
+      where: {
+        role: APP_ROLES.EMPLOYEE,
+        ...(role === APP_ROLES.EMPLOYEE ? { id: userId } : {}),
+      },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        department: true,
+      },
+    });
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      console.warn("Database is temporarily unreachable while loading salary slip employees.");
+      return [];
+    }
+
+    console.error("Failed to load salary slip employees");
+    return [];
+  }
 }
 
 async function getCurrentUserName(userId: string) {
