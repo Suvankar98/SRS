@@ -95,6 +95,7 @@ type DashboardServiceActivity = {
 type DashboardRequestRowProps = {
   request: DashboardRequestRowRequest;
   products: Array<{ id: string; name: string }>;
+  callTypeOptions: string[];
   employees: Array<{ id: string; name: string }>;
   canEditDocket: boolean;
   canAssign: boolean;
@@ -111,6 +112,7 @@ type DashboardRequestRowProps = {
 export function DashboardRequestRow({
   request,
   products,
+  callTypeOptions,
   employees,
   canEditDocket,
   canAssign,
@@ -449,6 +451,7 @@ export function DashboardRequestRow({
               canAssign={canAssign}
               employees={employees}
               products={products}
+              callTypeOptions={callTypeOptions}
               onReady={(open) => {
                 openModalRef.current = open;
               }}

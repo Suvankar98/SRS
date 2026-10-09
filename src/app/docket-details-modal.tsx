@@ -92,6 +92,7 @@ export function DocketDetailsModal({
   canAssign,
   employees,
   products,
+  callTypeOptions,
   renderTrigger,
   onReady,
 }: {
@@ -100,6 +101,7 @@ export function DocketDetailsModal({
   canAssign?: boolean;
   employees?: SimpleOption[];
   products: SimpleOption[];
+  callTypeOptions?: string[];
   renderTrigger?: (open: () => void) => React.ReactNode;
   onReady?: (open: () => void) => void;
 }) {
@@ -145,9 +147,10 @@ export function DocketDetailsModal({
 
     return [{ id: `current-${product}`, name: product }, ...products];
   }, [product, products]);
-  const callTypeOptions = request.callType && !CALL_TYPE_OPTIONS.includes(request.callType as (typeof CALL_TYPE_OPTIONS)[number])
-    ? [request.callType, ...CALL_TYPE_OPTIONS]
-    : [...CALL_TYPE_OPTIONS];
+  const availableCallTypeOptions = React.useMemo(() => {
+    const configuredOptions = callTypeOptions?.length ? callTypeOptions : [...CALL_TYPE_OPTIONS];
+    return Array.from(new Set([request.callType, ...configuredOptions].filter(Boolean)));
+  }, [callTypeOptions, request.callType]);
   const isServiceCall = callType === "Service";
   const isChargeable = isServiceCall && serviceBillingType === "chargeable";
 
@@ -413,7 +416,7 @@ export function DocketDetailsModal({
                 <GridField label="Call type">
                   {canEdit ? (
                     <select value={callType} onChange={(e) => handleCallTypeChange(e.target.value)} className={inputClassName}>
-                      {callTypeOptions.map((opt) => (
+                      {availableCallTypeOptions.map((opt) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>

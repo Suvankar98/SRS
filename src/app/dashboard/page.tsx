@@ -69,7 +69,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const canAssign = roleCanAssign(session.role);
   const canSeeDashboardImage = session.role === APP_ROLES.MANAGER || session.role === APP_ROLES.EMPLOYEE;
 
-  const [employees, databaseProducts, currentUser, employeePointAdjustments, reviewNoteAdjustments, dashboardLoginImage] = await Promise.all([
+  const [employees, databaseProducts, callTypes, currentUser, employeePointAdjustments, reviewNoteAdjustments, dashboardLoginImage] = await Promise.all([
     canAssign
       ? prisma.user.findMany({
           where: { role: APP_ROLES.EMPLOYEE },
@@ -78,6 +78,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         })
       : Promise.resolve([]),
     prisma.product.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.callType.findMany({ orderBy: { name: "asc" }, select: { name: true } }),
     prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, performancePoints: true } }),
     isEmployee
       ? prisma.employeePointAdjustment.findMany({
@@ -460,6 +461,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   key={requests.map((request) => `${request.id}:${request.dashboardOrder ?? ""}:${request.status ?? ""}:${request.assignedToId ?? ""}:${request.statusSubmittedAt ?? ""}:${request.lastAttemptByName ?? ""}:${request.lastAttemptAt ?? ""}:${request.mediaItems?.length ?? 0}:${request.assignments?.map((assignment) => assignment.employeeId).join(",") ?? ""}`).join("|")}
                   requests={requests}
                   products={products}
+                  callTypeOptions={callTypes.map((callType) => callType.name)}
                   employees={employees}
                   canEditDocket={canEditDocket}
                   canAssign={canAssign}

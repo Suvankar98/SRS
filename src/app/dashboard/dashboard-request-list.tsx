@@ -68,6 +68,7 @@ export type DashboardServiceActivity = {
 type DashboardRequestListProps = {
   requests: DashboardListRequest[];
   products: Array<{ id: string; name: string }>;
+  callTypeOptions: string[];
   employees: Array<{ id: string; name: string }>;
   canEditDocket: boolean;
   canAssign: boolean;
@@ -101,6 +102,7 @@ function saveStoredDashboardPageSize(storageKey: string, pageSize: number) {
 export function DashboardRequestList({
   requests,
   products,
+  callTypeOptions,
   employees,
   canEditDocket,
   canAssign,
@@ -375,6 +377,7 @@ export function DashboardRequestList({
                     canAssign={canAssign}
                     employees={employees}
                     products={products}
+                    callTypeOptions={callTypeOptions}
                     renderTrigger={(open) => (
                       <button
                         type="button"
@@ -533,6 +536,7 @@ export function DashboardRequestList({
                 key={request.id}
                 request={request}
                 products={products}
+                callTypeOptions={callTypeOptions}
                 employees={employees}
                 canEditDocket={canEditDocket}
                 canAssign={canAssign}
